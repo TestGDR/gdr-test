@@ -7,7 +7,7 @@ import { ACCESS_COOKIE, getClientIp, logAccess, type AccessEvent } from "@/lib/a
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { LEGAL_VERSION } from "@/lib/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireUser } from "@/lib/supabase/server";
 
 export type AuthState = { error?: string; message?: string };
 
@@ -134,6 +134,51 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   // Se la conferma email e' disattivata su Supabase, l'utente e' gia' loggato
   if (data.session) redirect("/personaggi");
   return { message: "Iscrizione completata! Controlla la tua email per confermare l'account." };
+}
+
+// Recupero password: accetta nome del personaggio o email. La risposta e' sempre la
+// stessa, per non rivelare quali account esistono.
+export async function requestPasswordReset(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const identifier = String(formData.get("identifier") ?? "").trim();
+  const done = {
+    message:
+      "Se l'account esiste, ti abbiamo inviato un'email con il link per reimpostare la password.",
+  };
+
+  const email = identifier.includes("@") ? identifier : await emailFromCharacterName(identifier);
+  if (!email) return done;
+
+  const supabase = await createClient();
+  const origin = (await headers()).get("origin");
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/reimposta-password`,
+  });
+  if (error?.status === 429) {
+    return { error: "Troppe richieste in poco tempo. Riprova tra qualche minuto." };
+  }
+  return done;
+}
+
+// Nuova password, dopo aver aperto il link ricevuto via email
+export async function updatePassword(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const { supabase } = await requireUser();
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { error: "La password deve avere almeno 8 caratteri." };
+  if (password !== formData.get("password_confirm")) {
+    return { error: "Le due password non coincidono." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    if (error.code === "same_password") {
+      return { error: "La nuova password deve essere diversa da quella attuale." };
+    }
+    return { error: error.message };
+  }
+  redirect("/mappa");
 }
 
 export async function logout() {

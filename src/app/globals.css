@@ -40,6 +40,11 @@ body {
   @apply w-full rounded-md border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted focus:border-accent focus:outline-none;
 }
 
+/* Barra in alto e footer: stesso stile */
+.bar {
+  @apply border-blood/60 bg-black/85 backdrop-blur-sm;
+}
+
 .panel {
   @apply rounded-lg border border-border bg-panel p-5;
 }

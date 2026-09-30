@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useRef, useState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { signup, type AuthState } from "@/app/login/actions";
+import { AtIcon, IconField, KeyIcon, UserIcon } from "@/components/auth/fields";
+import ModalButton, { ModalHeader } from "@/components/ui/ModalButton";
 import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal";
 
 type ConsentKey = "accept_disclaimer" | "accept_terms" | "accept_privacy";
@@ -20,19 +22,10 @@ export default function RegisterButton({
   className?: string;
   children?: ReactNode;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   return (
-    <>
-      <button type="button" className={className} onClick={() => dialogRef.current?.showModal()}>
-        {children}
-      </button>
-      <dialog
-        ref={dialogRef}
-        className="m-auto w-full max-w-lg rounded-lg border border-border bg-panel p-0 text-foreground shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm"
-      >
-        <RegisterForm onClose={() => dialogRef.current?.close()} />
-      </dialog>
-    </>
+    <ModalButton label={children} className={className}>
+      {(close) => <RegisterForm onClose={close} />}
+    </ModalButton>
   );
 }
 
@@ -94,15 +87,11 @@ function RegisterForm({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="max-h-[90vh] overflow-y-auto p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-bold tracking-widest uppercase">
-          {viewingDoc ? LEGAL_DOCS[viewingDoc].title : "Registrazione"}
-        </h2>
-        <button type="button" onClick={onClose} aria-label="Chiudi" className="text-muted hover:text-accent">
-          ✕
-        </button>
-      </div>
+    <div>
+      <ModalHeader
+        title={viewingDoc ? LEGAL_DOCS[viewingDoc].title : "Registrazione"}
+        onClose={onClose}
+      />
 
       {viewingDoc && (
         <div>
@@ -197,20 +186,6 @@ function RegisterForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function IconField({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
-  return (
-    <label className="flex overflow-hidden rounded-md border border-border bg-background focus-within:border-accent">
-      <span className="flex w-12 shrink-0 items-center justify-center border-r border-border text-muted">
-        {icon}
-      </span>
-      <span className="flex-1 px-3 py-1.5">
-        <span className="block text-xs text-muted">{label}</span>
-        {children}
-      </span>
-    </label>
-  );
-}
-
 function Consent({
   name,
   checked,
@@ -237,43 +212,5 @@ function Consent({
       />
       <span>{children}</span>
     </div>
-  );
-}
-
-const iconProps = {
-  width: 22,
-  height: 22,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
-
-function UserIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-    </svg>
-  );
-}
-
-function AtIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1" />
-    </svg>
-  );
-}
-
-function KeyIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="7.5" cy="15.5" r="4.5" />
-      <path d="M10.7 12.3 20 3M16 7l3 3M14 9l2 2" />
-    </svg>
   );
 }

@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
 import { Cinzel, Lora } from "next/font/google";
-import Link from "next/link";
 import Header from "@/components/Header";
-import { LEGAL_DOCS } from "@/lib/legal";
 import "./globals.css";
 
 const title = Cinzel({ variable: "--font-title", subsets: ["latin"] });
 const body = Lora({ variable: "--font-body", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GDR Play By Chat",
-  description: "Gioco di ruolo play by chat",
+  title: "Westeros GDR",
+  description: "Gioco di ruolo play by chat amatoriale ambientato a Westeros",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -19,15 +17,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <Header />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-        <footer className="border-t border-border py-4 text-center text-xs text-muted">
-          {Object.values(LEGAL_DOCS).map((doc, i) => (
-            <span key={doc.id}>
-              {i > 0 && " · "}
-              <Link href={`/legale/${doc.id}`} className="hover:text-accent">
-                {doc.title}
-              </Link>
-            </span>
-          ))}
+        <footer className="bar border-t px-4 py-4">
+          <p className="mx-auto max-w-3xl text-center text-xs leading-relaxed text-muted">
+            Westeros GDR è un progetto amatoriale di Gioco di Ruolo (GDR o RPG) non a scopo di
+            lucro. I temi trattati e le vicende sono solo di natura esclusivamente narrativa. Ogni
+            diritto originale appartiene a George R.R. Martin e non si intende violare in alcun modo
+            il possesso della proprietà intellettuale. Tutti gli avvenimenti presenti all&apos;interno
+            del gioco sono da prendere come una FanFiction.
+          </p>
         </footer>
       </body>
     </html>

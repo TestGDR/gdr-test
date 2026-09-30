@@ -21,32 +21,49 @@ export default async function Header() {
   }
 
   return (
-    <header className="border-b border-blood/60 bg-black/80 backdrop-blur-sm">
-      <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
-        <Link href="/" className="font-serif text-xl font-bold text-accent">
-          GDR Play By Chat
-        </Link>
-        {user && (
-          <>
-            <Link href="/mappa" className="hover:text-accent">
-              Mappa
-            </Link>
-            <Link href="/personaggi" className="hover:text-accent">
-              Personaggi
-            </Link>
-            {isAdmin && (
-              <Link href="/admin/accessi" className="hover:text-accent">
-                Accessi
+    <header className="bar border-b">
+      <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 text-sm">
+        {/* Sinistra: sezioni del gioco (solo da loggati) */}
+        <div className="flex items-center gap-4">
+          {user && (
+            <>
+              <Link href="/mappa" className="hover:text-accent">
+                Mappa
               </Link>
-            )}
-            <div className="ml-auto flex items-center gap-4">
-              <span className="text-sm text-muted">{username}</span>
+              <Link href="/personaggi" className="hover:text-accent">
+                Personaggi
+              </Link>
+              {isAdmin && (
+                <Link href="/admin/accessi" className="hover:text-accent">
+                  Accessi
+                </Link>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Centro: sempre visibile */}
+        <div className="flex items-center gap-3 font-serif tracking-wide">
+          <Link href="/manuale" className="hover:text-accent">
+            Manuale di Gioco
+          </Link>
+          <span className="text-blood">|</span>
+          <Link href="/ambientazione" className="hover:text-accent">
+            Ambientazione
+          </Link>
+        </div>
+
+        {/* Destra: utente */}
+        <div className="flex items-center justify-end gap-4">
+          {user && (
+            <>
+              <span className="text-muted">{username}</span>
               <form action={logout}>
-                <button className="text-sm hover:text-accent">Esci</button>
+                <button className="hover:text-accent">Esci</button>
               </form>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </nav>
     </header>
   );
