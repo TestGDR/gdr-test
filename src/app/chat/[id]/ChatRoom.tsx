@@ -232,7 +232,7 @@ function FormattedText({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className="font-semibold text-amber-200">
+          <span key={i} className="font-semibold text-orange-300">
             {part}
           </span>
         ) : (

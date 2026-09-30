@@ -21,7 +21,7 @@ export default async function Header() {
   }
 
   return (
-    <header className="border-b border-border bg-panel">
+    <header className="border-b border-blood/60 bg-black/80 backdrop-blur-sm">
       <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
         <Link href="/" className="font-serif text-xl font-bold text-accent">
           GDR Play By Chat

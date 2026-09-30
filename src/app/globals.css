@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
+/* Palette ispirata a Game of Thrones: nero, grigio ferro, rosso sangue, arancio brace */
 :root {
-  --background: #16130f;
-  --foreground: #ece3d0;
-  --panel: #221d17;
-  --border: #4a3d2c;
-  --accent: #c9a24d;
-  --muted: #a0927a;
+  --background: #0b0a0a;
+  --foreground: #e4dfdb;
+  --panel: #161313;
+  --border: #3a2c2a;
+  --accent: #e2622d; /* arancio brace: titoli, link, evidenze */
+  --blood: #a3201b; /* rosso sangue: pulsanti principali */
+  --muted: #968d89;
 }
 
 @theme inline {
@@ -15,6 +17,7 @@
   --color-panel: var(--panel);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-blood: var(--blood);
   --color-muted: var(--muted);
   --font-sans: var(--font-body);
   --font-serif: var(--font-title);
@@ -26,11 +29,11 @@ body {
 }
 
 .btn {
-  @apply inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-semibold text-background transition hover:brightness-110 disabled:opacity-50;
+  @apply inline-flex items-center justify-center rounded-md border border-red-900 bg-blood px-4 py-2 font-semibold text-white shadow-lg shadow-black/40 transition hover:bg-red-700 disabled:opacity-40;
 }
 
 .btn-ghost {
-  @apply inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-foreground transition hover:bg-panel;
+  @apply inline-flex items-center justify-center rounded-md border border-border bg-black/40 px-4 py-2 text-foreground transition hover:border-accent hover:text-accent;
 }
 
 .input {

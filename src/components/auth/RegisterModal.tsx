@@ -156,7 +156,7 @@ function RegisterForm({ onClose }: { onClose: () => void }) {
           />
         </IconField>
 
-        <div className="rounded-md bg-amber-300/90 p-3 text-sm text-stone-900">
+        <div className="rounded-md border border-accent/60 bg-accent/15 p-3 text-sm text-orange-100">
           Per andare avanti con la registrazione è necessario flaggare tutte le checkbox presenti.
           I link sono cliccabili, occorre aprirli e chiuderli per rendere attiva la selezione.
         </div>
