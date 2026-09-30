@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <defs>
+    <radialGradient id="land" cx="45%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#d9c9a0"/>
+      <stop offset="1" stop-color="#b59f72"/>
+    </radialGradient>
+    <pattern id="waves" width="40" height="20" patternUnits="userSpaceOnUse">
+      <path d="M0 10 Q10 4 20 10 T40 10" fill="none" stroke="#6f9bb0" stroke-width="1.5" opacity=".5"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="1000" fill="#4f7f96"/>
+  <rect width="1600" height="1000" fill="url(#waves)"/>
+  <!-- terraferma -->
+  <path d="M0 0 H1600 V520 C1450 560 1380 640 1300 760 C1220 880 1080 920 960 1000 H0 Z" fill="url(#land)"/>
+  <!-- fiume -->
+  <path d="M520 0 C560 150 480 260 560 360 C640 460 760 520 820 640 C880 760 1000 820 1120 860"
+        fill="none" stroke="#4f7f96" stroke-width="22" stroke-linecap="round"/>
+  <!-- bosco -->
+  <g fill="#5d7a4a" stroke="#3f5632" stroke-width="3">
+    <circle cx="200" cy="170" r="45"/><circle cx="270" cy="220" r="50"/><circle cx="330" cy="150" r="40"/>
+    <circle cx="160" cy="260" r="42"/><circle cx="250" cy="310" r="38"/><circle cx="360" cy="260" r="36"/>
+    <circle cx="110" cy="140" r="34"/><circle cx="410" cy="200" r="30"/>
+  </g>
+  <!-- colline -->
+  <g fill="#a38d61" stroke="#7d6a45" stroke-width="3">
+    <path d="M1020 250 L1150 110 L1280 250 Z"/><path d="M1180 250 L1300 140 L1420 250 Z"/>
+  </g>
+  <!-- torre in rovina -->
+  <g fill="#6b6257" stroke="#3e3730" stroke-width="3">
+    <rect x="1135" y="140" width="40" height="70"/><path d="M1135 140 l10 -15 l10 12 l10 -18 l10 21 Z"/>
+  </g>
+  <!-- mura della citta -->
+  <path d="M520 360 C620 320 860 330 940 420 C1010 500 960 640 850 680 C720 720 560 680 510 580 C470 500 460 400 520 360 Z"
+        fill="#cbb98f" stroke="#6b5a3a" stroke-width="8" stroke-dasharray="4 10"/>
+  <!-- edifici -->
+  <g fill="#8a5a3c" stroke="#4d321f" stroke-width="2">
+    <rect x="580" y="400" width="50" height="40"/><rect x="650" y="390" width="40" height="50"/>
+    <rect x="700" y="470" width="60" height="40"/><rect x="600" y="520" width="45" height="45"/>
+    <rect x="880" y="480" width="40" height="40"/><rect x="760" y="600" width="50" height="35"/>
+    <rect x="660" y="600" width="40" height="40"/>
+  </g>
+  <circle cx="832" cy="550" r="34" fill="#e2d5b0" stroke="#6b5a3a" stroke-width="4"/>
+  <circle cx="832" cy="550" r="10" fill="#4f7f96"/>
+  <!-- porto -->
+  <g fill="#7a5433" stroke="#4d321f" stroke-width="3">
+    <rect x="1180" y="690" width="160" height="16"/><rect x="1230" y="700" width="14" height="110"/>
+    <rect x="1290" y="700" width="14" height="80"/>
+  </g>
+  <path d="M1370 780 l40 0 l-10 20 l-30 0 Z M1390 780 v-40 l20 30 Z" fill="#eee" stroke="#333" stroke-width="2"/>
+  <!-- cornice -->
+  <rect x="12" y="12" width="1576" height="976" fill="none" stroke="#3b2b1a" stroke-width="10" rx="8"/>
+</svg>
