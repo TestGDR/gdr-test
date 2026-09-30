@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Cinzel, Lora } from "next/font/google";
+import Link from "next/link";
 import Header from "@/components/Header";
+import { LEGAL_DOCS } from "@/lib/legal";
 import "./globals.css";
 
 const title = Cinzel({ variable: "--font-title", subsets: ["latin"] });
@@ -17,6 +19,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <Header />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+        <footer className="border-t border-border py-4 text-center text-xs text-muted">
+          {Object.values(LEGAL_DOCS).map((doc, i) => (
+            <span key={doc.id}>
+              {i > 0 && " · "}
+              <Link href={`/legale/${doc.id}`} className="hover:text-accent">
+                {doc.title}
+              </Link>
+            </span>
+          ))}
+        </footer>
       </body>
     </html>
   );

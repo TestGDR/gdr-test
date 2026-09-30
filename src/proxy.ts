@@ -3,7 +3,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { ACCESS_COOKIE, getClientIp, logAccess } from "@/lib/access-log";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth"];
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/legale"];
 
 // Rinnova la sessione Supabase a ogni richiesta e protegge le pagine riservate
 export async function proxy(request: NextRequest, event: NextFetchEvent) {

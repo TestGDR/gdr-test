@@ -4,11 +4,15 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { ACCESS_COOKIE, getClientIp, logAccess, type AccessEvent } from "@/lib/access-log";
+import { createCaptcha, verifyCaptcha, type Captcha } from "@/lib/captcha";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
+import { LEGAL_VERSION } from "@/lib/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export type AuthState = { error?: string; message?: string };
+export type AuthState = { error?: string; message?: string; captcha?: Captcha };
+
+const LOGIN_ERROR = "Nome del personaggio o password non corretti.";
 
 // Registra IP e verifica VPN dopo aver risposto all'utente, senza rallentarlo
 async function recordAccess(userId: string, event: AccessEvent) {
@@ -26,26 +30,67 @@ async function recordAccess(userId: string, event: AccessEvent) {
   after(() => logAccess({ userId, event, ip, userAgent }));
 }
 
+// Dal nome del personaggio risale all'email dell'account (Supabase accede solo via email)
+async function emailFromCharacterName(rawName: string): Promise<string | null> {
+  const name = normalizeCharacterName(rawName);
+  // Il formato valido esclude anche % e _, che in ilike farebbero da jolly
+  if (validateCharacterName(name)) return null;
+
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data: character } = await admin
+    .from("characters")
+    .select("owner_id")
+    .ilike("name", name)
+    .maybeSingle();
+  if (!character) return null;
+
+  const { data } = await admin.auth.admin.getUserById(character.owner_id);
+  return data.user?.email ?? null;
+}
+
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const identifier = String(formData.get("identifier") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  // Si accede con il nome del personaggio; l'email resta accettata come alternativa
+  const email = identifier.includes("@") ? identifier : await emailFromCharacterName(identifier);
+  if (!email) return { error: LOGIN_ERROR };
+
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? ""),
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     if (error.code === "email_not_confirmed") {
       return { error: "Devi prima confermare l'email: controlla la tua casella di posta." };
     }
-    return { error: "Email o password non corretti." };
+    return { error: LOGIN_ERROR };
   }
   await recordAccess(data.user.id, "login");
   redirect("/mappa");
 }
 
+const REQUIRED_CONSENTS = [
+  "accept_disclaimer",
+  "accept_terms",
+  "accept_privacy",
+  "accept_adult",
+] as const;
+
 export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const characterName = normalizeCharacterName(String(formData.get("character_name") ?? ""));
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+
+  // I controlli nel browser si possono aggirare: si ripetono tutti qui
+  if (REQUIRED_CONSENTS.some((key) => formData.get(key) !== "on")) {
+    return { error: "Devi accettare tutte le condizioni per registrarti." };
+  }
+  if (
+    !verifyCaptcha(String(formData.get("captcha_token") ?? ""), String(formData.get("captcha") ?? ""))
+  ) {
+    return { error: "Risposta anti-robot errata o scaduta. Riprova.", captcha: createCaptcha() };
+  }
 
   const nameError = validateCharacterName(characterName);
   if (nameError) return { error: nameError };
@@ -69,7 +114,11 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     email,
     password,
     options: {
-      data: { character_name: characterName },
+      data: {
+        character_name: characterName,
+        terms_version: LEGAL_VERSION,
+        adult_declared: "true",
+      },
       emailRedirectTo: `${origin}/auth/callback`,
     },
   });
