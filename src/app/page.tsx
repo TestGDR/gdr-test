@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegisterButton from "@/components/auth/RegisterModal";
-import { createCaptcha } from "@/lib/captcha";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Home() {
@@ -22,7 +21,7 @@ export default async function Home() {
         <Link href="/login" className="btn-ghost">
           Accedi
         </Link>
-        <RegisterButton captcha={createCaptcha()} />
+        <RegisterButton />
       </div>
     </section>
   );

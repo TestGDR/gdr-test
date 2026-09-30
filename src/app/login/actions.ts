@@ -4,13 +4,12 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { ACCESS_COOKIE, getClientIp, logAccess, type AccessEvent } from "@/lib/access-log";
-import { createCaptcha, verifyCaptcha, type Captcha } from "@/lib/captcha";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { LEGAL_VERSION } from "@/lib/legal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export type AuthState = { error?: string; message?: string; captcha?: Captcha };
+export type AuthState = { error?: string; message?: string };
 
 const LOGIN_ERROR = "Nome del personaggio o password non corretti.";
 
@@ -85,11 +84,6 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   // I controlli nel browser si possono aggirare: si ripetono tutti qui
   if (REQUIRED_CONSENTS.some((key) => formData.get(key) !== "on")) {
     return { error: "Devi accettare tutte le condizioni per registrarti." };
-  }
-  if (
-    !verifyCaptcha(String(formData.get("captcha_token") ?? ""), String(formData.get("captcha") ?? ""))
-  ) {
-    return { error: "Risposta anti-robot errata o scaduta. Riprova.", captcha: createCaptcha() };
   }
 
   const nameError = validateCharacterName(characterName);

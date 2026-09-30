@@ -2,7 +2,6 @@
 
 import { useActionState, useRef, useState, type ReactNode } from "react";
 import { signup, type AuthState } from "@/app/login/actions";
-import type { Captcha } from "@/lib/captcha";
 import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal";
 
 type ConsentKey = "accept_disclaimer" | "accept_terms" | "accept_privacy";
@@ -15,11 +14,9 @@ const CONSENTS: { key: ConsentKey; docs: LegalDocId[] }[] = [
 ];
 
 export default function RegisterButton({
-  captcha,
   className = "btn",
   children = "Registrati",
 }: {
-  captcha: Captcha;
   className?: string;
   children?: ReactNode;
 }) {
@@ -33,18 +30,16 @@ export default function RegisterButton({
         ref={dialogRef}
         className="m-auto w-full max-w-lg rounded-lg border border-border bg-panel p-0 text-foreground shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm"
       >
-        <RegisterForm captcha={captcha} onClose={() => dialogRef.current?.close()} />
+        <RegisterForm onClose={() => dialogRef.current?.close()} />
       </dialog>
     </>
   );
 }
 
-function RegisterForm({ captcha: initialCaptcha, onClose }: { captcha: Captcha; onClose: () => void }) {
+function RegisterForm({ onClose }: { onClose: () => void }) {
   const [state, action, pending] = useActionState<AuthState, FormData>(signup, {});
-  const captcha = state.captcha ?? initialCaptcha;
 
   // Campi controllati: React svuota i campi non controllati dopo ogni invio
-  // (voluto solo per la risposta anti-robot, da reinserire a ogni tentativo)
   const [characterName, setCharacterName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -190,25 +185,6 @@ function RegisterForm({ captcha: initialCaptcha, onClose }: { captcha: Captcha; 
           >
             Dichiaro di avere almeno 18 anni compiuti
           </Consent>
-        </div>
-
-        <div className="rounded-md border border-border p-3">
-          <label className="block text-sm">
-            Non sono un robot — quanto fa{" "}
-            <strong className="text-accent">
-              {captcha.a} + {captcha.b}
-            </strong>
-            ?
-            <input
-              name="captcha"
-              inputMode="numeric"
-              required
-              placeholder="Risultato"
-              autoComplete="off"
-              className="input mt-2"
-            />
-          </label>
-          <input type="hidden" name="captcha_token" value={captcha.token} />
         </div>
 
         {state.error && <p className="text-sm text-red-400">{state.error}</p>}
