@@ -157,9 +157,8 @@ function RegisterForm({ onClose }: { onClose: () => void }) {
         </IconField>
 
         <div className="rounded-md bg-amber-300/90 p-3 text-sm text-stone-900">
-          Per flaggare i checkbox ed accettare la documentazione, dovrai prima aprirla e consultarla,
-          cliccando sui nomi riportati di fianco a ciascun checkbox. L&apos;ultimo checkbox sarà
-          flaggabile solo dopo aver accettato la documentazione integrale.
+          Per andare avanti con la registrazione è necessario flaggare tutte le checkbox presenti.
+          I link sono cliccabili, occorre aprirli e chiuderli per rendere attiva la selezione.
         </div>
 
         <div className="space-y-2 text-sm">
