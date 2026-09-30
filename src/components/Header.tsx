@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
+import GuideButton from "@/components/guide/GuideButton";
 
 export default async function Header() {
   const supabase = await createClient();
@@ -44,13 +45,9 @@ export default async function Header() {
 
         {/* Centro: sempre visibile */}
         <div className="flex items-center gap-3 font-serif tracking-wide">
-          <Link href="/manuale" className="hover:text-accent">
-            Manuale di Gioco
-          </Link>
+          <GuideButton book="manuale" label="Manuale di Gioco" />
           <span className="text-blood">|</span>
-          <Link href="/ambientazione" className="hover:text-accent">
-            Ambientazione
-          </Link>
+          <GuideButton book="ambientazione" label="Ambientazione" />
         </div>
 
         {/* Destra: utente */}

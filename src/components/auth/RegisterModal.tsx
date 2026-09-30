@@ -3,7 +3,7 @@
 import { useActionState, useState, type ReactNode } from "react";
 import { signup, type AuthState } from "@/app/login/actions";
 import { AtIcon, IconField, KeyIcon, UserIcon } from "@/components/auth/fields";
-import ModalButton, { ModalHeader } from "@/components/ui/ModalButton";
+import ModalButton from "@/components/ui/ModalButton";
 import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal";
 
 type ConsentKey = "accept_disclaimer" | "accept_terms" | "accept_privacy";
@@ -23,13 +23,13 @@ export default function RegisterButton({
   children?: ReactNode;
 }) {
   return (
-    <ModalButton label={children} className={className}>
-      {(close) => <RegisterForm onClose={close} />}
+    <ModalButton label={children} title="Registrazione" className={className}>
+      {() => <RegisterForm />}
     </ModalButton>
   );
 }
 
-function RegisterForm({ onClose }: { onClose: () => void }) {
+function RegisterForm() {
   const [state, action, pending] = useActionState<AuthState, FormData>(signup, {});
 
   // Campi controllati: React svuota i campi non controllati dopo ogni invio
@@ -88,13 +88,9 @@ function RegisterForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div>
-      <ModalHeader
-        title={viewingDoc ? LEGAL_DOCS[viewingDoc].title : "Registrazione"}
-        onClose={onClose}
-      />
-
       {viewingDoc && (
         <div>
+          <h3 className="mb-3 font-serif text-xl text-accent">{LEGAL_DOCS[viewingDoc].title}</h3>
           <div className="max-h-[60vh] overflow-y-auto rounded-md border border-border bg-background p-4 text-sm leading-relaxed">
             {LEGAL_DOCS[viewingDoc].body}
           </div>

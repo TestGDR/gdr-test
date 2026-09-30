@@ -13,6 +13,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             Il link è scaduto o non è valido. Richiedine uno nuovo.
           </p>
         )}
+        <h1 className="mb-4 font-serif text-2xl text-accent">Accedi</h1>
         <LoginPanel />
         <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted">
           Non hai ancora un personaggio?

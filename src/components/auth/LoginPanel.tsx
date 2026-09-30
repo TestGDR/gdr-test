@@ -3,26 +3,28 @@
 import { useActionState, useState } from "react";
 import { login, requestPasswordReset, type AuthState } from "@/app/login/actions";
 import { AtIcon, IconField, KeyIcon, UserIcon } from "@/components/auth/fields";
-import ModalButton, { ModalHeader } from "@/components/ui/ModalButton";
+import ModalButton from "@/components/ui/ModalButton";
 
 // Pulsante "Accedi" che apre la modale di accesso
 export function LoginButton({ className = "btn-ghost" }: { className?: string }) {
   return (
-    <ModalButton label="Accedi" className={className}>
-      {(close) => <LoginPanel onClose={close} />}
+    <ModalButton label="Accedi" title="Accedi" className={className}>
+      {() => <LoginPanel />}
     </ModalButton>
   );
 }
 
 // Accesso + recupero password (nella modale o nella pagina /login)
-export default function LoginPanel({ onClose }: { onClose?: () => void }) {
+export default function LoginPanel() {
   const [view, setView] = useState<"login" | "recupero">("login");
   // Condiviso tra le due schermate: se hai scritto il nome, resta anche nel recupero
   const [identifier, setIdentifier] = useState("");
 
   return (
     <div>
-      <ModalHeader title={view === "login" ? "Accedi" : "Recupero password"} onClose={onClose} />
+      {view === "recupero" && (
+        <h3 className="mb-3 font-serif text-xl text-accent">Recupero password</h3>
+      )}
       {view === "login" ? (
         <LoginView
           identifier={identifier}

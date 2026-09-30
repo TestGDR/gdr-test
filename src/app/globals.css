@@ -45,6 +45,51 @@ body {
   @apply border-blood/60 bg-black/85 backdrop-blur-sm;
 }
 
+/* Testi di Manuale e Ambientazione (Markdown) */
+.guide-content {
+  @apply leading-relaxed;
+}
+.guide-content h2 {
+  @apply mb-4 font-serif text-2xl font-bold text-foreground;
+}
+.guide-content h3 {
+  @apply mt-6 mb-2 font-serif text-lg text-accent;
+}
+.guide-content p {
+  @apply my-3;
+}
+.guide-content ul {
+  @apply my-3 list-disc pl-6;
+}
+.guide-content ol {
+  @apply my-3 list-decimal pl-6;
+}
+.guide-content strong {
+  @apply font-bold text-foreground;
+}
+.guide-content em {
+  @apply text-orange-200;
+}
+.guide-content a {
+  @apply text-accent underline;
+}
+/* Riquadro "Esempio" */
+.guide-content blockquote {
+  @apply my-4 rounded-r-md border-l-4 border-accent bg-accent/10 px-4 py-2;
+}
+.guide-content blockquote p {
+  @apply my-1;
+}
+.guide-content table {
+  @apply my-4 w-full border-collapse text-sm;
+}
+.guide-content th {
+  @apply border-b-2 border-blood/70 px-3 py-2 text-left font-bold;
+}
+.guide-content td {
+  @apply border-b border-border px-3 py-2 align-top;
+}
+
 .panel {
   @apply rounded-lg border border-border bg-panel p-5;
 }
