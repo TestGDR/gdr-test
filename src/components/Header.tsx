@@ -9,13 +9,15 @@ export default async function Header() {
   } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let isAdmin = false;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, role")
       .eq("id", user.id)
       .single();
     username = data?.username ?? null;
+    isAdmin = data?.role === "admin";
   }
 
   return (
@@ -32,6 +34,11 @@ export default async function Header() {
             <Link href="/personaggi" className="hover:text-accent">
               Personaggi
             </Link>
+            {isAdmin && (
+              <Link href="/admin/accessi" className="hover:text-accent">
+                Accessi
+              </Link>
+            )}
             <div className="ml-auto flex items-center gap-4">
               <span className="text-sm text-muted">{username}</span>
               <form action={logout}>

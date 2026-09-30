@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { requireUser } from "@/lib/supabase/server";
 
 export type CharacterState = { error?: string; ok?: boolean };
@@ -11,13 +12,12 @@ export async function createCharacter(
 ): Promise<CharacterState> {
   const { supabase, user } = await requireUser();
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = normalizeCharacterName(String(formData.get("name") ?? ""));
   const description = String(formData.get("description") ?? "").trim();
   const avatarUrl = String(formData.get("avatar_url") ?? "").trim() || null;
 
-  if (name.length < 2 || name.length > 40) {
-    return { error: "Il nome deve avere tra 2 e 40 caratteri." };
-  }
+  const nameError = validateCharacterName(name);
+  if (nameError) return { error: nameError };
 
   const { error } = await supabase.from("characters").insert({
     owner_id: user.id,

@@ -24,8 +24,18 @@ export default function AuthForm() {
       <form action={isLogin ? loginAction : signupAction} className="space-y-4">
         {!isLogin && (
           <label className="block">
-            <span className="mb-1 block text-sm text-muted">Nome utente</span>
-            <input name="username" required minLength={3} maxLength={30} className="input" />
+            <span className="mb-1 block text-sm text-muted">Nome del personaggio</span>
+            <input
+              name="character_name"
+              required
+              minLength={2}
+              maxLength={40}
+              autoComplete="off"
+              className="input"
+            />
+            <span className="mt-1 block text-xs text-muted">
+              Unico in tutto il gioco. Solo lettere, spazi, apostrofi e trattini.
+            </span>
           </label>
         )}
         <label className="block">
@@ -34,7 +44,14 @@ export default function AuthForm() {
         </label>
         <label className="block">
           <span className="mb-1 block text-sm text-muted">Password</span>
-          <input name="password" type="password" required minLength={6} className="input" />
+          <input
+            name="password"
+            type="password"
+            required
+            minLength={isLogin ? undefined : 8}
+            autoComplete={isLogin ? "current-password" : "new-password"}
+            className="input"
+          />
         </label>
 
         {state.error && <p className="text-sm text-red-400">{state.error}</p>}
