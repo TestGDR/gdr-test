@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { ACCESS_COOKIE, getClientIp, logAccess, type AccessEvent } from "@/lib/access-log";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { LEGAL_VERSION } from "@/lib/legal";
+import { sendWelcomeEmail } from "@/lib/mailer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -123,13 +124,19 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
       return { error: "Questo nome è già usato da un altro personaggio." };
     }
     if (error.code === "weak_password") return { error: "Password troppo debole." };
+    if (error.code === "user_already_exists" || error.code === "email_exists") {
+      return { error: "Esiste già un account con questa email. Usa \"Password dimenticata?\" se non ricordi la password." };
+    }
     return { error: error.message };
   }
 
   // Email gia' registrata: Supabase restituisce un utente fittizio senza identita'
   // (per non rivelare quali email esistono) e non crea nulla.
   const isNewUser = (data.user?.identities?.length ?? 0) > 0;
-  if (data.user && isNewUser) await recordAccess(data.user.id, "iscrizione");
+  if (data.user && isNewUser) {
+    await recordAccess(data.user.id, "iscrizione");
+    after(() => sendWelcomeEmail({ to: email, characterName, siteUrl: origin ?? "" }));
+  }
 
   // Se la conferma email e' disattivata su Supabase, l'utente e' gia' loggato
   if (data.session) redirect("/personaggi");
