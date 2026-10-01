@@ -1,6 +1,8 @@
 "use server";
 
+import { IMAGE_TYPES } from "@/lib/houses";
 import { getStaffContext } from "@/lib/staff";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type GuideResult = { error?: string; id?: string };
 type Book = "manuale" | "ambientazione";
@@ -113,6 +115,28 @@ export async function deletePage(id: string): Promise<GuideResult> {
   if (!ctx) return DENIED;
   const { error } = await ctx.supabase.from("guide_pages").delete().eq("id", id);
   return error ? { error: "Eliminazione non riuscita." } : {};
+}
+
+// ---------------------------------------------------------------------
+// Immagini inserite nel testo: caricate dal server nell'archivio "documentazione"
+// ---------------------------------------------------------------------
+const GUIDE_IMAGE_MAX = 2 * 1024 * 1024;
+
+export async function uploadGuideImage(form: FormData): Promise<{ url?: string; error?: string }> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const file = form.get("image");
+  if (!(file instanceof File) || file.size === 0) return { error: "Scegli un'immagine." };
+  if (!IMAGE_TYPES.includes(file.type)) return { error: "Formato non valido: usa PNG, JPG, WebP o GIF." };
+  if (file.size > GUIDE_IMAGE_MAX) return { error: "Immagine troppo grande (massimo 2 MB)." };
+
+  const admin = createAdminClient();
+  if (!admin) return { error: "Configurazione del server incompleta." };
+  const ext = file.type.split("/")[1].replace("jpeg", "jpg");
+  const path = `immagini/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("documentazione").upload(path, file, { contentType: file.type });
+  if (error) return { error: "Caricamento dell'immagine non riuscito." };
+  return { url: admin.storage.from("documentazione").getPublicUrl(path).data.publicUrl };
 }
 
 // ---------------------------------------------------------------------

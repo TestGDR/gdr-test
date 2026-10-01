@@ -2,9 +2,11 @@
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { uploadGuideImage } from "./actions";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
 export default function RichEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
@@ -19,6 +21,8 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
       TextStyle,
       Color,
       FontSize,
+      // Immagini: si ridimensionano trascinando l'angolo, mantenendo le proporzioni
+      Image.configure({ resize: { enabled: true, minWidth: 60, minHeight: 40, alwaysPreserveAspectRatio: true } }),
     ],
     content: value,
     immediatelyRender: false, // la pagina viene generata anche sul server
@@ -113,6 +117,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       {btn("1.", "Elenco numerato", editor.isActive("orderedList"), () => chain().toggleOrderedList().run())}
       {btn("❝", "Riquadro esempio / citazione", editor.isActive("blockquote"), () => chain().toggleBlockquote().run())}
       {btn("🔗", "Link", editor.isActive("link"), link)}
+      <ImageButton editor={editor} />
       {btn("―", "Linea separatrice", false, () => chain().setHorizontalRule().run())}
       <span className="mx-1 h-5 w-px bg-border" />
       {btn("↶", "Annulla", false, () => chain().undo().run())}
@@ -253,5 +258,92 @@ function FontSizeSelect({ editor }: { editor: Editor }) {
         </option>
       ))}
     </select>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Immagine: caricata dal computer oppure da un indirizzo web
+// ---------------------------------------------------------------------
+function ImageButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [alt, setAlt] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Il riquadro si chiude cliccando altrove
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  async function insert(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    let src = url.trim();
+    if (file) {
+      setBusy(true);
+      const form = new FormData();
+      form.set("image", file);
+      const res = await uploadGuideImage(form);
+      setBusy(false);
+      if (res.error || !res.url) return setError(res.error ?? "Caricamento non riuscito.");
+      src = res.url;
+    }
+    if (!src.toLowerCase().startsWith("https://")) return setError("Carica un file oppure incolla un indirizzo che inizia con https://");
+    editor.chain().focus().setImage({ src, alt: alt.trim() || undefined }).run();
+    setOpen(false);
+    setUrl("");
+    setAlt("");
+    setFile(null);
+  }
+
+  return (
+    <span ref={ref} className="relative">
+      <button
+        type="button"
+        title="Inserisci immagine"
+        aria-label="Inserisci immagine"
+        aria-expanded={open}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((v) => !v)}
+        className="h-8 min-w-8 rounded px-1.5 text-sm text-muted transition hover:bg-white/5 hover:text-foreground"
+      >
+        🖼
+      </button>
+      {open && (
+        <form
+          onSubmit={insert}
+          className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black"
+        >
+          <label className="block">
+            <span className="mb-1 block tracking-wider text-muted uppercase">Dal computer (max 2 MB)</span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="w-full text-muted file:mr-2 file:rounded file:border file:border-border file:bg-background file:px-2 file:py-1 file:text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block tracking-wider text-muted uppercase">Oppure indirizzo web</span>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} disabled={!!file} placeholder="https://..." className="input py-1 text-xs" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block tracking-wider text-muted uppercase">Descrizione (facoltativa)</span>
+            <input value={alt} onChange={(e) => setAlt(e.target.value)} maxLength={150} placeholder="Es. Mappa di Essos" className="input py-1 text-xs" />
+          </label>
+          {error && <p className="text-red-400">{error}</p>}
+          <button className="btn w-full py-1.5 text-xs" disabled={busy || (!file && !url.trim())}>
+            {busy ? "Caricamento..." : "Inserisci"}
+          </button>
+          <p className="text-[10px] leading-snug text-muted">Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine per ridimensionarla.</p>
+        </form>
+      )}
+    </span>
   );
 }
