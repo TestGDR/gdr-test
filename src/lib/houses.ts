@@ -68,6 +68,7 @@ export type HouseNpc = {
   house_id: string;
   name: string;
   title: string;
+  house_role_id: string | null; // ruolo di casata ricoperto (occupa un posto)
   description: string;
   image_url: string | null;
   sort_order: number;

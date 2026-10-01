@@ -235,9 +235,9 @@ function HouseEditor({
       </div>
       <div className="p-4">
         {tab === "dati" && <DataTab house={house} onCreated={onCreated} onDeleted={onDeleted} />}
-        {house && tab === "ruoli" && <RolesTab houseId={house.id} roles={roles} members={members} />}
+        {house && tab === "ruoli" && <RolesTab houseId={house.id} roles={roles} members={members} npcs={npcs} />}
         {house && tab === "albero" && <TreeTab houseId={house.id} family={family} relations={relations} allNpcs={allNpcs} allHouses={allHouses} />}
-        {house && tab === "png" && <NpcTab houseId={house.id} npcs={npcs} />}
+        {house && tab === "png" && <NpcTab houseId={house.id} npcs={npcs} roles={roles} />}
         {house && tab === "pg" && <MembersTab house={house} roles={roles} members={members} />}
       </div>
     </section>
@@ -332,7 +332,17 @@ function DataTab({
 // ---------------------------------------------------------------------
 // Ruoli e stipendi
 // ---------------------------------------------------------------------
-function RolesTab({ houseId, roles, members }: { houseId: string; roles: HouseRole[]; members: HouseMember[] }) {
+function RolesTab({
+  houseId,
+  roles,
+  members,
+  npcs,
+}: {
+  houseId: string;
+  roles: HouseRole[];
+  members: HouseMember[];
+  npcs: HouseNpc[];
+}) {
   const total = members.reduce((sum, m) => sum + (roles.find((r) => r.id === m.house_role_id)?.daily_salary ?? 0), 0);
   return (
     <div className="space-y-3">
@@ -347,9 +357,15 @@ function RolesTab({ houseId, roles, members }: { houseId: string; roles: HouseRo
         <span />
       </div>
       {roles.map((r) => (
-        <RoleRow key={r.id} houseId={houseId} role={r} holders={members.filter((m) => m.house_role_id === r.id).length} />
+        <RoleRow
+          key={r.id}
+          houseId={houseId}
+          role={r}
+          pgHolders={members.filter((m) => m.house_role_id === r.id).length}
+          npcHolders={npcs.filter((n) => n.house_role_id === r.id).length}
+        />
       ))}
-      <RoleRow key={`nuovo-${roles.length}`} houseId={houseId} role={null} holders={0} />
+      <RoleRow key={`nuovo-${roles.length}`} houseId={houseId} role={null} pgHolders={0} npcHolders={0} />
       <p className="pt-2 text-sm text-muted">
         Spesa giornaliera della casata per gli stipendi dei PG: <strong className="text-accent">{total} monete</strong>
       </p>
@@ -360,7 +376,19 @@ function RolesTab({ houseId, roles, members }: { houseId: string; roles: HouseRo
 const toInput = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 const fromInput = (v: string) => (v.trim() === "" ? null : Number(v));
 
-function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole | null; holders: number }) {
+function RoleRow({
+  houseId,
+  role,
+  pgHolders,
+  npcHolders,
+}: {
+  houseId: string;
+  role: HouseRole | null;
+  pgHolders: number;
+  npcHolders: number;
+}) {
+  const holders = pgHolders + npcHolders; // anche i PNG occupano un posto
+  const holdersLabel = `${pgHolders} PG · ${npcHolders} PNG`;
   const { run, pending, feedback } = useAction();
   const [form, setForm] = useState({
     name: role?.name ?? "",
@@ -396,7 +424,7 @@ function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole 
 
   function remove() {
     if (!role) return;
-    if (holders > 0 && !window.confirm(`${holders} PG hanno il ruolo "${role.name}": resteranno nella casata senza ruolo. Eliminare?`)) return;
+    if (holders > 0 && !window.confirm(`Il ruolo "${role.name}" è ricoperto (${holdersLabel}): resteranno nella casata senza ruolo. Eliminare?`)) return;
     run(() => deleteHouseRole(role.id), "Ruolo eliminato.");
   }
 
@@ -452,11 +480,11 @@ function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole 
         <p className="mt-2 text-xs text-muted">
           {role.signup_available && role.max_members !== null ? (
             <>
-              Posti occupati: <strong className={full ? "text-red-400" : "text-foreground"}>{holders}/{role.max_members}</strong>
+              Posti occupati: <strong className={full ? "text-red-400" : "text-foreground"}>{holders}/{role.max_members}</strong> ({holdersLabel})
               {full && " — completo, non compare più all'iscrizione"}
             </>
           ) : (
-            <>{holders} PG con questo ruolo · non disponibile all&apos;iscrizione</>
+            <>{holdersLabel} con questo ruolo · non disponibile all&apos;iscrizione</>
           )}
         </p>
       )}
@@ -1017,7 +1045,7 @@ function RelationsForm({
 // ---------------------------------------------------------------------
 // PNG di casata
 // ---------------------------------------------------------------------
-function NpcTab({ houseId, npcs }: { houseId: string; npcs: HouseNpc[] }) {
+function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; roles: HouseRole[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = npcs.find((n) => n.id === editingId) ?? null;
 
@@ -1036,7 +1064,11 @@ function NpcTab({ houseId, npcs }: { houseId: string; npcs: HouseNpc[] }) {
               <Sigil url={n.image_url} name={n.name} size="h-16 w-16" />
               <span className="min-w-0">
                 <span className="block truncate font-serif text-accent">{n.name}</span>
-                {n.title && <span className="block text-xs text-muted">{n.title}</span>}
+                {(n.house_role_id || n.title) && (
+                  <span className="block text-xs text-muted">
+                    {[roles.find((r) => r.id === n.house_role_id)?.name, n.title].filter(Boolean).join(" · ")}
+                  </span>
+                )}
                 <span className="mt-1 line-clamp-2 block text-xs">{n.description}</span>
               </span>
             </button>
@@ -1044,12 +1076,28 @@ function NpcTab({ houseId, npcs }: { houseId: string; npcs: HouseNpc[] }) {
         ))}
         {npcs.length === 0 && <li className="text-sm text-muted">Nessun PNG in questa casata.</li>}
       </ul>
-      <NpcForm key={editingId ?? `nuovo-${npcs.length}`} houseId={houseId} npc={editing} onDone={() => setEditingId(null)} />
+      <NpcForm
+        key={editingId ?? `nuovo-${npcs.length}`}
+        houseId={houseId}
+        npc={editing}
+        roles={roles}
+        onDone={() => setEditingId(null)}
+      />
     </div>
   );
 }
 
-function NpcForm({ houseId, npc, onDone }: { houseId: string; npc: HouseNpc | null; onDone: () => void }) {
+function NpcForm({
+  houseId,
+  npc,
+  roles,
+  onDone,
+}: {
+  houseId: string;
+  npc: HouseNpc | null;
+  roles: HouseRole[];
+  onDone: () => void;
+}) {
   const { run, pending, feedback } = useAction();
   const [preview, setPreview] = useState<string | null>(npc?.image_url ?? null);
 
@@ -1086,8 +1134,21 @@ function NpcForm({ houseId, npc, onDone }: { houseId: string; npc: HouseNpc | nu
       <Field label="Nome">
         <input name="name" defaultValue={npc?.name} maxLength={80} required className="input py-1.5" />
       </Field>
-      <Field label="Ruolo / titolo">
-        <input name="title" defaultValue={npc?.title} maxLength={80} placeholder="Es. Maestro della casata" className="input py-1.5" />
+      <Field label="Ruolo di casata">
+        <select name="house_role_id" defaultValue={npc?.house_role_id ?? ""} className="input py-1.5">
+          <option value="">— Nessun ruolo —</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name} ({r.daily_salary}/giorno)
+            </option>
+          ))}
+        </select>
+        {roles.length === 0 && (
+          <span className="mt-1 block text-xs text-muted">Crea i ruoli nella scheda &quot;Ruoli e stipendi&quot;.</span>
+        )}
+      </Field>
+      <Field label="Titolo (facoltativo)">
+        <input name="title" defaultValue={npc?.title} maxLength={80} placeholder="Es. Signore di Driftmark" className="input py-1.5" />
       </Field>
       <Field label="Descrizione">
         <textarea name="description" defaultValue={npc?.description} rows={4} maxLength={4000} className="input" />

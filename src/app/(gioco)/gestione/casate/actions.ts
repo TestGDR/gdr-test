@@ -335,6 +335,17 @@ export async function saveNpc(form: FormData): Promise<HouseResult> {
     description: text(form, "description", 4000),
   };
 
+  // Ruolo di casata: deve appartenere alla casata del PNG
+  const houseId = id
+    ? ((await ctx.supabase.from("house_npcs").select("house_id").eq("id", id).single()).data?.house_id as string | undefined)
+    : text(form, "house_id", 36);
+  const roleId = text(form, "house_role_id", 36) || null;
+  if (roleId) {
+    const { data: role } = await ctx.supabase.from("house_roles").select("house_id").eq("id", roleId).maybeSingle();
+    if (!role || role.house_id !== houseId) return { error: "Ruolo non valido per questa casata." };
+  }
+  row.house_role_id = roleId;
+
   const { data: current } = id
     ? await ctx.supabase.from("house_npcs").select("image_url").eq("id", id).single()
     : { data: null };
