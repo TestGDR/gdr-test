@@ -16,12 +16,13 @@ type Pg = {
 };
 type PlayableHouse = { id: string; name: string; sigil_url: string | null; motto: string };
 
-const TABS = [
-  { id: "pg", label: "Anagrafica giocatori" },
-  { id: "prestavolti", label: "Anagrafica prestavolti" },
-  { id: "casate", label: "Casate PG" },
+// Box della schermata iniziale: cliccandone uno il suo contenuto prende il posto dei box
+const BOXES = [
+  { id: "pg", label: "Anagrafe personaggi", icon: <AddressBookIcon />, color: "text-accent" },
+  { id: "prestavolti", label: "Anagrafe prestavolti", icon: <MasksIcon />, color: "text-amber-400" },
+  { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
 ] as const;
-type Tab = (typeof TABS)[number]["id"];
+type Section = (typeof BOXES)[number]["id"];
 
 // Pulsante della barra in alto: apre l'Utility giocatore
 export default function UtilityButton({ className, trigger }: { className: string; trigger: ReactNode }) {
@@ -36,7 +37,7 @@ export default function UtilityButton({ className, trigger }: { className: strin
 
 function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
   const supabase = useMemo(() => createClient(), []);
-  const [tab, setTab] = useState<Tab>("pg");
+  const [tab, setTab] = useState<Section | null>(null); // null = schermata dei box
   const [pgs, setPgs] = useState<Pg[] | null>(null);
   const [houses, setHouses] = useState<PlayableHouse[]>([]);
   const [query, setQuery] = useState("");
@@ -59,29 +60,41 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 pt-2">
-        <div role="tablist" className="flex gap-1 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-xs tracking-[0.12em] uppercase transition ${
-                tab === t.id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+      {tab === null ? (
+        // Schermata iniziale: i box
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
+          <h2 className="mb-8 text-center font-serif text-4xl tracking-[0.15em] text-accent uppercase">Utility</h2>
+          <ul className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {BOXES.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab(b.id);
+                    setQuery("");
+                  }}
+                  className="group flex h-36 w-full flex-col items-center justify-center gap-4 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
+                >
+                  <span className={`${b.color} transition group-hover:scale-110`}>{b.icon}</span>
+                  <span className="font-serif text-sm tracking-[0.2em] text-muted uppercase group-hover:text-foreground">{b.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
+      ) : (
+      <>
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
+        <button type="button" onClick={() => setTab(null)} className="text-sm text-muted hover:text-accent">
+          ← Utility
+        </button>
+        <h2 className="font-serif text-lg tracking-[0.15em] text-accent uppercase">{BOXES.find((b) => b.id === tab)?.label}</h2>
         {tab !== "casate" && (
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={tab === "pg" ? "Cerca un personaggio..." : "Cerca un prestavolto..."}
-            className="input my-1.5 ml-auto w-full py-1.5 text-sm sm:w-64"
+            className="input ml-auto w-full py-1.5 text-sm sm:w-64"
           />
         )}
       </div>
@@ -173,6 +186,9 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
         )}
       </div>
 
+      </>
+      )}
+
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
     </div>
   );
@@ -186,5 +202,34 @@ function Portrait({ pg }: { pg: Pg }) {
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-blood/60 bg-background font-serif text-accent">
       {pg.name[0]}
     </span>
+  );
+}
+
+// Icone dei box
+const big = { width: 44, height: 44, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true };
+
+function AddressBookIcon() {
+  return (
+    <svg {...big}>
+      <path d="M5 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm6 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm-5 11h10c0-2.8-2.2-4-5-4s-5 1.2-5 4Z" />
+      <path d="M20 5h1.5v3H20zM20 10.5h1.5v3H20zM20 16h1.5v3H20z" />
+    </svg>
+  );
+}
+
+function MasksIcon() {
+  return (
+    <svg {...big}>
+      <path d="M2 4c3 .9 6 .9 9 0v6.5c0 3-2 5.3-4.5 5.3S2 13.5 2 10.5V4Zm2.6 4.1c.8-.6 1.8-.6 2.6 0 .2-.6-.5-1.2-1.3-1.2s-1.5.6-1.3 1.2Zm.8 3.6c.8.8 2.4.8 3.2 0-.9-.4-2.3-.4-3.2 0Z" opacity=".75" />
+      <path d="M12 8c3 .9 6 .9 9 0v6.5c0 3-2 5.5-4.5 5.5S12 17.5 12 14.5V8Zm2.4 3.6c.2.6.8 1 1.4 1s1.2-.4 1.4-1c-.8-.3-2-.3-2.8 0Zm4.6 0c-.8-.3-2-.3-2.8 0 .2.6.8 1 1.4 1s1.2-.4 1.4-1Zm-4.2 4c.8 1.1 2.6 1.1 3.4 0-.9.3-2.5.3-3.4 0Z" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg {...big}>
+      <path d="M12 2 4 5v6.5c0 5 3.4 9 8 10.5 4.6-1.5 8-5.5 8-10.5V5l-8-3Zm0 4.2 4 2.8-1.5 4.8h-5L8 9l4-2.8Z" />
+    </svg>
   );
 }
