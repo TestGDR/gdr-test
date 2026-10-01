@@ -520,25 +520,36 @@ function TreeTab({ houseId, family, relations }: { houseId: string; family: Fami
   const tree = buildTree(family, relations);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_22rem]">
-      <div className="min-w-0 overflow-x-auto">
-        {tree.roots.length === 0 ? (
-          <p className="text-sm text-muted">L&apos;albero è vuoto: aggiungi il capostipite con il modulo.</p>
-        ) : (
-          <ul>
-            {tree.roots.map((r) => (
-              <TreeNode key={r.id} member={r} tree={tree} selectedId={editingId} onSelect={setEditingId} />
-            ))}
-          </ul>
-        )}
-        <p className="mt-3 text-xs text-muted">
-          Clicca un membro per modificarlo. † deceduto ·{" "}
-          {Object.values(RELATION_KINDS)
-            .map((k) => `${k.symbol} ${k.label.toLowerCase()}`)
-            .join(" · ")}
-        </p>
+    <div className="space-y-5">
+      {/* Legenda */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span className="rounded-full border border-border px-2 py-0.5">† deceduto</span>
+        {Object.values(RELATION_KINDS).map((k) => (
+          <span key={k.label} className="rounded-full border border-border px-2 py-0.5">
+            <span className="text-accent">{k.symbol}</span> {k.label.toLowerCase()}
+          </span>
+        ))}
+        <span className="ml-auto">Clicca una persona per modificarla</span>
       </div>
-      <div className="space-y-4">
+
+      {/* Albero dall'alto verso il basso; se e' largo si scorre di lato */}
+      <div className="overflow-x-auto rounded-md border border-border/60 bg-[radial-gradient(ellipse_at_top,#1d1512_0%,transparent_70%)] p-6">
+        {tree.roots.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">
+            L&apos;albero è vuoto: aggiungi il capostipite con il modulo qui sotto.
+          </p>
+        ) : (
+          <div className="ftree mx-auto w-max min-w-full">
+            <ul>
+              {tree.roots.map((r) => (
+                <TreeNode key={r.id} member={r} tree={tree} selectedId={editingId} onSelect={setEditingId} />
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <FamilyForm
           key={editingId ?? `nuovo-${family.length}`}
           houseId={houseId}
@@ -552,32 +563,44 @@ function TreeTab({ houseId, family, relations }: { houseId: string; family: Fami
   );
 }
 
+// Carta di una persona nell'albero
 function MemberBox({
   member,
   selected,
   onSelect,
   subtitle,
+  hideSpouse,
 }: {
   member: FamilyMember;
   selected: boolean;
   onSelect: (id: string) => void;
   subtitle?: string;
+  hideSpouse?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(member.id)}
-      className={`inline-flex flex-col rounded border px-3 py-1.5 text-left transition hover:border-accent ${
-        selected ? "border-accent bg-accent/10" : "border-border bg-background"
-      }`}
+      className={`group relative flex w-40 flex-col items-center rounded-lg border bg-gradient-to-b from-panel to-black px-3 pt-3 pb-2.5 text-center shadow-lg shadow-black/60 transition hover:-translate-y-0.5 hover:border-accent ${
+        selected ? "border-accent ring-2 ring-accent/40" : "border-border"
+      } ${member.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
     >
-      <span className={`font-serif ${member.deceased ? "text-muted" : "text-foreground"}`}>
-        {member.name}
-        {member.deceased && " †"}
+      <span
+        className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 font-serif text-lg ${
+          member.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
+        }`}
+      >
+        {member.name[0]}
       </span>
-      {member.spouse && <span className="text-xs text-muted">⚭ {member.spouse}</span>}
-      {subtitle && <span className="text-xs text-muted">{subtitle}</span>}
-      {member.note && <span className="text-xs text-muted italic">{member.note}</span>}
+      <span className="font-serif text-sm leading-tight text-foreground">
+        {member.name}
+        {member.deceased && <span className="ml-1 text-muted">†</span>}
+      </span>
+      {member.note && <span className="mt-0.5 text-[11px] leading-tight text-accent/80 italic">{member.note}</span>}
+      {member.spouse && !hideSpouse && (
+        <span className="mt-1 text-[10px] leading-tight text-muted">⚭ {member.spouse}</span>
+      )}
+      {subtitle && <span className="mt-1 text-[10px] leading-tight text-muted">{subtitle}</span>}
     </button>
   );
 }
@@ -598,37 +621,70 @@ function TreeNode({
   const relations = tree.relationsOf(member.id);
   // Rapporti con chi non e' disegnato accanto (es. due sposati con i genitori entrambi nell'albero)
   const otherRelations = relations.filter((x) => !beside.some((b) => b.id === x.other.id));
-  const parentsLabel = (c: FamilyMember) => {
-    const names = [c.parent_id, c.parent2_id].map((p) => (p ? tree.byId.get(p)?.name : undefined)).filter(Boolean);
+  // Il coniuge scritto a mano si nasconde se e' gia' collegato nell'albero
+  const linkedNames = relations.map((x) => x.other.name.toLowerCase());
+  const spouseIsLinked = linkedNames.includes(member.spouse.trim().toLowerCase());
+
+  // "figlio/a di ..." solo se i genitori non sono gia' la coppia disegnata sopra
+  const parentsLabel = () => {
+    const parents = [member.parent_id, member.parent2_id].filter((p): p is string => !!p);
+    if (parents.length < 2) return undefined;
+    const [first, second] = parents;
+    const shownTogether = tree.besideOf(first).some((b) => b.id === second) || tree.besideOf(second).some((b) => b.id === first);
+    if (shownTogether) return undefined;
+    const names = parents.map((p) => tree.byId.get(p)?.name).filter(Boolean);
     return names.length === 2 ? `figlio/a di ${names[0]} e ${names[1]}` : undefined;
   };
 
   return (
-    <li className="relative pl-5 before:absolute before:top-0 before:left-0 before:h-5 before:w-4 before:border-b before:border-l before:border-accent/40">
-      <div className="my-1 flex flex-wrap items-center gap-2">
-        <MemberBox member={member} selected={member.id === selectedId} onSelect={onSelect} subtitle={parentsLabel(member)} />
+    <li>
+      <div className="flex items-center">
+        <MemberBox
+          member={member}
+          selected={member.id === selectedId}
+          onSelect={onSelect}
+          subtitle={parentsLabel()}
+          hideSpouse={spouseIsLinked}
+        />
         {beside.map((b) => {
           const rel = relations.find((x) => x.other.id === b.id)?.relation;
+          const kind = rel ? RELATION_KINDS[rel.kind] : RELATION_KINDS.matrimonio;
           return (
-            <span key={b.id} className="flex items-center gap-2">
+            <div key={b.id} className="flex items-center">
+              {/* Legame della coppia */}
+              <span className="h-px w-4 bg-accent/60" />
               <span
-                className="text-lg text-accent"
-                title={rel ? RELATION_KINDS[rel.kind].label + (rel.note ? ` — ${rel.note}` : "") : ""}
+                title={kind.label + (rel?.note ? ` — ${rel.note}` : "")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/70 bg-black text-sm text-accent shadow-[0_0_10px_rgba(226,98,45,0.35)]"
               >
-                {rel ? RELATION_KINDS[rel.kind].symbol : "⚭"}
+                {kind.symbol}
               </span>
-              <MemberBox member={b} selected={b.id === selectedId} onSelect={onSelect} />
-            </span>
+              <span className="h-px w-4 bg-accent/60" />
+              <MemberBox
+                member={b}
+                selected={b.id === selectedId}
+                onSelect={onSelect}
+                hideSpouse={b.spouse.trim().toLowerCase() === member.name.toLowerCase()}
+              />
+            </div>
           );
         })}
-        {otherRelations.map(({ relation, other }) => (
-          <span key={relation.id} className="text-xs text-muted" title={relation.note}>
-            {RELATION_KINDS[relation.kind].symbol} {other.name}
-          </span>
-        ))}
       </div>
+      {otherRelations.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+          {otherRelations.map(({ relation, other }) => (
+            <span
+              key={relation.id}
+              title={RELATION_KINDS[relation.kind].label + (relation.note ? ` — ${relation.note}` : "")}
+              className="rounded-full border border-accent/40 bg-black/60 px-2 py-0.5 text-[10px] text-muted"
+            >
+              <span className="text-accent">{RELATION_KINDS[relation.kind].symbol}</span> {other.name}
+            </span>
+          ))}
+        </div>
+      )}
       {kids.length > 0 && (
-        <ul className="ml-3 border-l border-accent/40">
+        <ul>
           {kids.map((k) => (
             <TreeNode key={k.id} member={k} tree={tree} selectedId={selectedId} onSelect={onSelect} />
           ))}
