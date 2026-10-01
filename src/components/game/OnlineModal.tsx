@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Modal from "@/components/ui/Modal";
 import type { Availability } from "@/lib/availability";
 import AvailabilityDot from "./AvailabilityDot";
+import { SheetModal } from "@/components/scheda/SheetButton";
 import { Avatar, type Contact } from "./MessagesModal";
 import type { OnlinePlayer } from "./presence";
 
@@ -33,6 +34,7 @@ type Props = {
 export default function OnlineModal(props: Props) {
   const { open, onClose, online } = props;
   const [filter, setFilter] = useState<Filter>("tutti");
+  const [sheetId, setSheetId] = useState<string | null>(null); // scheda aperta cliccando un nome
 
   const visible = online.filter(
     (p) =>
@@ -108,6 +110,7 @@ export default function OnlineModal(props: Props) {
                     player={p}
                     isMe={p.userId === props.myUserId}
                     onMessageOff={props.onMessageOff}
+                    onOpenSheet={setSheetId}
                     onChangeAvailability={props.onChangeAvailability}
                   />
                 ))}
@@ -116,6 +119,7 @@ export default function OnlineModal(props: Props) {
           ))}
         </div>
       </div>
+      <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
     </Modal>
   );
 }
@@ -125,11 +129,13 @@ function PlayerRow({
   isMe,
   onMessageOff,
   onChangeAvailability,
+  onOpenSheet,
 }: {
   player: OnlinePlayer;
   isMe: boolean;
   onMessageOff: (to: Contact) => void;
   onChangeAvailability: (value: Availability) => void;
+  onOpenSheet: (characterId: string) => void;
 }) {
   return (
     <li
@@ -145,10 +151,17 @@ function PlayerRow({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-5 w-5 shrink-0 object-contain" />
           )}
-          <span className="truncate font-serif tracking-wide text-accent uppercase">
+          {/* Il nome apre la scheda del personaggio */}
+          <button
+            type="button"
+            onClick={() => player.characterId && onOpenSheet(player.characterId)}
+            disabled={!player.characterId}
+            title={player.characterId ? `Apri la scheda di ${player.name}` : undefined}
+            className="truncate text-left font-serif tracking-wide text-accent uppercase hover:underline disabled:no-underline"
+          >
             {player.name}
             {player.house && <span className="text-foreground/70"> {player.house}</span>}
-          </span>
+          </button>
           {!isMe && player.characterId && (
             <button
               type="button"
