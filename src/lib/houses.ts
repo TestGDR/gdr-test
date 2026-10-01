@@ -36,11 +36,30 @@ export type FamilyMember = {
   id: string;
   house_id: string;
   parent_id: string | null;
+  parent2_id: string | null; // secondo genitore (figlio di una coppia)
   name: string;
   spouse: string;
   note: string;
   deceased: boolean;
   sort_order: number;
+};
+
+export type RelationKind = "matrimonio" | "promessi" | "amanti" | "separati";
+
+export const RELATION_KINDS: Record<RelationKind, { label: string; symbol: string }> = {
+  matrimonio: { label: "Sposati", symbol: "⚭" },
+  promessi: { label: "Promessi sposi", symbol: "💍" },
+  amanti: { label: "Amanti", symbol: "♥" },
+  separati: { label: "Separati", symbol: "⚮" },
+};
+
+export type FamilyRelation = {
+  id: string;
+  house_id: string;
+  member_a: string;
+  member_b: string;
+  kind: RelationKind;
+  note: string;
 };
 
 export type HouseNpc = {

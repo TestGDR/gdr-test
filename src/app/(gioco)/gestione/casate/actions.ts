@@ -193,6 +193,7 @@ export async function saveFamilyMember(input: {
   id?: string;
   house_id: string;
   parent_id: string | null;
+  parent2_id: string | null;
   name: string;
   spouse: string;
   note: string;
@@ -204,21 +205,33 @@ export async function saveFamilyMember(input: {
   const name = input.name.trim().slice(0, 80);
   if (!name) return { error: "Scrivi il nome." };
 
-  // Il genitore deve essere della stessa casata e non un discendente (niente cicli)
-  if (input.parent_id) {
+  // I genitori devono essere della stessa casata, diversi tra loro e non discendenti
+  // del membro (niente cicli, seguendo entrambe le linee di discendenza)
+  const parents = [input.parent_id, input.parent2_id].filter((p): p is string => Boolean(p));
+  if (parents.length === 2 && parents[0] === parents[1]) return { error: "I due genitori devono essere persone diverse." };
+  if (parents.length) {
     const { data: tree } = await ctx.supabase
       .from("house_family_members")
-      .select("id, parent_id")
+      .select("id, parent_id, parent2_id")
       .eq("house_id", input.house_id);
-    const parentOf = new Map((tree ?? []).map((m) => [m.id, m.parent_id as string | null]));
-    if (!parentOf.has(input.parent_id)) return { error: "Genitore non valido." };
-    for (let p: string | null | undefined = input.parent_id; p; p = parentOf.get(p)) {
-      if (p === input.id) return { error: "Un membro non può discendere da se stesso." };
+    const byId = new Map((tree ?? []).map((m) => [m.id as string, m]));
+    for (const p of parents) if (!byId.has(p)) return { error: "Genitore non valido." };
+    const seen = new Set<string>();
+    const queue = [...parents];
+    while (queue.length) {
+      const current = queue.shift()!;
+      if (current === input.id) return { error: "Un membro non può discendere da se stesso." };
+      if (seen.has(current)) continue;
+      seen.add(current);
+      const m = byId.get(current);
+      if (m?.parent_id) queue.push(m.parent_id);
+      if (m?.parent2_id) queue.push(m.parent2_id);
     }
   }
 
   const row = {
-    parent_id: input.parent_id || null,
+    parent_id: parents[0] ?? null,
+    parent2_id: parents[1] ?? null,
     name,
     spouse: input.spouse.trim().slice(0, 80),
     note: input.note.trim().slice(0, 200),
@@ -240,6 +253,57 @@ export async function deleteFamilyMember(id: string): Promise<HouseResult> {
   if (!ctx) return DENIED;
   // I figli restano nell'albero, risalendo di un livello
   const { error } = await ctx.supabase.from("house_family_members").delete().eq("id", id);
+  if (error) return { error: "Eliminazione non riuscita." };
+  return done();
+}
+
+// ---------------------------------------------------------------------
+// Rapporti tra membri dell'albero (matrimoni, promesse, amanti, separati)
+// ---------------------------------------------------------------------
+const RELATION_KINDS = ["matrimonio", "promessi", "amanti", "separati"];
+
+export async function saveRelation(input: {
+  house_id: string;
+  member_a: string;
+  member_b: string;
+  kind: string;
+  note: string;
+}): Promise<HouseResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+
+  if (!RELATION_KINDS.includes(input.kind)) return { error: "Tipo di rapporto non valido." };
+  if (!input.member_a || !input.member_b) return { error: "Scegli le due persone." };
+  if (input.member_a === input.member_b) return { error: "Scegli due persone diverse." };
+  const { data: both } = await ctx.supabase
+    .from("house_family_members")
+    .select("id")
+    .eq("house_id", input.house_id)
+    .in("id", [input.member_a, input.member_b]);
+  if ((both ?? []).length !== 2) return { error: "Le due persone devono essere nell'albero di questa casata." };
+
+  const { data, error } = await ctx.supabase
+    .from("house_family_relations")
+    .insert({
+      house_id: input.house_id,
+      member_a: input.member_a,
+      member_b: input.member_b,
+      kind: input.kind,
+      note: input.note.trim().slice(0, 120),
+    })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { error: "Questo rapporto esiste già." };
+    return { error: "Salvataggio non riuscito." };
+  }
+  return done(data.id);
+}
+
+export async function deleteRelation(id: string): Promise<HouseResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const { error } = await ctx.supabase.from("house_family_relations").delete().eq("id", id);
   if (error) return { error: "Eliminazione non riuscita." };
   return done();
 }

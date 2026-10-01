@@ -3,7 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { AGE_MAX, AGE_MIN } from "@/lib/character-creation";
-import type { FamilyMember, House, HouseMember, HouseNpc, HouseRole, SignupRole } from "@/lib/houses";
+import {
+  RELATION_KINDS,
+  type FamilyMember,
+  type FamilyRelation,
+  type House,
+  type HouseMember,
+  type HouseNpc,
+  type HouseRole,
+  type RelationKind,
+  type SignupRole,
+} from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
 import {
   addMember,
@@ -11,11 +21,13 @@ import {
   deleteHouse,
   deleteHouseRole,
   deleteNpc,
+  deleteRelation,
   removeMember,
   saveFamilyMember,
   saveHouse,
   saveHouseRole,
   saveNpc,
+  saveRelation,
   setMemberRole,
   type HouseResult,
 } from "./actions";
@@ -24,6 +36,7 @@ type Data = {
   houses: House[];
   roles: HouseRole[];
   family: FamilyMember[];
+  relations: FamilyRelation[];
   npcs: HouseNpc[];
   members: HouseMember[];
 };
@@ -96,6 +109,7 @@ export default function HousesManager(data: Data) {
         house={house}
         roles={data.roles.filter((r) => r.house_id === house?.id)}
         family={data.family.filter((f) => f.house_id === house?.id)}
+        relations={data.relations.filter((r) => r.house_id === house?.id)}
         npcs={data.npcs.filter((n) => n.house_id === house?.id)}
         members={data.members.filter((m) => m.house_id === house?.id)}
         onCreated={(id) => setSelectedId(id)}
@@ -172,6 +186,7 @@ function HouseEditor({
   house,
   roles,
   family,
+  relations,
   npcs,
   members,
   onCreated,
@@ -180,6 +195,7 @@ function HouseEditor({
   house: House | null;
   roles: HouseRole[];
   family: FamilyMember[];
+  relations: FamilyRelation[];
   npcs: HouseNpc[];
   members: HouseMember[];
   onCreated: (id: string) => void;
@@ -214,7 +230,7 @@ function HouseEditor({
       <div className="p-4">
         {tab === "dati" && <DataTab house={house} onCreated={onCreated} onDeleted={onDeleted} />}
         {house && tab === "ruoli" && <RolesTab houseId={house.id} roles={roles} members={members} />}
-        {house && tab === "albero" && <TreeTab houseId={house.id} family={family} />}
+        {house && tab === "albero" && <TreeTab houseId={house.id} family={family} relations={relations} />}
         {house && tab === "png" && <NpcTab houseId={house.id} npcs={npcs} />}
         {house && tab === "pg" && <MembersTab house={house} roles={roles} members={members} />}
       </div>
@@ -453,78 +469,168 @@ function MiniField({ label, children }: { label: string; children: ReactNode }) 
 }
 
 // ---------------------------------------------------------------------
-// Albero genealogico
+// Albero genealogico: genitori (fino a due) e rapporti tra membri
 // ---------------------------------------------------------------------
-function TreeTab({ houseId, family }: { houseId: string; family: FamilyMember[] }) {
+type Tree = {
+  byId: Map<string, FamilyMember>;
+  roots: FamilyMember[];
+  childrenOf: (nodeId: string) => FamilyMember[];
+  besideOf: (nodeId: string) => FamilyMember[]; // coniugi mostrati accanto al membro
+  relationsOf: (memberId: string) => { relation: FamilyRelation; other: FamilyMember }[];
+};
+
+const byOrder = (a: FamilyMember, b: FamilyMember) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
+
+// Chi entra in famiglia per matrimonio (nessun genitore nell'albero) viene disegnato
+// accanto al coniuge invece che come capostipite separato; i figli stanno sotto la coppia.
+function buildTree(family: FamilyMember[], relations: FamilyRelation[]): Tree {
+  const byId = new Map(family.map((f) => [f.id, f]));
+  const parentsOf = (m: FamilyMember) => [m.parent_id, m.parent2_id].filter((p): p is string => !!p && byId.has(p));
+  const hasParents = (m: FamilyMember) => parentsOf(m).length > 0;
+  const relationsOf = (id: string) =>
+    relations
+      .filter((r) => r.member_a === id || r.member_b === id)
+      .map((r) => ({ relation: r, other: byId.get(r.member_a === id ? r.member_b : r.member_a) }))
+      .filter((x): x is { relation: FamilyRelation; other: FamilyMember } => !!x.other);
+
+  const host = new Map<string, string>(); // membro disegnato accanto -> membro principale
+  for (const m of [...family].sort(byOrder)) {
+    if (hasParents(m)) continue;
+    const partners = relationsOf(m.id).map((x) => x.other);
+    const withParents = partners.find(hasParents);
+    const earlierRootless = partners.find((p) => !hasParents(p) && !host.has(p.id) && byOrder(p, m) < 0);
+    const target = withParents ?? earlierRootless;
+    if (target) host.set(m.id, target.id);
+  }
+  const nodeOf = (id: string) => host.get(id) ?? id;
+
+  return {
+    byId,
+    roots: family.filter((m) => !host.has(m.id) && !hasParents(m)).sort(byOrder),
+    childrenOf: (nodeId) =>
+      family.filter((c) => !host.has(c.id) && hasParents(c) && nodeOf(parentsOf(c)[0]) === nodeId).sort(byOrder),
+    besideOf: (nodeId) => family.filter((m) => host.get(m.id) === nodeId).sort(byOrder),
+    relationsOf,
+  };
+}
+
+function TreeTab({ houseId, family, relations }: { houseId: string; family: FamilyMember[]; relations: FamilyRelation[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = family.find((f) => f.id === editingId) ?? null;
-
-  const roots = childrenOf(family, null);
+  const tree = buildTree(family, relations);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-5 xl:grid-cols-[1fr_22rem]">
       <div className="min-w-0 overflow-x-auto">
-        {roots.length === 0 ? (
+        {tree.roots.length === 0 ? (
           <p className="text-sm text-muted">L&apos;albero è vuoto: aggiungi il capostipite con il modulo.</p>
         ) : (
           <ul>
-            {roots.map((r) => (
-              <TreeNode key={r.id} member={r} family={family} selectedId={editingId} onSelect={setEditingId} />
+            {tree.roots.map((r) => (
+              <TreeNode key={r.id} member={r} tree={tree} selectedId={editingId} onSelect={setEditingId} />
             ))}
           </ul>
         )}
-        <p className="mt-3 text-xs text-muted">Clicca un membro per modificarlo. † = deceduto · ∞ = coniuge</p>
+        <p className="mt-3 text-xs text-muted">
+          Clicca un membro per modificarlo. † deceduto ·{" "}
+          {Object.values(RELATION_KINDS)
+            .map((k) => `${k.symbol} ${k.label.toLowerCase()}`)
+            .join(" · ")}
+        </p>
       </div>
-      <FamilyForm
-        key={editingId ?? `nuovo-${family.length}`}
-        houseId={houseId}
-        member={editing}
-        family={family}
-        onDone={() => setEditingId(null)}
-      />
+      <div className="space-y-4">
+        <FamilyForm
+          key={editingId ?? `nuovo-${family.length}`}
+          houseId={houseId}
+          member={editing}
+          family={family}
+          onDone={() => setEditingId(null)}
+        />
+        <RelationsForm houseId={houseId} family={family} relations={relations} />
+      </div>
     </div>
   );
 }
 
-// Figli diretti; con id = null i capostipiti (anche chi ha un genitore non piu' esistente)
-function childrenOf(family: FamilyMember[], id: string | null) {
-  return family.filter(
-    (f) => (f.parent_id ?? null) === id || (id === null && f.parent_id && !family.some((p) => p.id === f.parent_id)),
+function MemberBox({
+  member,
+  selected,
+  onSelect,
+  subtitle,
+}: {
+  member: FamilyMember;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  subtitle?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(member.id)}
+      className={`inline-flex flex-col rounded border px-3 py-1.5 text-left transition hover:border-accent ${
+        selected ? "border-accent bg-accent/10" : "border-border bg-background"
+      }`}
+    >
+      <span className={`font-serif ${member.deceased ? "text-muted" : "text-foreground"}`}>
+        {member.name}
+        {member.deceased && " †"}
+      </span>
+      {member.spouse && <span className="text-xs text-muted">⚭ {member.spouse}</span>}
+      {subtitle && <span className="text-xs text-muted">{subtitle}</span>}
+      {member.note && <span className="text-xs text-muted italic">{member.note}</span>}
+    </button>
   );
 }
 
 function TreeNode({
   member,
-  family,
+  tree,
   selectedId,
   onSelect,
 }: {
   member: FamilyMember;
-  family: FamilyMember[];
+  tree: Tree;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const kids = childrenOf(family, member.id);
+  const beside = tree.besideOf(member.id);
+  const kids = tree.childrenOf(member.id);
+  const relations = tree.relationsOf(member.id);
+  // Rapporti con chi non e' disegnato accanto (es. due sposati con i genitori entrambi nell'albero)
+  const otherRelations = relations.filter((x) => !beside.some((b) => b.id === x.other.id));
+  const parentsLabel = (c: FamilyMember) => {
+    const names = [c.parent_id, c.parent2_id].map((p) => (p ? tree.byId.get(p)?.name : undefined)).filter(Boolean);
+    return names.length === 2 ? `figlio/a di ${names[0]} e ${names[1]}` : undefined;
+  };
+
   return (
-    <li className="relative pl-5 before:absolute before:top-0 before:left-0 before:h-4 before:w-4 before:border-b before:border-l before:border-accent/40">
-      <button
-        type="button"
-        onClick={() => onSelect(member.id)}
-        className={`my-1 inline-flex flex-col rounded border px-3 py-1.5 text-left transition hover:border-accent ${
-          member.id === selectedId ? "border-accent bg-accent/10" : "border-border bg-background"
-        }`}
-      >
-        <span className={`font-serif ${member.deceased ? "text-muted" : "text-foreground"}`}>
-          {member.name}
-          {member.deceased && " †"}
-        </span>
-        {member.spouse && <span className="text-xs text-muted">∞ {member.spouse}</span>}
-        {member.note && <span className="text-xs text-muted italic">{member.note}</span>}
-      </button>
+    <li className="relative pl-5 before:absolute before:top-0 before:left-0 before:h-5 before:w-4 before:border-b before:border-l before:border-accent/40">
+      <div className="my-1 flex flex-wrap items-center gap-2">
+        <MemberBox member={member} selected={member.id === selectedId} onSelect={onSelect} subtitle={parentsLabel(member)} />
+        {beside.map((b) => {
+          const rel = relations.find((x) => x.other.id === b.id)?.relation;
+          return (
+            <span key={b.id} className="flex items-center gap-2">
+              <span
+                className="text-lg text-accent"
+                title={rel ? RELATION_KINDS[rel.kind].label + (rel.note ? ` — ${rel.note}` : "") : ""}
+              >
+                {rel ? RELATION_KINDS[rel.kind].symbol : "⚭"}
+              </span>
+              <MemberBox member={b} selected={b.id === selectedId} onSelect={onSelect} />
+            </span>
+          );
+        })}
+        {otherRelations.map(({ relation, other }) => (
+          <span key={relation.id} className="text-xs text-muted" title={relation.note}>
+            {RELATION_KINDS[relation.kind].symbol} {other.name}
+          </span>
+        ))}
+      </div>
       {kids.length > 0 && (
         <ul className="ml-3 border-l border-accent/40">
           {kids.map((k) => (
-            <TreeNode key={k.id} member={k} family={family} selectedId={selectedId} onSelect={onSelect} />
+            <TreeNode key={k.id} member={k} tree={tree} selectedId={selectedId} onSelect={onSelect} />
           ))}
         </ul>
       )}
@@ -547,19 +653,42 @@ function FamilyForm({
   const [form, setForm] = useState({
     name: member?.name ?? "",
     parent_id: member?.parent_id ?? "",
+    parent2_id: member?.parent2_id ?? "",
     spouse: member?.spouse ?? "",
     note: member?.note ?? "",
     deceased: member?.deceased ?? false,
   });
+  const others = family.filter((f) => f.id !== member?.id).sort(byOrder);
 
   function submit(e: FormEvent) {
     e.preventDefault();
     run(
-      () => saveFamilyMember({ id: member?.id, house_id: houseId, ...form, parent_id: form.parent_id || null }),
+      () =>
+        saveFamilyMember({
+          id: member?.id,
+          house_id: houseId,
+          name: form.name,
+          parent_id: form.parent_id || null,
+          parent2_id: form.parent2_id || null,
+          spouse: form.spouse,
+          note: form.note,
+          deceased: form.deceased,
+        }),
       member ? "Membro salvato." : "Membro aggiunto.",
       onDone,
     );
   }
+
+  const parentSelect = (key: "parent_id" | "parent2_id") => (
+    <select value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="input py-1.5">
+      <option value="">— Nessuno —</option>
+      {others.map((f) => (
+        <option key={f.id} value={f.id}>
+          {f.name}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     <form onSubmit={submit} className="h-fit space-y-3 rounded-md border border-border bg-background/60 p-3">
@@ -567,20 +696,18 @@ function FamilyForm({
       <Field label="Nome">
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} required className="input py-1.5" />
       </Field>
-      <Field label="Figlio/a di">
-        <select value={form.parent_id} onChange={(e) => setForm({ ...form, parent_id: e.target.value })} className="input py-1.5">
-          <option value="">— Capostipite (nessun genitore) —</option>
-          {family
-            .filter((f) => f.id !== member?.id)
-            .map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-        </select>
-      </Field>
-      <Field label="Coniuge">
-        <input value={form.spouse} onChange={(e) => setForm({ ...form, spouse: e.target.value })} maxLength={80} className="input py-1.5" />
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Genitore 1">{parentSelect("parent_id")}</Field>
+        <Field label="Genitore 2">{parentSelect("parent2_id")}</Field>
+      </div>
+      <Field label="Coniuge non presente nell'albero">
+        <input
+          value={form.spouse}
+          onChange={(e) => setForm({ ...form, spouse: e.target.value })}
+          maxLength={80}
+          placeholder="Solo se non è un membro dell'albero"
+          className="input py-1.5"
+        />
       </Field>
       <Field label="Nota">
         <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} maxLength={200} placeholder="Es. Lord di Grande Inverno" className="input py-1.5" />
@@ -598,7 +725,11 @@ function FamilyForm({
             <button
               type="button"
               disabled={pending}
-              onClick={() => window.confirm(`Togliere ${member.name} dall'albero? I suoi figli saliranno di un livello.`) && run(() => deleteFamilyMember(member.id), "Membro eliminato.", onDone)}
+              onClick={() =>
+                window.confirm(
+                  `Togliere ${member.name} dall'albero? I figli resteranno senza questo genitore e i suoi rapporti verranno cancellati.`,
+                ) && run(() => deleteFamilyMember(member.id), "Membro eliminato.", onDone)
+              }
               className="btn-ghost px-3 py-1.5 text-sm text-red-400"
             >
               Elimina
@@ -611,6 +742,94 @@ function FamilyForm({
       </div>
       {feedback}
     </form>
+  );
+}
+
+function RelationsForm({
+  houseId,
+  family,
+  relations,
+}: {
+  houseId: string;
+  family: FamilyMember[];
+  relations: FamilyRelation[];
+}) {
+  const { run, pending, feedback } = useAction();
+  const [form, setForm] = useState({ member_a: "", kind: "matrimonio" as RelationKind, member_b: "", note: "" });
+  const sorted = [...family].sort(byOrder);
+  const name = (id: string) => family.find((f) => f.id === id)?.name ?? "?";
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    run(
+      () => saveRelation({ house_id: houseId, ...form }),
+      "Rapporto aggiunto.",
+      () => setForm({ ...form, member_a: "", member_b: "", note: "" }),
+    );
+  }
+
+  const memberSelect = (key: "member_a" | "member_b") => (
+    <select value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required className="input py-1.5">
+      <option value="">— Scegli —</option>
+      {sorted.map((f) => (
+        <option key={f.id} value={f.id}>
+          {f.name}
+        </option>
+      ))}
+    </select>
+  );
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-background/60 p-3">
+      <h3 className="font-serif text-lg text-accent">Rapporti</h3>
+      {family.length < 2 ? (
+        <p className="text-sm text-muted">Servono almeno due membri nell&apos;albero.</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-2">
+          {memberSelect("member_a")}
+          <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as RelationKind })} className="input py-1.5">
+            {Object.entries(RELATION_KINDS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.symbol} {v.label}
+              </option>
+            ))}
+          </select>
+          {memberSelect("member_b")}
+          <input
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+            maxLength={120}
+            placeholder="Nota (facoltativa)"
+            className="input py-1.5"
+          />
+          <button className="btn w-full py-1.5 text-sm" disabled={pending}>
+            Aggiungi rapporto
+          </button>
+        </form>
+      )}
+      {feedback}
+      {relations.length > 0 && (
+        <ul className="space-y-1 border-t border-border pt-2 text-sm">
+          {relations.map((r) => (
+            <li key={r.id} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1">
+                {name(r.member_a)} <span className="text-accent">{RELATION_KINDS[r.kind].symbol}</span> {name(r.member_b)}
+                {r.note && <span className="block text-xs text-muted">{r.note}</span>}
+              </span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => deleteRelation(r.id), "Rapporto eliminato.")}
+                aria-label="Elimina rapporto"
+                className="text-muted hover:text-red-400"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
