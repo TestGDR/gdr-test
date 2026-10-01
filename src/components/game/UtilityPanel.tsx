@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import { createClient } from "@/lib/supabase/client";
@@ -30,14 +30,15 @@ export default function UtilityButton({ className, trigger }: { className: strin
   const [openCount, setOpenCount] = useState(0);
   return (
     <ModalButton label={trigger} title="Utility giocatore" size="xl" className={className} onOpen={() => setOpenCount((c) => c + 1)}>
-      {(close) => (openCount > 0 ? <UtilityPanel key={openCount} onNavigate={close} /> : null)}
+      {() => (openCount > 0 ? <UtilityPanel key={openCount} /> : null)}
     </ModalButton>
   );
 }
 
-function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
+function UtilityPanel() {
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<Section | null>(null); // null = schermata dei box
+  const [houseId, setHouseId] = useState<string | null>(null); // casata aperta dentro la modale
   const [pgs, setPgs] = useState<Pg[] | null>(null);
   const [houses, setHouses] = useState<PlayableHouse[]>([]);
   const [query, setQuery] = useState("");
@@ -53,6 +54,7 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
     });
   }, [supabase]);
 
+  const openHouse = houses.find((h) => h.id === houseId);
   const q = query.trim().toLowerCase();
   const fullName = (p: Pg) => (p.house ? `${p.name} ${p.house.name}` : p.name);
   const visiblePgs = (pgs ?? []).filter((p) => !q || fullName(p).toLowerCase().includes(q) || (p.face_claim ?? "").toLowerCase().includes(q));
@@ -71,6 +73,7 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
                   type="button"
                   onClick={() => {
                     setTab(b.id);
+                    setHouseId(null);
                     setQuery("");
                   }}
                   className="group flex h-36 w-full flex-col items-center justify-center gap-4 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
@@ -85,10 +88,18 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
       ) : (
       <>
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
-        <button type="button" onClick={() => setTab(null)} className="text-sm text-muted hover:text-accent">
-          ← Utility
-        </button>
-        <h2 className="font-serif text-lg tracking-[0.15em] text-accent uppercase">{BOXES.find((b) => b.id === tab)?.label}</h2>
+        {openHouse ? (
+          <button type="button" onClick={() => setHouseId(null)} className="text-sm text-muted hover:text-accent">
+            ← Casate PG
+          </button>
+        ) : (
+          <button type="button" onClick={() => setTab(null)} className="text-sm text-muted hover:text-accent">
+            ← Utility
+          </button>
+        )}
+        <h2 className="font-serif text-lg tracking-[0.15em] text-accent uppercase">
+          {openHouse ? `Casata ${openHouse.name}` : BOXES.find((b) => b.id === tab)?.label}
+        </h2>
         {tab !== "casate" && (
           <input
             value={query}
@@ -151,16 +162,19 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
         )}
 
         {/* Casate giocabili: aprono la pagina della casata */}
-        {pgs !== null && tab === "casate" && (
+        {/* Pagina della casata aperta, al posto dell'elenco */}
+        {tab === "casate" && houseId && <HouseLoader key={houseId} houseId={houseId} />}
+
+        {pgs !== null && tab === "casate" && !houseId && (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {houses.map((h) => {
               const members = (pgs ?? []).filter((p) => p.house?.name === h.name).length;
               return (
                 <li key={h.id}>
-                  <Link
-                    href={`/casata/${h.id}`}
-                    onClick={onNavigate}
-                    className="flex h-full items-center gap-3 rounded-md border border-border bg-black/40 p-3 transition hover:border-accent hover:bg-blood/10"
+                  <button
+                    type="button"
+                    onClick={() => setHouseId(h.id)}
+                    className="flex h-full w-full items-center gap-3 rounded-md border border-border bg-black/40 p-3 text-left transition hover:border-accent hover:bg-blood/10"
                   >
                     {h.sigil_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -177,7 +191,7 @@ function UtilityPanel({ onNavigate }: { onNavigate: () => void }) {
                         {members} PG
                       </span>
                     </span>
-                  </Link>
+                  </button>
                 </li>
               );
             })}
