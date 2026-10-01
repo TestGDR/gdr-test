@@ -194,6 +194,7 @@ export async function saveFamilyMember(input: {
   house_id: string;
   parent_id: string | null;
   parent2_id: string | null;
+  npc_id: string | null;
   name: string;
   spouse: string;
   note: string;
@@ -202,8 +203,14 @@ export async function saveFamilyMember(input: {
   const ctx = await authorized();
   if (!ctx) return DENIED;
 
-  const name = input.name.trim().slice(0, 80);
-  if (!name) return { error: "Scrivi il nome." };
+  // Collegato a un PNG (di qualunque casata): il nome e' quello del PNG
+  let name = input.name.trim().slice(0, 80);
+  if (input.npc_id) {
+    const { data: npc } = await ctx.supabase.from("house_npcs").select("name").eq("id", input.npc_id).maybeSingle();
+    if (!npc) return { error: "PNG non trovato." };
+    name = npc.name;
+  }
+  if (!name) return { error: "Scrivi il nome o scegli un PNG." };
 
   // I genitori devono essere della stessa casata, diversi tra loro e non discendenti
   // del membro (niente cicli, seguendo entrambe le linee di discendenza)
@@ -232,6 +239,7 @@ export async function saveFamilyMember(input: {
   const row = {
     parent_id: parents[0] ?? null,
     parent2_id: parents[1] ?? null,
+    npc_id: input.npc_id || null,
     name,
     spouse: input.spouse.trim().slice(0, 80),
     note: input.note.trim().slice(0, 200),
@@ -244,7 +252,10 @@ export async function saveFamilyMember(input: {
         .insert({ ...row, house_id: input.house_id })
         .select("id")
         .single();
-  if (error) return { error: "Salvataggio non riuscito." };
+  if (error) {
+    if (error.code === "23505") return { error: "Questo PNG è già in questo albero." };
+    return { error: "Salvataggio non riuscito." };
+  }
   return done(data.id);
 }
 
@@ -349,6 +360,8 @@ export async function saveNpc(form: FormData): Promise<HouseResult> {
     return { error: "Salvataggio non riuscito." };
   }
   if ("image_url" in row && current?.image_url) await removeImage(current.image_url);
+  // Il nome negli alberi genealogici segue quello del PNG
+  if (id) await ctx.supabase.from("house_family_members").update({ name }).eq("npc_id", id);
   return done(data.id);
 }
 

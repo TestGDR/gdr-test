@@ -111,6 +111,8 @@ export default function HousesManager(data: Data) {
         family={data.family.filter((f) => f.house_id === house?.id)}
         relations={data.relations.filter((r) => r.house_id === house?.id)}
         npcs={data.npcs.filter((n) => n.house_id === house?.id)}
+        allNpcs={data.npcs}
+        allHouses={data.houses}
         members={data.members.filter((m) => m.house_id === house?.id)}
         onCreated={(id) => setSelectedId(id)}
         onDeleted={() => setSelectedId(data.houses.find((h) => h.id !== selectedId)?.id ?? NEW)}
@@ -188,6 +190,8 @@ function HouseEditor({
   family,
   relations,
   npcs,
+  allNpcs,
+  allHouses,
   members,
   onCreated,
   onDeleted,
@@ -196,6 +200,8 @@ function HouseEditor({
   roles: HouseRole[];
   family: FamilyMember[];
   relations: FamilyRelation[];
+  allNpcs: HouseNpc[];
+  allHouses: House[];
   npcs: HouseNpc[];
   members: HouseMember[];
   onCreated: (id: string) => void;
@@ -230,7 +236,7 @@ function HouseEditor({
       <div className="p-4">
         {tab === "dati" && <DataTab house={house} onCreated={onCreated} onDeleted={onDeleted} />}
         {house && tab === "ruoli" && <RolesTab houseId={house.id} roles={roles} members={members} />}
-        {house && tab === "albero" && <TreeTab houseId={house.id} family={family} relations={relations} />}
+        {house && tab === "albero" && <TreeTab houseId={house.id} family={family} relations={relations} allNpcs={allNpcs} allHouses={allHouses} />}
         {house && tab === "png" && <NpcTab houseId={house.id} npcs={npcs} />}
         {house && tab === "pg" && <MembersTab house={house} roles={roles} members={members} />}
       </div>
@@ -477,14 +483,26 @@ type Tree = {
   childrenOf: (nodeId: string) => FamilyMember[];
   besideOf: (nodeId: string) => FamilyMember[]; // coniugi mostrati accanto al membro
   relationsOf: (memberId: string) => { relation: FamilyRelation; other: FamilyMember }[];
+  linkOf: (member: FamilyMember) => MemberLink; // PNG collegato e sua casata
 };
+
+// Per la carta: ritratto del PNG collegato e casata di provenienza se diversa
+type MemberLink = { image: string | null; externalHouse: House | null };
 
 const byOrder = (a: FamilyMember, b: FamilyMember) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
 
 // Chi entra in famiglia per matrimonio (nessun genitore nell'albero) viene disegnato
 // accanto al coniuge invece che come capostipite separato; i figli stanno sotto la coppia.
-function buildTree(family: FamilyMember[], relations: FamilyRelation[]): Tree {
+function buildTree(
+  family: FamilyMember[],
+  relations: FamilyRelation[],
+  npcs: HouseNpc[],
+  houses: House[],
+  houseId: string,
+): Tree {
   const byId = new Map(family.map((f) => [f.id, f]));
+  const npcById = new Map(npcs.map((n) => [n.id, n]));
+  const houseById = new Map(houses.map((h) => [h.id, h]));
   const parentsOf = (m: FamilyMember) => [m.parent_id, m.parent2_id].filter((p): p is string => !!p && byId.has(p));
   const hasParents = (m: FamilyMember) => parentsOf(m).length > 0;
   const relationsOf = (id: string) =>
@@ -511,13 +529,30 @@ function buildTree(family: FamilyMember[], relations: FamilyRelation[]): Tree {
       family.filter((c) => !host.has(c.id) && hasParents(c) && nodeOf(parentsOf(c)[0]) === nodeId).sort(byOrder),
     besideOf: (nodeId) => family.filter((m) => host.get(m.id) === nodeId).sort(byOrder),
     relationsOf,
+    linkOf: (m) => {
+      const npc = m.npc_id ? npcById.get(m.npc_id) : undefined;
+      const external = npc && npc.house_id !== houseId ? (houseById.get(npc.house_id) ?? null) : null;
+      return { image: npc?.image_url ?? null, externalHouse: external };
+    },
   };
 }
 
-function TreeTab({ houseId, family, relations }: { houseId: string; family: FamilyMember[]; relations: FamilyRelation[] }) {
+function TreeTab({
+  houseId,
+  family,
+  relations,
+  allNpcs,
+  allHouses,
+}: {
+  houseId: string;
+  family: FamilyMember[];
+  relations: FamilyRelation[];
+  allNpcs: HouseNpc[];
+  allHouses: House[];
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = family.find((f) => f.id === editingId) ?? null;
-  const tree = buildTree(family, relations);
+  const tree = buildTree(family, relations, allNpcs, allHouses, houseId);
 
   return (
     <div className="space-y-5">
@@ -529,6 +564,7 @@ function TreeTab({ houseId, family, relations }: { houseId: string; family: Fami
             <span className="text-accent">{k.symbol}</span> {k.label.toLowerCase()}
           </span>
         ))}
+        <span className="rounded-full border border-sky-700/60 px-2 py-0.5">bordo azzurro = PNG di un&apos;altra casata</span>
         <span className="ml-auto">Clicca una persona per modificarla</span>
       </div>
 
@@ -555,6 +591,8 @@ function TreeTab({ houseId, family, relations }: { houseId: string; family: Fami
           houseId={houseId}
           member={editing}
           family={family}
+          allNpcs={allNpcs}
+          allHouses={allHouses}
           onDone={() => setEditingId(null)}
         />
         <RelationsForm houseId={houseId} family={family} relations={relations} />
@@ -566,12 +604,14 @@ function TreeTab({ houseId, family, relations }: { houseId: string; family: Fami
 // Carta di una persona nell'albero
 function MemberBox({
   member,
+  link,
   selected,
   onSelect,
   subtitle,
   hideSpouse,
 }: {
   member: FamilyMember;
+  link: MemberLink;
   selected: boolean;
   onSelect: (id: string) => void;
   subtitle?: string;
@@ -582,16 +622,36 @@ function MemberBox({
       type="button"
       onClick={() => onSelect(member.id)}
       className={`group relative flex w-40 flex-col items-center rounded-lg border bg-gradient-to-b from-panel to-black px-3 pt-3 pb-2.5 text-center shadow-lg shadow-black/60 transition hover:-translate-y-0.5 hover:border-accent ${
-        selected ? "border-accent ring-2 ring-accent/40" : "border-border"
+        selected ? "border-accent ring-2 ring-accent/40" : link.externalHouse ? "border-sky-700/70" : "border-border"
       } ${member.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
     >
-      <span
-        className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 font-serif text-lg ${
-          member.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
-        }`}
-      >
-        {member.name[0]}
-      </span>
+      {/* Ritratto del PNG collegato, altrimenti l'iniziale */}
+      {link.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={link.image}
+          alt=""
+          className={`mb-1.5 h-12 w-12 rounded-full border-2 object-cover ${member.deceased ? "border-muted/50" : "border-accent/70"}`}
+        />
+      ) : (
+        <span
+          className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 font-serif text-lg ${
+            member.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
+          }`}
+        >
+          {member.name[0]}
+        </span>
+      )}
+      {/* PNG di un'altra casata: stemma e nome della casata di provenienza */}
+      {link.externalHouse && (
+        <span className="absolute -top-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sky-700/70 bg-black px-2 py-0.5 text-[10px] whitespace-nowrap text-sky-200">
+          {link.externalHouse.sigil_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={link.externalHouse.sigil_url} alt="" className="h-3.5 w-3.5 object-contain" />
+          )}
+          {link.externalHouse.name}
+        </span>
+      )}
       <span className="font-serif text-sm leading-tight text-foreground">
         {member.name}
         {member.deceased && <span className="ml-1 text-muted">†</span>}
@@ -641,6 +701,7 @@ function TreeNode({
       <div className="flex items-center">
         <MemberBox
           member={member}
+          link={tree.linkOf(member)}
           selected={member.id === selectedId}
           onSelect={onSelect}
           subtitle={parentsLabel()}
@@ -662,6 +723,7 @@ function TreeNode({
               <span className="h-px w-4 bg-accent/60" />
               <MemberBox
                 member={b}
+                link={tree.linkOf(b)}
                 selected={b.id === selectedId}
                 onSelect={onSelect}
                 hideSpouse={b.spouse.trim().toLowerCase() === member.name.toLowerCase()}
@@ -698,15 +760,21 @@ function FamilyForm({
   houseId,
   member,
   family,
+  allNpcs,
+  allHouses,
   onDone,
 }: {
   houseId: string;
   member: FamilyMember | null;
   family: FamilyMember[];
+  allNpcs: HouseNpc[];
+  allHouses: House[];
   onDone: () => void;
 }) {
   const { run, pending, feedback } = useAction();
+  const [mode, setMode] = useState<"png" | "nome">(member && !member.npc_id ? "nome" : "png");
   const [form, setForm] = useState({
+    npc_id: member?.npc_id ?? "",
     name: member?.name ?? "",
     parent_id: member?.parent_id ?? "",
     parent2_id: member?.parent2_id ?? "",
@@ -716,6 +784,16 @@ function FamilyForm({
   });
   const others = family.filter((f) => f.id !== member?.id).sort(byOrder);
 
+  // PNG sceglibili, raggruppati per casata (prima questa); esclusi quelli gia' nell'albero
+  const usedNpcs = new Set(family.filter((f) => f.id !== member?.id && f.npc_id).map((f) => f.npc_id));
+  const npcGroups = [...allHouses]
+    .sort((a, b) => (a.id === houseId ? -1 : b.id === houseId ? 1 : a.name.localeCompare(b.name)))
+    .map((h) => ({
+      house: h,
+      npcs: allNpcs.filter((n) => n.house_id === h.id && !usedNpcs.has(n.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .filter((g) => g.npcs.length > 0);
+
   function submit(e: FormEvent) {
     e.preventDefault();
     run(
@@ -723,6 +801,7 @@ function FamilyForm({
         saveFamilyMember({
           id: member?.id,
           house_id: houseId,
+          npc_id: mode === "png" ? form.npc_id || null : null,
           name: form.name,
           parent_id: form.parent_id || null,
           parent2_id: form.parent2_id || null,
@@ -749,9 +828,55 @@ function FamilyForm({
   return (
     <form onSubmit={submit} className="h-fit space-y-3 rounded-md border border-border bg-background/60 p-3">
       <h3 className="font-serif text-lg text-accent">{member ? "Modifica membro" : "Aggiungi membro"}</h3>
-      <Field label="Nome">
-        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} required className="input py-1.5" />
-      </Field>
+      {/* Chi e': un PNG gia' esistente (anche di altre casate) oppure un nome scritto a mano */}
+      <div className="flex gap-1 rounded-md border border-border p-1 text-xs">
+        {(
+          [
+            ["png", "PNG esistente"],
+            ["nome", "Scrivi il nome"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMode(id)}
+            className={`flex-1 rounded px-2 py-1 tracking-wider uppercase transition ${
+              mode === id ? "bg-blood/40 text-foreground" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "png" ? (
+        <Field label="PNG">
+          <select
+            value={form.npc_id}
+            onChange={(e) => setForm({ ...form, npc_id: e.target.value })}
+            required
+            className="input py-1.5"
+          >
+            <option value="">— Scegli un PNG —</option>
+            {npcGroups.map((g) => (
+              <optgroup key={g.house.id} label={g.house.id === houseId ? `Casata ${g.house.name} (questa)` : `Casata ${g.house.name}`}>
+                {g.npcs.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                    {n.title ? ` — ${n.title}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {npcGroups.length === 0 && (
+            <span className="mt-1 block text-xs text-muted">Nessun PNG disponibile: creali nella scheda PNG di una casata.</span>
+          )}
+        </Field>
+      ) : (
+        <Field label="Nome">
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} required className="input py-1.5" />
+        </Field>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Field label="Genitore 1">{parentSelect("parent_id")}</Field>
         <Field label="Genitore 2">{parentSelect("parent2_id")}</Field>

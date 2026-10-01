@@ -37,6 +37,7 @@ export type FamilyMember = {
   house_id: string;
   parent_id: string | null;
   parent2_id: string | null; // secondo genitore (figlio di una coppia)
+  npc_id: string | null; // PNG collegato (anche di un'altra casata)
   name: string;
   spouse: string;
   note: string;
