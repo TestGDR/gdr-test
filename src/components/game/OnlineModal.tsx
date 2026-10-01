@@ -132,7 +132,12 @@ function PlayerRow({
   onChangeAvailability: (value: Availability) => void;
 }) {
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-2 sm:gap-3 sm:px-3">
+    <li
+      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-2 sm:gap-3 sm:px-3 ${
+        player.live ? "" : "opacity-50"
+      }`}
+      title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
+    >
       <Avatar name={player.name} url={player.avatar} size="h-9 w-9 sm:h-11 sm:w-11" />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2">

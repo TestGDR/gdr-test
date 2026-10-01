@@ -403,7 +403,11 @@ function LeftColumn({
         </h3>
         <ul className="mt-2 space-y-1.5 text-sm">
           {here.map((p) => (
-            <li key={p.userId} className="flex items-center gap-2">
+            <li
+              key={p.userId}
+              className={`flex items-center gap-2 ${p.live ? "" : "opacity-50"}`}
+              title={p.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
+            >
               <AvailabilityDot
                 value={p.availability}
                 onChange={p.userId === userId ? onChangeAvailability : undefined}
