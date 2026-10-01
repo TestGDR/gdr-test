@@ -3,14 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { AGE_MAX, AGE_MIN } from "@/lib/character-creation";
+import { GAME_YEAR } from "@/lib/game-config";
 import {
   RELATION_KINDS,
+  YEAR_MAX,
+  YEAR_MIN,
+  lifeLabel,
   type FamilyMember,
   type FamilyRelation,
   type House,
   type HouseMember,
   type HouseNpc,
   type HouseRole,
+  type LifeDates,
   type RelationKind,
   type SignupRole,
 } from "@/lib/houses";
@@ -515,7 +520,7 @@ type Tree = {
 };
 
 // Per la carta: ritratto del PNG collegato e casata di provenienza se diversa
-type MemberLink = { image: string | null; externalHouse: House | null };
+type MemberLink = { image: string | null; externalHouse: House | null; life: LifeDates };
 
 const byOrder = (a: FamilyMember, b: FamilyMember) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
 
@@ -560,7 +565,11 @@ function buildTree(
     linkOf: (m) => {
       const npc = m.npc_id ? npcById.get(m.npc_id) : undefined;
       const external = npc && npc.house_id !== houseId ? (houseById.get(npc.house_id) ?? null) : null;
-      return { image: npc?.image_url ?? null, externalHouse: external };
+      // Nascita, morte e "deceduto" dei membri collegati vengono dalla scheda del PNG
+      const life: LifeDates = npc
+        ? { birth_year: npc.birth_year, death_year: npc.death_year, deceased: npc.deceased }
+        : { birth_year: m.birth_year, death_year: m.death_year, deceased: m.deceased };
+      return { image: npc?.image_url ?? null, externalHouse: external, life };
     },
   };
 }
@@ -651,7 +660,7 @@ function MemberBox({
       onClick={() => onSelect(member.id)}
       className={`group relative flex w-40 flex-col items-center rounded-lg border bg-gradient-to-b from-panel to-black px-3 pt-3 pb-2.5 text-center shadow-lg shadow-black/60 transition hover:-translate-y-0.5 hover:border-accent ${
         selected ? "border-accent ring-2 ring-accent/40" : link.externalHouse ? "border-sky-700/70" : "border-border"
-      } ${member.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
+      } ${link.life.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
     >
       {/* Ritratto del PNG collegato, altrimenti l'iniziale */}
       {link.image ? (
@@ -659,12 +668,12 @@ function MemberBox({
         <img
           src={link.image}
           alt=""
-          className={`mb-1.5 h-12 w-12 rounded-full border-2 object-cover ${member.deceased ? "border-muted/50" : "border-accent/70"}`}
+          className={`mb-1.5 h-12 w-12 rounded-full border-2 object-cover ${link.life.deceased ? "border-muted/50" : "border-accent/70"}`}
         />
       ) : (
         <span
           className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 font-serif text-lg ${
-            member.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
+            link.life.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
           }`}
         >
           {member.name[0]}
@@ -682,8 +691,11 @@ function MemberBox({
       )}
       <span className="font-serif text-sm leading-tight text-foreground">
         {member.name}
-        {member.deceased && <span className="ml-1 text-muted">†</span>}
+        {link.life.deceased && <span className="ml-1 text-muted">†</span>}
       </span>
+      {lifeLabel(link.life, GAME_YEAR) && (
+        <span className="mt-0.5 text-[10px] leading-tight text-foreground/70">{lifeLabel(link.life, GAME_YEAR)}</span>
+      )}
       {member.note && <span className="mt-0.5 text-[11px] leading-tight text-accent/80 italic">{member.note}</span>}
       {member.spouse && !hideSpouse && (
         <span className="mt-1 text-[10px] leading-tight text-muted">⚭ {member.spouse}</span>
@@ -809,8 +821,11 @@ function FamilyForm({
     spouse: member?.spouse ?? "",
     note: member?.note ?? "",
     deceased: member?.deceased ?? false,
+    birth_year: member?.birth_year === null || member?.birth_year === undefined ? "" : String(member.birth_year),
+    death_year: member?.death_year === null || member?.death_year === undefined ? "" : String(member.death_year),
   });
   const others = family.filter((f) => f.id !== member?.id).sort(byOrder);
+  const yearOf = (v: string) => (v.trim() === "" ? null : Number(v));
 
   // PNG sceglibili, raggruppati per casata (prima questa); esclusi quelli gia' nell'albero
   const usedNpcs = new Set(family.filter((f) => f.id !== member?.id && f.npc_id).map((f) => f.npc_id));
@@ -836,19 +851,39 @@ function FamilyForm({
           spouse: form.spouse,
           note: form.note,
           deceased: form.deceased,
+          birth_year: yearOf(form.birth_year),
+          death_year: form.deceased ? yearOf(form.death_year) : null,
         }),
       member ? "Membro salvato." : "Membro aggiunto.",
       onDone,
     );
   }
 
+  // Genitore: una persona di questo albero oppure un PNG di qualunque casata non ancora
+  // nell'albero ("npc:<id>"), che verra' aggiunto automaticamente
   const parentSelect = (key: "parent_id" | "parent2_id") => (
     <select value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="input py-1.5">
       <option value="">— Nessuno —</option>
-      {others.map((f) => (
-        <option key={f.id} value={f.id}>
-          {f.name}
-        </option>
+      {others.length > 0 && (
+        <optgroup label="In questo albero">
+          {others.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {npcGroups.map((g) => (
+        <optgroup key={g.house.id} label={`PNG · Casata ${g.house.name}`}>
+          {g.npcs
+            .filter((n) => n.id !== form.npc_id)
+            .map((n) => (
+              <option key={n.id} value={`npc:${n.id}`}>
+                {n.name}
+                {n.title ? ` — ${n.title}` : ""}
+              </option>
+            ))}
+        </optgroup>
       ))}
     </select>
   );
@@ -921,10 +956,16 @@ function FamilyForm({
       <Field label="Nota">
         <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} maxLength={200} placeholder="Es. Lord di Grande Inverno" className="input py-1.5" />
       </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={form.deceased} onChange={(e) => setForm({ ...form, deceased: e.target.checked })} className="accent-[var(--accent)]" />
-        Deceduto
-      </label>
+      {mode === "png" ? (
+        <p className="text-xs text-muted">Nascita, morte e &quot;deceduto&quot; vengono dalla scheda del PNG.</p>
+      ) : (
+        <LifeFields
+          birth={form.birth_year}
+          death={form.death_year}
+          deceased={form.deceased}
+          onChange={(patch) => setForm({ ...form, ...patch })}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <button className="btn px-3 py-1.5 text-sm" disabled={pending}>
           {member ? "Salva" : "Aggiungi"}
@@ -951,6 +992,67 @@ function FamilyForm({
       </div>
       {feedback}
     </form>
+  );
+}
+
+// Anno di nascita, "deceduto" e anno di morte (D.C.); i nomi servono ai moduli dei PNG
+function LifeFields({
+  birth,
+  death,
+  deceased,
+  onChange,
+}: {
+  birth: string;
+  death: string;
+  deceased: boolean;
+  onChange: (patch: { birth_year?: string; death_year?: string; deceased?: boolean }) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <Field label="Anno di nascita">
+        <span className="flex items-center gap-1.5">
+          <input
+            type="number"
+            name="birth_year"
+            min={YEAR_MIN}
+            max={YEAR_MAX}
+            value={birth}
+            onChange={(e) => onChange({ birth_year: e.target.value })}
+            placeholder="es. 312"
+            className="input w-24 py-1.5"
+          />
+          <span className="text-sm text-muted">D.C.</span>
+        </span>
+      </Field>
+      <label className="flex items-center gap-2 py-2 text-sm">
+        <input
+          type="checkbox"
+          name="deceased"
+          value="1"
+          checked={deceased}
+          onChange={(e) => onChange({ deceased: e.target.checked })}
+          className="accent-[var(--accent)]"
+        />
+        Deceduto
+      </label>
+      {deceased && (
+        <Field label="Anno di morte">
+          <span className="flex items-center gap-1.5">
+            <input
+              type="number"
+              name="death_year"
+              min={YEAR_MIN}
+              max={YEAR_MAX}
+              value={death}
+              onChange={(e) => onChange({ death_year: e.target.value })}
+              placeholder="es. 350"
+              className="input w-24 py-1.5"
+            />
+            <span className="text-sm text-muted">D.C.</span>
+          </span>
+        </Field>
+      )}
+    </div>
   );
 }
 
@@ -1063,7 +1165,11 @@ function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; r
             >
               <Sigil url={n.image_url} name={n.name} size="h-16 w-16" />
               <span className="min-w-0">
-                <span className="block truncate font-serif text-accent">{n.name}</span>
+                <span className="block truncate font-serif text-accent">
+                  {n.name}
+                  {n.deceased && <span className="ml-1 text-muted">†</span>}
+                </span>
+                {lifeLabel(n, GAME_YEAR) && <span className="block text-[11px] text-foreground/70">{lifeLabel(n, GAME_YEAR)}</span>}
                 {(n.house_role_id || n.title) && (
                   <span className="block text-xs text-muted">
                     {[roles.find((r) => r.id === n.house_role_id)?.name, n.title].filter(Boolean).join(" · ")}
@@ -1100,6 +1206,11 @@ function NpcForm({
 }) {
   const { run, pending, feedback } = useAction();
   const [preview, setPreview] = useState<string | null>(npc?.image_url ?? null);
+  const [life, setLife] = useState({
+    birth_year: npc?.birth_year === null || npc?.birth_year === undefined ? "" : String(npc.birth_year),
+    death_year: npc?.death_year === null || npc?.death_year === undefined ? "" : String(npc.death_year),
+    deceased: npc?.deceased ?? false,
+  });
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1147,6 +1258,12 @@ function NpcForm({
           <span className="mt-1 block text-xs text-muted">Crea i ruoli nella scheda &quot;Ruoli e stipendi&quot;.</span>
         )}
       </Field>
+      <LifeFields
+        birth={life.birth_year}
+        death={life.death_year}
+        deceased={life.deceased}
+        onChange={(patch) => setLife({ ...life, ...patch })}
+      />
       <Field label="Titolo (facoltativo)">
         <input name="title" defaultValue={npc?.title} maxLength={80} placeholder="Es. Signore di Driftmark" className="input py-1.5" />
       </Field>

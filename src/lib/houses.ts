@@ -42,6 +42,8 @@ export type FamilyMember = {
   spouse: string;
   note: string;
   deceased: boolean;
+  birth_year: number | null; // per i membri collegati a un PNG valgono quelli del PNG
+  death_year: number | null;
   sort_order: number;
 };
 
@@ -71,6 +73,9 @@ export type HouseNpc = {
   house_role_id: string | null; // ruolo di casata ricoperto (occupa un posto)
   description: string;
   image_url: string | null;
+  deceased: boolean;
+  birth_year: number | null;
+  death_year: number | null;
   sort_order: number;
 };
 
@@ -84,3 +89,43 @@ export type HouseMember = {
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 export const IMAGE_MAX_BYTES = 1024 * 1024;
+
+// ---------------------------------------------------------------------
+// Nascita, morte ed eta' (anni Dopo la Conquista, da 0 a 999)
+// ---------------------------------------------------------------------
+export type LifeDates = { birth_year: number | null; death_year: number | null; deceased: boolean };
+
+export const YEAR_MIN = 0;
+export const YEAR_MAX = 999;
+
+export function formatYear(year: number) {
+  return `${year} D.C.`;
+}
+
+// Es. "312 – 350 D.C. · 38 anni", "n. 312 D.C. · 51 anni", "m. 350 D.C."
+export function lifeLabel({ birth_year, death_year, deceased }: LifeDates, currentYear: number): string | null {
+  const years = (n: number) => `${n} ann${n === 1 ? "o" : "i"}`;
+  if (birth_year !== null && death_year !== null) {
+    return `${birth_year} – ${formatYear(death_year)} · ${years(death_year - birth_year)}`;
+  }
+  if (birth_year !== null) {
+    if (deceased) return `n. ${formatYear(birth_year)}`;
+    return birth_year <= currentYear ? `n. ${formatYear(birth_year)} · ${years(currentYear - birth_year)}` : `n. ${formatYear(birth_year)}`;
+  }
+  if (death_year !== null) return `m. ${formatYear(death_year)}`;
+  return null;
+}
+
+// Controllo degli anni inseriti: messaggio d'errore oppure null
+export function validateLife({ birth_year, death_year, deceased }: LifeDates): string | null {
+  for (const y of [birth_year, death_year]) {
+    if (y !== null && (!Number.isInteger(y) || y < YEAR_MIN || y > YEAR_MAX)) {
+      return `Gli anni devono essere numeri tra ${YEAR_MIN} e ${YEAR_MAX}.`;
+    }
+  }
+  if (death_year !== null && !deceased) return "L'anno di morte si indica solo per chi è deceduto.";
+  if (birth_year !== null && death_year !== null && death_year < birth_year) {
+    return "L'anno di morte non può essere precedente a quello di nascita.";
+  }
+  return null;
+}

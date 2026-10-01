@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { AGE_MAX, AGE_MIN } from "@/lib/character-creation";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
-import { IMAGE_MAX_BYTES, IMAGE_TYPES } from "@/lib/houses";
+import { IMAGE_MAX_BYTES, IMAGE_TYPES, validateLife } from "@/lib/houses";
 import { getStaffContext } from "@/lib/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -189,6 +189,31 @@ export async function deleteHouseRole(id: string): Promise<HouseResult> {
 // ---------------------------------------------------------------------
 // Albero genealogico
 // ---------------------------------------------------------------------
+// Il membro di questo albero collegato al PNG; se non c'e' viene creato
+async function memberForNpc(
+  ctx: NonNullable<Awaited<ReturnType<typeof authorized>>>,
+  houseId: string,
+  npcId: string,
+): Promise<{ id?: string; error?: string }> {
+  const { data: existing } = await ctx.supabase
+    .from("house_family_members")
+    .select("id")
+    .eq("house_id", houseId)
+    .eq("npc_id", npcId)
+    .maybeSingle();
+  if (existing) return { id: existing.id };
+
+  const { data: npc } = await ctx.supabase.from("house_npcs").select("name").eq("id", npcId).maybeSingle();
+  if (!npc) return { error: "PNG genitore non trovato." };
+  const { data, error } = await ctx.supabase
+    .from("house_family_members")
+    .insert({ house_id: houseId, npc_id: npcId, name: npc.name })
+    .select("id")
+    .single();
+  if (error) return { error: "Non è stato possibile aggiungere il genitore all'albero." };
+  return { id: data.id };
+}
+
 export async function saveFamilyMember(input: {
   id?: string;
   house_id: string;
@@ -199,9 +224,18 @@ export async function saveFamilyMember(input: {
   spouse: string;
   note: string;
   deceased: boolean;
+  birth_year: number | null;
+  death_year: number | null;
 }): Promise<HouseResult> {
   const ctx = await authorized();
   if (!ctx) return DENIED;
+
+  // Nascita/morte: per i membri collegati a un PNG valgono quelle della scheda del PNG
+  const life = input.npc_id
+    ? { birth_year: null, death_year: null, deceased: false }
+    : { birth_year: input.birth_year, death_year: input.deceased ? input.death_year : null, deceased: Boolean(input.deceased) };
+  const lifeError = validateLife(life);
+  if (lifeError) return { error: lifeError };
 
   // Collegato a un PNG (di qualunque casata): il nome e' quello del PNG
   let name = input.name.trim().slice(0, 80);
@@ -214,7 +248,21 @@ export async function saveFamilyMember(input: {
 
   // I genitori devono essere della stessa casata, diversi tra loro e non discendenti
   // del membro (niente cicli, seguendo entrambe le linee di discendenza)
-  const parents = [input.parent_id, input.parent2_id].filter((p): p is string => Boolean(p));
+  // Un genitore puo' essere un PNG di qualunque casata ("npc:<id>"): se non e' ancora
+  // in questo albero viene aggiunto automaticamente, collegato alla sua scheda
+  const parents: string[] = [];
+  for (const raw of [input.parent_id, input.parent2_id]) {
+    if (!raw) continue;
+    if (!raw.startsWith("npc:")) {
+      parents.push(raw);
+      continue;
+    }
+    const npcId = raw.slice(4);
+    if (npcId === input.npc_id) return { error: "Un membro non può essere genitore di se stesso." };
+    const resolved = await memberForNpc(ctx, input.house_id, npcId);
+    if (resolved.error) return { error: resolved.error };
+    parents.push(resolved.id!);
+  }
   if (parents.length === 2 && parents[0] === parents[1]) return { error: "I due genitori devono essere persone diverse." };
   if (parents.length) {
     const { data: tree } = await ctx.supabase
@@ -243,7 +291,7 @@ export async function saveFamilyMember(input: {
     name,
     spouse: input.spouse.trim().slice(0, 80),
     note: input.note.trim().slice(0, 200),
-    deceased: Boolean(input.deceased),
+    ...life,
   };
   const { data, error } = input.id
     ? await ctx.supabase.from("house_family_members").update(row).eq("id", input.id).select("id").single()
@@ -329,10 +377,20 @@ export async function saveNpc(form: FormData): Promise<HouseResult> {
   const id = text(form, "id", 36) || undefined;
   const name = text(form, "name", 80);
   if (!name) return { error: "Scrivi il nome del PNG." };
+  const year = (key: string) => {
+    const v = text(form, key, 4);
+    return v === "" ? null : Number(v);
+  };
+  const deceased = form.get("deceased") === "1";
+  const life = { birth_year: year("birth_year"), death_year: deceased ? year("death_year") : null, deceased };
+  const lifeError = validateLife(life);
+  if (lifeError) return { error: lifeError };
+
   const row: Record<string, unknown> = {
     name,
     title: text(form, "title", 80),
     description: text(form, "description", 4000),
+    ...life,
   };
 
   // Ruolo di casata: deve appartenere alla casata del PNG
