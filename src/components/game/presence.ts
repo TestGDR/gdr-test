@@ -25,9 +25,28 @@ export function usePresence(me: OnlinePlayer) {
   useEffect(() => {
     const ch = supabase.channel("online", { config: { presence: { key: me.userId } } });
     ch.on("presence", { event: "sync" }, () => {
-      // Una voce per utente: con piu' schede aperte vale l'ultima
-      const state = ch.presenceState<OnlinePlayer>();
-      setOnline(Object.values(state).map((entries) => entries[entries.length - 1]));
+      // Una voce per utente: con piu' schede aperte vale l'ultima.
+      // L'id utente si prende dalla chiave della presenza (sempre presente e unica),
+      // non dal contenuto: una scheda aperta con una versione vecchia del sito
+      // potrebbe inviare dati incompleti.
+      const state = ch.presenceState<Partial<OnlinePlayer>>();
+      setOnline(
+        Object.entries(state).map(([key, entries]) => {
+          const p = entries[entries.length - 1];
+          return {
+            userId: key,
+            characterId: p.characterId ?? null,
+            name: p.name ?? "?",
+            avatar: p.avatar ?? null,
+            role: p.role ?? "player",
+            active: p.active ?? false,
+            phrase: p.phrase ?? "",
+            place: p.place ?? "mappa",
+            placeKey: p.placeKey ?? "mappa",
+            placeLabel: p.placeLabel ?? "",
+          };
+        }),
+      );
     }).subscribe((status) => {
       if (status === "SUBSCRIBED") setChannel(ch);
     });
