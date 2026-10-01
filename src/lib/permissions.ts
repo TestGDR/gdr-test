@@ -68,5 +68,4 @@ export const MANAGEMENT_PERMISSIONS = [
   "gestione.accessi",
   "casate.gestire",
   "mondo.gestire",
-  "documentazione.scrivere",
 ];

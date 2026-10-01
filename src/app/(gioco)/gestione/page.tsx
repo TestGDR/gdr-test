@@ -29,12 +29,6 @@ const PANELS = [
     title: "Gestione mondo",
     description: "Mappe, luoghi e liste di gioco.",
   },
-  {
-    permission: "documentazione.scrivere",
-    href: null,
-    title: "Manuale e Ambientazione",
-    description: "Scrittura delle pagine della documentazione.",
-  },
 ];
 
 export default async function GestionePage() {
