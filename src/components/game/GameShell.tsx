@@ -586,9 +586,18 @@ function RightRail({ characterId, isStaff }: { characterId: string | null; isSta
   return (
     <>
       <div className="contents md:grid md:grid-cols-2 md:justify-items-center md:gap-2">
-        <button type="button" onClick={() => router.refresh()} className={railBtn} aria-label="Aggiorna">
+        {/* In chat: resta e aggiorna i messaggi. Altrove: torna alla mappa aggiornata */}
+        <button
+          type="button"
+          onClick={() => {
+            if (pathname.startsWith("/chat/") || pathname === "/mappa") router.refresh();
+            else router.push("/mappa");
+          }}
+          className={railBtn}
+          aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+        >
           <RefreshIcon />
-          <Tip>Aggiorna</Tip>
+          <Tip>{pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}</Tip>
         </button>
         <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />

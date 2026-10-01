@@ -14,6 +14,16 @@ type Props = {
 export default function ChatRoom({ roomId, canNarrate, characters, initialMessages }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  // Dopo "Aggiorna" arrivano dal server i messaggi aggiornati: li unisco a quelli
+  // gia' mostrati (senza ricreare la chat, cosi' il testo che si sta scrivendo resta)
+  const [lastInitial, setLastInitial] = useState(initialMessages);
+  if (initialMessages !== lastInitial) {
+    setLastInitial(initialMessages);
+    setMessages((prev) => {
+      const byId = new Map([...prev, ...initialMessages].map((m) => [m.id, m]));
+      return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    });
+  }
   const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
   const [kind, setKind] = useState<MessageKind>("azione");
   const [text, setText] = useState("");
