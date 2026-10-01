@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
 import { GameArea } from "@/components/game/GameShell";
-import { requireUser } from "@/lib/supabase/server";
+import { getStaffContext } from "@/lib/staff";
 import type { Character, Location, Message, Room } from "@/lib/types";
 import ChatRoom from "./ChatRoom";
 
@@ -10,7 +10,7 @@ const HISTORY_SIZE = 100;
 
 export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const { id } = await params;
-  const { supabase, user } = await requireUser();
+  const { supabase, user, permissions } = await getStaffContext();
 
   const { data: room } = await supabase
     .from("rooms")
@@ -19,7 +19,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     .maybeSingle<Room & { location: Location }>();
   if (!room) notFound();
 
-  const [{ data: messages }, { data: characters }, { data: profile }] = await Promise.all([
+  const [{ data: messages }, { data: characters }] = await Promise.all([
     supabase
       .from("messages")
       .select("*")
@@ -33,7 +33,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       .eq("owner_id", user.id)
       .eq("status", "attivo")
       .order("created_at"),
-    supabase.from("profiles").select("role").eq("id", user.id).single(),
   ]);
 
   if (!characters?.length) {
@@ -60,7 +59,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       </div>
       <ChatRoom
         roomId={room.id}
-        isStaff={profile?.role === "master" || profile?.role === "admin"}
+        canNarrate={permissions.has("chat.narrazione")}
         characters={(characters ?? []) as Character[]}
         initialMessages={((messages ?? []) as Message[]).reverse()}
       />

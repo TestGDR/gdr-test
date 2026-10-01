@@ -1,6 +1,6 @@
 import { GameArea } from "@/components/game/GameShell";
-import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/supabase/server";
+import Link from "next/link";
+import { requirePermission } from "@/lib/staff";
 
 type AccessRow = {
   id: number;
@@ -20,10 +20,7 @@ type AccessRow = {
 const LIMIT = 500;
 
 export default async function AccessiPage() {
-  const { supabase, user } = await requireUser();
-
-  const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (me?.role !== "admin") notFound();
+  const { supabase } = await requirePermission("gestione.accessi");
 
   const { data } = await supabase
     .from("access_logs")
@@ -45,6 +42,9 @@ export default async function AccessiPage() {
   return (
     <div className="space-y-8">
       <GameArea title="Registro accessi" />
+      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
+        ← Gestione
+      </Link>
       <h1 className="font-serif text-3xl text-accent">Registro accessi</h1>
 
       <section className="panel">

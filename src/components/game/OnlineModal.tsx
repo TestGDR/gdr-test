@@ -16,7 +16,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "staff", label: "Staff" },
 ];
 
-const isStaff = (p: OnlinePlayer) => p.role === "master" || p.role === "admin";
+const isStaff = (p: OnlinePlayer) => p.staffRole !== null;
 
 type Props = {
   open: boolean;
@@ -154,7 +154,7 @@ function PlayerRow({
       {/* Simboli */}
       <div className="flex shrink-0 items-center gap-2 text-base">
         {isStaff(player) && (
-          <span title={player.role === "admin" ? "Admin" : "Master"} className="text-accent">
+          <span title={player.staffRole ?? ""} className="text-accent" style={{ color: player.staffColor ?? undefined }}>
             <CrownIcon />
           </span>
         )}

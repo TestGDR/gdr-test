@@ -6,12 +6,12 @@ import type { Character, Message, MessageKind } from "@/lib/types";
 
 type Props = {
   roomId: string;
-  isStaff: boolean;
+  canNarrate: boolean;
   characters: Character[];
   initialMessages: Message[];
 };
 
-export default function ChatRoom({ roomId, isStaff, characters, initialMessages }: Props) {
+export default function ChatRoom({ roomId, canNarrate, characters, initialMessages }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
@@ -102,7 +102,7 @@ export default function ChatRoom({ roomId, isStaff, characters, initialMessages 
             >
               <option value="azione">Azione</option>
               <option value="fuori_gioco">Fuori gioco (OFF)</option>
-              {isStaff && <option value="master">Narrazione master</option>}
+              {canNarrate && <option value="master">Narrazione master</option>}
             </select>
           </div>
           <div className="flex gap-2">

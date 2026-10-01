@@ -25,8 +25,8 @@ import {
   BookIcon,
   CastleIcon,
   ChevronIcon,
-  EyeIcon,
   FlameIcon,
+  GearIcon,
   MapIcon,
   MenuIcon,
   PowerIcon,
@@ -58,7 +58,7 @@ type Props = {
   userId: string;
   displayName: string;
   character: MainCharacter | null;
-  role: OnlinePlayer["role"];
+  staffRole: { name: string; color: string } | null;
   statusText: string;
   initialAvailability: Availability;
   children: ReactNode;
@@ -68,7 +68,7 @@ export default function GameShell({
   userId,
   displayName,
   character,
-  role,
+  staffRole,
   statusText,
   initialAvailability,
   children,
@@ -96,7 +96,8 @@ export default function GameShell({
     characterId: character?.id ?? null,
     name: character?.name ?? displayName,
     avatar: character?.avatar_url ?? null,
-    role,
+    staffRole: staffRole?.name ?? null,
+    staffColor: staffRole?.color ?? null,
     active: character?.status === "attivo",
     phrase,
     availability,
@@ -234,7 +235,7 @@ export default function GameShell({
                 : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
-            <RightRail characterId={character?.id ?? null} isAdmin={role === "admin"} />
+            <RightRail characterId={character?.id ?? null} isStaff={staffRole !== null} />
           </nav>
         </div>
       </div>
@@ -554,7 +555,7 @@ function Tip({ children }: { children: ReactNode }) {
   );
 }
 
-function RightRail({ characterId, isAdmin }: { characterId: string | null; isAdmin: boolean }) {
+function RightRail({ characterId, isStaff }: { characterId: string | null; isStaff: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
@@ -586,10 +587,11 @@ function RightRail({ characterId, isAdmin }: { characterId: string | null; isAdm
           <UsersIcon />
           <Tip>Personaggi</Tip>
         </Link>
-        {isAdmin && (
-          <Link href="/admin/accessi" className={`${railBtn} ${active("/admin")}`} aria-label="Registro accessi">
-            <EyeIcon />
-            <Tip>Registro accessi</Tip>
+        {/* Pannelli di gestione: solo staff */}
+        {isStaff && (
+          <Link href="/gestione" className={`${railBtn} ${active("/gestione")}`} aria-label="Gestione">
+            <GearIcon />
+            <Tip>Gestione</Tip>
           </Link>
         )}
       </div>

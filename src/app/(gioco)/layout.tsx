@@ -4,23 +4,38 @@ import { AVAILABILITY_COOKIE, isAvailability } from "@/lib/availability";
 import { getMainCharacter } from "@/lib/main-character";
 import { requireUser } from "@/lib/supabase/server";
 
-// Mondo di gioco: barra con la zona attuale, colonna sinistra (luogo, data,
+type Profile = {
+  username: string | null;
+  role: string;
+  status_text: string | null;
+  staff_role: { name: string; color: string } | null;
+};
+
+// Mondo di gioco: barra con titolo e icone, colonna sinistra (luogo, data,
 // personaggio, presenti), area centrale e colonna destra con le icone
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const { supabase, user } = await requireUser();
   const [{ data: profile }, character, cookieStore] = await Promise.all([
-    supabase.from("profiles").select("username, role, status_text").eq("id", user.id).single(),
+    supabase
+      .from("profiles")
+      .select("username, role, status_text, staff_role:staff_roles(name, color)")
+      .eq("id", user.id)
+      .single<Profile>(),
     getMainCharacter(supabase, user.id),
     cookies(),
   ]);
   const savedAvailability = cookieStore.get(AVAILABILITY_COOKIE)?.value;
+
+  // L'admin e' staff anche senza un ruolo assegnato
+  const staffRole =
+    profile?.staff_role ?? (profile?.role === "admin" ? { name: "Admin", color: "#e2622d" } : null);
 
   return (
     <GameShell
       userId={user.id}
       displayName={profile?.username ?? "Viandante"}
       character={character}
-      role={profile?.role ?? "player"}
+      staffRole={staffRole}
       statusText={profile?.status_text ?? ""}
       initialAvailability={isAvailability(savedAvailability) ? savedAvailability : "disponibile"}
     >

@@ -17,7 +17,8 @@ export type OnlinePlayer = {
   characterId: string | null;
   name: string;
   avatar: string | null;
-  role: "player" | "master" | "admin";
+  staffRole: string | null; // nome del ruolo staff ("Admin" per il super-utente), null = giocatore
+  staffColor: string | null;
   active: boolean; // PG attivo (creazione completata)
   phrase: string;
   place: "mappa" | "chat";
@@ -47,7 +48,8 @@ export function usePresence(me: OnlinePlayer) {
             characterId: p.characterId ?? null,
             name: p.name ?? "?",
             avatar: p.avatar ?? null,
-            role: p.role ?? "player",
+            staffRole: p.staffRole ?? null,
+            staffColor: p.staffColor ?? null,
             active: p.active ?? false,
             phrase: p.phrase ?? "",
             place: p.place ?? "mappa",
