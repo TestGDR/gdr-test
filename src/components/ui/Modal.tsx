@@ -73,7 +73,7 @@ export default function Modal({
       onCancel={(e) => e.preventDefault()}
       onKeyDown={(e) => e.key === "Escape" && e.preventDefault()}
       style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-      className={`${SIZE_CLASS[size]} m-auto flex-col overflow-hidden rounded-lg border border-border bg-panel/95 p-0 text-foreground shadow-2xl shadow-black backdrop:bg-black/70 open:flex`}
+      className={`${SIZE_CLASS[size]} m-auto flex-col overflow-hidden rounded-lg border border-border bg-panel p-0 text-foreground shadow-2xl shadow-black backdrop:bg-black/70 open:flex`}
     >
       <div
         onPointerDown={onDragStart}

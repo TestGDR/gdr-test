@@ -28,6 +28,35 @@ body {
   color: var(--foreground);
 }
 
+/* Barre di scorrimento intonate al sito: sottili, binario scuro, cursore rosso
+   che diventa arancio al passaggio. (Firefox e Chrome recenti usano le prime due
+   proprieta'; Safari e i Chrome meno recenti le regole ::-webkit-scrollbar) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--blood) 85%, transparent) transparent;
+}
+*:hover {
+  scrollbar-color: var(--accent) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(var(--blood), color-mix(in srgb, var(--blood) 70%, black)) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(var(--accent), var(--blood)) padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .btn {
   @apply inline-flex items-center justify-center rounded-md border border-red-900 bg-blood px-4 py-2 font-semibold text-white shadow-lg shadow-black/40 transition hover:bg-red-700 disabled:opacity-40;
 }

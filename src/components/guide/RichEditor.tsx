@@ -3,7 +3,8 @@
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
-import { useState, type ReactNode } from "react";
+import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
 export default function RichEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
@@ -14,9 +15,14 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
       StarterKit.configure({ link: { openOnClick: false } }),
       // Allineamento di paragrafi e titoli (salvato come style="text-align: ...")
       TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right", "justify"] }),
+      // Colore e dimensione del testo (salvati come style="color: ...; font-size: ...")
+      TextStyle,
+      Color,
+      FontSize,
     ],
     content: value,
     immediatelyRender: false, // la pagina viene generata anche sul server
+    shouldRerenderOnTransaction: true, // la barra mostra lo stato del testo selezionato
     editorProps: { attributes: { class: "guide-content min-h-64 p-4 outline-none" } },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
@@ -92,6 +98,8 @@ function Toolbar({ editor }: { editor: Editor }) {
       {btn(<b>G</b>, "Grassetto", editor.isActive("bold"), () => chain().toggleBold().run())}
       {btn(<i>C</i>, "Corsivo", editor.isActive("italic"), () => chain().toggleItalic().run())}
       {btn(<u>S</u>, "Sottolineato", editor.isActive("underline"), () => chain().toggleUnderline().run())}
+      <ColorPicker editor={editor} />
+      <FontSizeSelect editor={editor} />
       <span className="mx-1 h-5 w-px bg-border" />
       {btn("T1", "Titolo", editor.isActive("heading", { level: 2 }), () => chain().toggleHeading({ level: 2 }).run())}
       {btn("T2", "Sottotitolo", editor.isActive("heading", { level: 3 }), () => chain().toggleHeading({ level: 3 }).run())}
@@ -127,5 +135,123 @@ function AlignIcon({ kind }: { kind: "left" | "center" | "right" | "justify" }) 
         <path key={i} d={`M${x1} ${5 + i * 5}H${x2}`} />
       ))}
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Colore del testo: tavolozza del sito + colore libero
+// ---------------------------------------------------------------------
+const PALETTE = [
+  { label: "Arancio brace", value: "#e2622d" },
+  { label: "Rosso sangue", value: "#c2302a" },
+  { label: "Oro", value: "#d4a84b" },
+  { label: "Avorio", value: "#e4dfdb" },
+  { label: "Grigio", value: "#968d89" },
+  { label: "Verde", value: "#6aa56a" },
+  { label: "Azzurro", value: "#6fa8dc" },
+  { label: "Viola", value: "#a77bd1" },
+];
+
+function ColorPicker({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const current = (editor.getAttributes("textStyle").color as string | undefined) ?? null;
+
+  // Il menu si chiude cliccando altrove
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const apply = (color: string | null) => {
+    if (color) editor.chain().focus().setColor(color).run();
+    else editor.chain().focus().unsetColor().run();
+    setOpen(false);
+  };
+
+  return (
+    <span ref={ref} className="relative">
+      <button
+        type="button"
+        title="Colore del testo"
+        aria-label="Colore del testo"
+        aria-expanded={open}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 min-w-8 flex-col items-center justify-center rounded px-1.5 text-sm text-muted hover:bg-white/5 hover:text-foreground"
+      >
+        <span className="leading-none font-bold">A</span>
+        <span className="mt-0.5 h-1 w-4 rounded-sm" style={{ background: current ?? "var(--foreground)" }} />
+      </button>
+      {open && (
+        <span className="absolute top-9 left-0 z-50 w-44 rounded-md border border-border bg-panel p-2 shadow-xl shadow-black">
+          <span className="grid grid-cols-4 gap-1.5">
+            {PALETTE.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                title={c.label}
+                aria-label={c.label}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => apply(c.value)}
+                className={`h-7 w-7 rounded border-2 ${current === c.value ? "border-white" : "border-transparent hover:border-white/50"}`}
+                style={{ background: c.value }}
+              />
+            ))}
+          </span>
+          <span className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <input
+                type="color"
+                value={current ?? "#e4dfdb"}
+                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent"
+              />
+              Altro
+            </label>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => apply(null)} className="hover:text-accent">
+              Togli colore
+            </button>
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Dimensione del testo
+// ---------------------------------------------------------------------
+const SIZES = [
+  { label: "Piccolo", value: "13px" },
+  { label: "Normale", value: "" },
+  { label: "Medio", value: "18px" },
+  { label: "Grande", value: "22px" },
+  { label: "Molto grande", value: "28px" },
+  { label: "Enorme", value: "36px" },
+];
+
+function FontSizeSelect({ editor }: { editor: Editor }) {
+  const current = (editor.getAttributes("textStyle").fontSize as string | undefined) ?? "";
+  return (
+    <select
+      value={SIZES.some((s) => s.value === current) ? current : ""}
+      onChange={(e) => {
+        const size = e.target.value;
+        if (size) editor.chain().focus().setFontSize(size).run();
+        else editor.chain().focus().unsetFontSize().run();
+      }}
+      title="Dimensione del testo"
+      aria-label="Dimensione del testo"
+      className="h-8 rounded border border-border bg-background px-1.5 text-xs text-muted hover:text-foreground"
+    >
+      {SIZES.map((s) => (
+        <option key={s.label} value={s.value}>
+          {s.label}
+        </option>
+      ))}
+    </select>
   );
 }
