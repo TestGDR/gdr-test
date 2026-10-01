@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { uploadGuideImage } from "./actions";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
@@ -281,8 +281,8 @@ function ImageButton({ editor }: { editor: Editor }) {
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  async function insert(e: FormEvent) {
-    e.preventDefault();
+  // Non e' un <form>: l'editor puo' stare dentro un altro modulo (es. dati della casata)
+  async function insert() {
     setError(null);
     let src = url.trim();
     if (file) {
@@ -316,8 +316,7 @@ function ImageButton({ editor }: { editor: Editor }) {
         🖼
       </button>
       {open && (
-        <form
-          onSubmit={insert}
+        <div
           className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black"
         >
           <label className="block">
@@ -331,18 +330,18 @@ function ImageButton({ editor }: { editor: Editor }) {
           </label>
           <label className="block">
             <span className="mb-1 block tracking-wider text-muted uppercase">Oppure indirizzo web</span>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} disabled={!!file} placeholder="https://..." className="input py-1 text-xs" />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insert(); } }} disabled={!!file} placeholder="https://..." className="input py-1 text-xs" />
           </label>
           <label className="block">
             <span className="mb-1 block tracking-wider text-muted uppercase">Descrizione (facoltativa)</span>
-            <input value={alt} onChange={(e) => setAlt(e.target.value)} maxLength={150} placeholder="Es. Mappa di Essos" className="input py-1 text-xs" />
+            <input value={alt} onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insert(); } }} maxLength={150} placeholder="Es. Mappa di Essos" className="input py-1 text-xs" />
           </label>
           {error && <p className="text-red-400">{error}</p>}
-          <button className="btn w-full py-1.5 text-xs" disabled={busy || (!file && !url.trim())}>
+          <button type="button" onClick={insert} className="btn w-full py-1.5 text-xs" disabled={busy || (!file && !url.trim())}>
             {busy ? "Caricamento..." : "Inserisci"}
           </button>
           <p className="text-[10px] leading-snug text-muted">Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine per ridimensionarla.</p>
-        </form>
+        </div>
       )}
     </span>
   );

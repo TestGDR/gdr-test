@@ -19,7 +19,8 @@ import {
   type SignupRole,
 } from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
-import { buildTree, byOrder, FamilyCanvas } from "./FamilyTree";
+import RichEditor from "@/components/guide/RichEditor";
+import { buildTree, byOrder, FamilyCanvas } from "@/components/houses/FamilyTree";
 import {
   addMember,
   deleteFamilyMember,
@@ -266,12 +267,16 @@ function DataTab({
   const { run, pending, feedback } = useAction();
   const [preview, setPreview] = useState<string | null>(house?.sigil_url ?? null);
   const [removeSigil, setRemoveSigil] = useState(false);
+  const [history, setHistory] = useState(house?.history ?? "");
+  const [playable, setPlayable] = useState(house?.playable ?? true);
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     if (house) form.set("id", house.id);
     if (removeSigil) form.set("remove_sigil", "1");
+    form.set("history", history);
+    form.set("playable", playable ? "1" : "0");
     run(() => saveHouse(form), "Casata salvata.", (res) => !house && res.id && onCreated(res.id));
   }
 
@@ -288,9 +293,16 @@ function DataTab({
           <Field label="Nome della casata (sarà il cognome dei membri)">
             <input name="name" defaultValue={house?.name} required minLength={2} maxLength={40} className="input" />
           </Field>
-          <Field label="Descrizione">
-            <textarea name="description" defaultValue={house?.description} rows={8} maxLength={8000} className="input" />
+          <Field label="Motto">
+            <input name="motto" defaultValue={house?.motto} maxLength={200} placeholder="Es. Fuoco e sangue" className="input" />
           </Field>
+          <Field label="Descrizione (breve presentazione)">
+            <textarea name="description" defaultValue={house?.description} rows={5} maxLength={8000} className="input" />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={playable} onChange={(e) => setPlayable(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+            Casata giocabile (PG) — compare in &quot;Casate PG&quot; nell&apos;Utility giocatore
+          </label>
         </div>
         <Field label="Stemma">
           <div className="flex flex-col items-center gap-2">
@@ -316,6 +328,9 @@ function DataTab({
           </div>
         </Field>
       </div>
+      <Field label="Storia della casata">
+        <RichEditor value={history} onChange={setHistory} />
+      </Field>
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn" disabled={pending}>
           {pending ? "Salvataggio..." : house ? "Salva" : "Crea casata"}

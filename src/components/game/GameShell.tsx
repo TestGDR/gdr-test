@@ -38,6 +38,7 @@ import {
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
+import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
 
@@ -177,7 +178,15 @@ export default function GameShell({
               </span>
             </h1>
 
-            <ComingSoonButton title="Utility giocatore" icon={<ToolsIcon />} />
+            <UtilityButton
+              className={topBtn}
+              trigger={
+                <>
+                  <ToolsIcon />
+                  <TopTip>Utility giocatore</TopTip>
+                </>
+              }
+            />
             <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
           </div>
         </header>

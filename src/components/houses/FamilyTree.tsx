@@ -171,12 +171,14 @@ export function FamilyCanvas({
   selectedId,
   onSelect,
   onMove,
+  readOnly = false,
 }: {
   tree: Tree;
   family: FamilyMember[];
   selectedId: string | null;
-  onSelect: (id: string) => void;
-  onMove: (id: string, x: number, y: number) => void;
+  onSelect?: (id: string) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  readOnly?: boolean; // solo consultazione (pagina pubblica della casata): niente trascinamento
 }) {
   // Posizioni trascinate in questa sessione (prima che arrivino dal server)
   const [moved, setMoved] = useState<Record<string, Pos>>({});
@@ -258,7 +260,7 @@ export function FamilyCanvas({
 
   // --- Trascinamento -----------------------------------------------------
   function down(e: ReactPointerEvent, id: string) {
-    if (e.button !== 0) return;
+    if (readOnly || e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { id, startX: e.clientX, startY: e.clientY, base: posOf(id), moving: false };
   }
@@ -276,9 +278,9 @@ export function FamilyCanvas({
     const d = drag.current;
     drag.current = null;
     if (!d) return;
-    if (!d.moving) return onSelect(d.id);
+    if (!d.moving) return onSelect?.(d.id);
     const p = moved[d.id];
-    if (p) onMove(d.id, p.x, p.y);
+    if (p) onMove?.(d.id, p.x, p.y);
   }
 
   return (
@@ -320,7 +322,7 @@ export function FamilyCanvas({
               onPointerMove={move}
               onPointerUp={up}
               onPointerCancel={() => (drag.current = null)}
-              className="absolute z-20 cursor-grab touch-none select-none active:cursor-grabbing"
+              className={`absolute z-20 select-none ${readOnly ? "" : "cursor-grab touch-none active:cursor-grabbing"}`}
               style={{ left: p.x, top: p.y, width: W, height: H }}
             >
               <MemberCard member={f} link={tree.linkOf(f)} selected={f.id === selectedId} />

@@ -68,7 +68,14 @@ export async function saveHouse(form: FormData): Promise<HouseResult> {
   const nameError = validateCharacterName(name);
   if (nameError) return { error: nameError.replace("Il nome", "Il nome della casata") };
 
-  const row: Record<string, unknown> = { name, description: text(form, "description", 8000) };
+  const row: Record<string, unknown> = {
+    name,
+    description: text(form, "description", 8000),
+    motto: text(form, "motto", 200),
+    // HTML dall'editor: viene ripulito quando si mostra
+    history: String(form.get("history") ?? "").slice(0, 100000),
+    playable: form.get("playable") === "1",
+  };
 
   const { data: current } = id
     ? await ctx.supabase.from("houses").select("sigil_url").eq("id", id).single()

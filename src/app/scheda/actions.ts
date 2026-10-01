@@ -75,3 +75,29 @@ export async function finalizeCharacter(characterId: string): Promise<CreationRe
   revalidatePath("/", "layout");
   return {};
 }
+
+// Prestavolto e immagine del proprio personaggio (modificabili in ogni momento)
+export async function saveSheetExtras(
+  characterId: string,
+  faceClaim: string,
+  avatarUrl: string,
+): Promise<CreationResult> {
+  const { supabase, user } = await requireUser();
+  const claim = faceClaim.trim().replace(/\s+/g, " ").slice(0, 80);
+  const avatar = avatarUrl.trim();
+  if (avatar && !avatar.toLowerCase().startsWith("https://")) {
+    return { error: "L'immagine deve essere un indirizzo che inizia con https://" };
+  }
+
+  const { error } = await supabase
+    .from("characters")
+    .update({ face_claim: claim || null, avatar_url: avatar || null })
+    .eq("id", characterId)
+    .eq("owner_id", user.id);
+  if (error) {
+    if (error.code === "23505") return { error: "Questo prestavolto è già usato da un altro personaggio." };
+    return { error: "Salvataggio non riuscito." };
+  }
+  revalidatePath("/", "layout");
+  return {};
+}

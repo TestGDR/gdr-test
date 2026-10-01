@@ -3,6 +3,9 @@ export type House = {
   id: string;
   name: string; // = cognome dei membri
   description: string;
+  motto: string;
+  history: string; // HTML scritto con l'editor
+  playable: boolean; // casata giocabile dai PG (compare in "Casate PG")
   sigil_url: string | null;
   sort_order: number;
 };
