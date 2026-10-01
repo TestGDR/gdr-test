@@ -315,11 +315,19 @@ function LeftColumn({
           </div>
         </div>
         {character && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <MessageButton label="Missive" count={unread.missiva} onClick={() => onOpenMessages("missiva")}>
+          <div className="mt-3 flex gap-2">
+            <MessageButton
+              label="Missive (messaggi in gioco)"
+              count={unread.missiva}
+              onClick={() => onOpenMessages("missiva")}
+            >
               <ScrollIcon />
             </MessageButton>
-            <MessageButton label="OFF" count={unread.off} onClick={() => onOpenMessages("off")}>
+            <MessageButton
+              label="Messaggi OFF (fuori gioco)"
+              count={unread.off}
+              onClick={() => onOpenMessages("off")}
+            >
               <BubbleIcon />
             </MessageButton>
           </div>
@@ -367,25 +375,32 @@ function MessageButton({
   onClick: () => void;
   children: ReactNode;
 }) {
+  // Solo l'icona; il nome compare nel fumetto al passaggio del mouse (o al focus da tastiera)
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative flex items-center justify-center gap-2 rounded border border-border bg-background px-2 py-1.5 text-xs tracking-wider uppercase transition hover:border-accent hover:text-accent"
+      aria-label={count > 0 ? `${label}: ${count} non letti` : label}
+      className="group relative flex h-9 w-11 items-center justify-center rounded border border-border bg-background text-muted transition hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
     >
       {children}
-      {label}
       {count > 0 && (
         <span className="absolute -top-2 -right-2 min-w-5 rounded-full bg-blood px-1.5 text-[11px] font-bold text-white shadow">
           {count}
         </span>
       )}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-blood/60 after:content-['']"
+      >
+        {label}
+      </span>
     </button>
   );
 }
 
 const ScrollIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M8 4h11v13a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1h11v1a3 3 0 0 0 3 3M8 4a3 3 0 0 0-3 3v9M11 8h5M11 12h5" />
   </svg>
 );
