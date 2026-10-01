@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { AGE_MAX, AGE_MIN } from "@/lib/character-creation";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { IMAGE_MAX_BYTES, IMAGE_TYPES } from "@/lib/houses";
 import { getStaffContext } from "@/lib/staff";
@@ -119,6 +120,11 @@ export async function saveHouseRole(input: {
   name: string;
   daily_salary: number;
   sort_order: number;
+  signup_available: boolean;
+  max_members: number | null;
+  required_sex: string | null;
+  min_age: number | null;
+  max_age: number | null;
 }): Promise<HouseResult> {
   const ctx = await authorized();
   if (!ctx) return DENIED;
@@ -130,7 +136,37 @@ export async function saveHouseRole(input: {
     return { error: "Lo stipendio deve essere un numero tra 0 e 1.000.000." };
   }
 
-  const row = { name, daily_salary: salary, sort_order: Math.trunc(input.sort_order) || 0 };
+  // Requisiti per l'iscrizione (ignorati se il ruolo non e' disponibile all'iscrizione)
+  const optInt = (v: number | null) => (v === null || Number.isNaN(Number(v)) ? null : Math.trunc(Number(v)));
+  const signup = Boolean(input.signup_available);
+  const maxMembers = signup ? optInt(input.max_members) : null;
+  const minAge = signup ? optInt(input.min_age) : null;
+  const maxAge = signup ? optInt(input.max_age) : null;
+  const sex = signup && (input.required_sex === "uomo" || input.required_sex === "donna") ? input.required_sex : null;
+  if (signup) {
+    if (!maxMembers || maxMembers < 1 || maxMembers > 1000) {
+      return { error: "Indica quanti PG al massimo possono avere il ruolo (da 1 a 1000)." };
+    }
+    for (const age of [minAge, maxAge]) {
+      if (age !== null && (age < AGE_MIN || age > AGE_MAX)) {
+        return { error: `Le età devono essere tra ${AGE_MIN} e ${AGE_MAX} anni.` };
+      }
+    }
+    if (minAge !== null && maxAge !== null && minAge > maxAge) {
+      return { error: "L'età minima non può superare quella massima." };
+    }
+  }
+
+  const row = {
+    name,
+    daily_salary: salary,
+    sort_order: Math.trunc(input.sort_order) || 0,
+    signup_available: signup,
+    max_members: maxMembers,
+    required_sex: sex,
+    min_age: minAge,
+    max_age: maxAge,
+  };
   const { data, error } = input.id
     ? await ctx.supabase.from("house_roles").update(row).eq("id", input.id).select("id").single()
     : await ctx.supabase.from("house_roles").insert({ ...row, house_id: input.house_id }).select("id").single();

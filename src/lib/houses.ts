@@ -13,6 +13,23 @@ export type HouseRole = {
   name: string;
   daily_salary: number;
   sort_order: number;
+  // disponibilita' all'iscrizione (creazione del PG)
+  signup_available: boolean;
+  max_members: number | null;
+  required_sex: "uomo" | "donna" | null; // null = qualsiasi
+  min_age: number | null;
+  max_age: number | null;
+};
+
+// Una riga di signup_house_roles(): ruolo che un PG puo' scegliere all'iscrizione
+export type SignupRole = {
+  house_id: string;
+  house_name: string;
+  sigil_url: string | null;
+  role_id: string;
+  role_name: string;
+  daily_salary: number;
+  free_slots: number;
 };
 
 export type FamilyMember = {

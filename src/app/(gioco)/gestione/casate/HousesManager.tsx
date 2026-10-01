@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
-import type { FamilyMember, House, HouseMember, HouseNpc, HouseRole } from "@/lib/houses";
+import { AGE_MAX, AGE_MIN } from "@/lib/character-creation";
+import type { FamilyMember, House, HouseMember, HouseNpc, HouseRole, SignupRole } from "@/lib/houses";
+import { createClient } from "@/lib/supabase/client";
 import {
   addMember,
   deleteFamilyMember,
@@ -85,6 +87,7 @@ export default function HousesManager(data: Data) {
         >
           + Nuova casata
         </button>
+        <SignupPreview />
       </aside>
 
       <HouseEditor
@@ -99,6 +102,60 @@ export default function HousesManager(data: Data) {
         onDeleted={() => setSelectedId(data.houses.find((h) => h.id !== selectedId)?.id ?? NEW)}
       />
     </div>
+  );
+}
+
+// Cosa vedrebbe all'iscrizione un PG con questo sesso ed eta' (stessa regola della creazione)
+function SignupPreview() {
+  const [sex, setSex] = useState("uomo");
+  const [age, setAge] = useState("20");
+  const [result, setResult] = useState<SignupRole[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function check(e: FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const { data, error } = await createClient().rpc("signup_house_roles", { p_sex: sex, p_age: Number(age) });
+    setLoading(false);
+    if (error) return setError("Simulazione non riuscita.");
+    setResult((data ?? []) as SignupRole[]);
+  }
+
+  const byHouse = new Map<string, SignupRole[]>();
+  for (const r of result ?? []) byHouse.set(r.house_name, [...(byHouse.get(r.house_name) ?? []), r]);
+
+  return (
+    <form onSubmit={check} className="mt-4 space-y-2 border-t border-border pt-3">
+      <h3 className="text-xs font-semibold tracking-[0.15em] text-muted uppercase">Simulazione iscrizione</h3>
+      <div className="flex gap-2">
+        <select value={sex} onChange={(e) => setSex(e.target.value)} className="input py-1 text-sm" aria-label="Sesso">
+          <option value="uomo">Uomo</option>
+          <option value="donna">Donna</option>
+        </select>
+        <input type="number" min={AGE_MIN} max={AGE_MAX} value={age} onChange={(e) => setAge(e.target.value)} className="input w-20 py-1 text-sm" aria-label="Età" />
+      </div>
+      <button className="btn-ghost w-full py-1 text-xs" disabled={loading}>
+        {loading ? "Calcolo..." : "Mostra casate disponibili"}
+      </button>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      {result && byHouse.size === 0 && <p className="text-xs text-muted">Nessuna casata disponibile.</p>}
+      <ul className="space-y-2 text-xs">
+        {[...byHouse].map(([house, roles]) => (
+          <li key={house}>
+            <span className="font-serif text-sm text-accent">{house}</span>
+            <ul className="ml-2">
+              {roles.map((r) => (
+                <li key={r.role_id} className="text-muted">
+                  {r.role_name} · {r.free_slots} post{r.free_slots === 1 ? "o" : "i"} liber{r.free_slots === 1 ? "o" : "i"}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </form>
   );
 }
 
@@ -259,8 +316,9 @@ function RolesTab({ houseId, roles, members }: { houseId: string; roles: HouseRo
     <div className="space-y-3">
       <p className="text-sm text-muted">
         I ruoli che i PG possono ricoprire in questa casata e quanto guadagnano ogni giorno (in monete).
+        Spunta &quot;Disponibile all&apos;iscrizione&quot; per renderlo sceglibile durante la creazione del PG.
       </p>
-      <div className="hidden grid-cols-[1fr_10rem_6rem_auto] gap-2 px-1 text-xs tracking-wider text-muted uppercase sm:grid">
+      <div className="hidden grid-cols-[1fr_10rem_6rem_auto] gap-2 px-3 text-xs tracking-wider text-muted uppercase sm:grid">
         <span>Ruolo</span>
         <span>Stipendio / giorno</span>
         <span>Ordine</span>
@@ -277,16 +335,39 @@ function RolesTab({ houseId, roles, members }: { houseId: string; roles: HouseRo
   );
 }
 
+const toInput = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+const fromInput = (v: string) => (v.trim() === "" ? null : Number(v));
+
 function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole | null; holders: number }) {
   const { run, pending, feedback } = useAction();
-  const [name, setName] = useState(role?.name ?? "");
-  const [salary, setSalary] = useState(String(role?.daily_salary ?? 0));
-  const [order, setOrder] = useState(String(role?.sort_order ?? 0));
+  const [form, setForm] = useState({
+    name: role?.name ?? "",
+    salary: String(role?.daily_salary ?? 0),
+    order: String(role?.sort_order ?? 0),
+    signup: role?.signup_available ?? false,
+    maxMembers: toInput(role?.max_members),
+    sex: role?.required_sex ?? "",
+    minAge: toInput(role?.min_age),
+    maxAge: toInput(role?.max_age),
+  });
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   function save(e: FormEvent) {
     e.preventDefault();
     run(
-      () => saveHouseRole({ id: role?.id, house_id: houseId, name, daily_salary: Number(salary), sort_order: Number(order) }),
+      () =>
+        saveHouseRole({
+          id: role?.id,
+          house_id: houseId,
+          name: form.name,
+          daily_salary: Number(form.salary),
+          sort_order: Number(form.order),
+          signup_available: form.signup,
+          max_members: fromInput(form.maxMembers),
+          required_sex: form.sex || null,
+          min_age: fromInput(form.minAge),
+          max_age: fromInput(form.maxAge),
+        }),
       role ? "Ruolo salvato." : "Ruolo aggiunto.",
     );
   }
@@ -297,14 +378,16 @@ function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole 
     run(() => deleteHouseRole(role.id), "Ruolo eliminato.");
   }
 
+  const full = role?.signup_available && role.max_members !== null && holders >= role.max_members;
+
   return (
-    <form onSubmit={save} className={`rounded-md border p-2 ${role ? "border-border/60" : "border-dashed border-accent/50"}`}>
+    <form onSubmit={save} className={`rounded-md border p-3 ${role ? "border-border/60" : "border-dashed border-accent/50"}`}>
       <div className="grid items-center gap-2 sm:grid-cols-[1fr_10rem_6rem_auto]">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={role ? "" : "Nuovo ruolo (es. Maestro d'armi)"} maxLength={40} className="input py-1.5" />
-        <input type="number" min={0} max={1000000} value={salary} onChange={(e) => setSalary(e.target.value)} className="input py-1.5" aria-label="Stipendio giornaliero" />
-        <input type="number" value={order} onChange={(e) => setOrder(e.target.value)} className="input py-1.5" aria-label="Ordine" />
+        <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={role ? "" : "Nuovo ruolo (es. Maestro d'armi)"} maxLength={40} className="input py-1.5" aria-label="Nome del ruolo" />
+        <input type="number" min={0} max={1000000} value={form.salary} onChange={(e) => set({ salary: e.target.value })} className="input py-1.5" aria-label="Stipendio giornaliero" />
+        <input type="number" value={form.order} onChange={(e) => set({ order: e.target.value })} className="input py-1.5" aria-label="Ordine" />
         <div className="flex gap-2">
-          <button className="btn px-3 py-1.5 text-sm" disabled={pending || !name.trim()}>
+          <button className="btn px-3 py-1.5 text-sm" disabled={pending || !form.name.trim()}>
             {role ? "Salva" : "Aggiungi"}
           </button>
           {role && (
@@ -314,9 +397,58 @@ function RoleRow({ houseId, role, holders }: { houseId: string; role: HouseRole 
           )}
         </div>
       </div>
-      {role && <p className="mt-1 px-1 text-xs text-muted">{holders} PG con questo ruolo</p>}
-      {feedback && <div className="mt-1 px-1">{feedback}</div>}
+
+      {/* Disponibilita' all'iscrizione */}
+      <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 py-1.5 text-sm">
+          <input type="checkbox" checked={form.signup} onChange={(e) => set({ signup: e.target.checked })} className="h-4 w-4 accent-[var(--accent)]" />
+          Disponibile all&apos;iscrizione
+        </label>
+        {form.signup && (
+          <>
+            <MiniField label="Max PG">
+              <input type="number" min={1} max={1000} required value={form.maxMembers} onChange={(e) => set({ maxMembers: e.target.value })} className="input w-24 py-1" />
+            </MiniField>
+            <MiniField label="Sesso">
+              <select value={form.sex} onChange={(e) => set({ sex: e.target.value as typeof form.sex })} className="input w-32 py-1">
+                <option value="">Qualsiasi</option>
+                <option value="uomo">Uomo</option>
+                <option value="donna">Donna</option>
+              </select>
+            </MiniField>
+            <MiniField label={`Età min (${AGE_MIN}+)`}>
+              <input type="number" min={AGE_MIN} max={AGE_MAX} value={form.minAge} onChange={(e) => set({ minAge: e.target.value })} placeholder="—" className="input w-24 py-1" />
+            </MiniField>
+            <MiniField label={`Età max (≤${AGE_MAX})`}>
+              <input type="number" min={AGE_MIN} max={AGE_MAX} value={form.maxAge} onChange={(e) => set({ maxAge: e.target.value })} placeholder="—" className="input w-24 py-1" />
+            </MiniField>
+          </>
+        )}
+      </div>
+
+      {role && (
+        <p className="mt-2 text-xs text-muted">
+          {role.signup_available && role.max_members !== null ? (
+            <>
+              Posti occupati: <strong className={full ? "text-red-400" : "text-foreground"}>{holders}/{role.max_members}</strong>
+              {full && " — completo, non compare più all'iscrizione"}
+            </>
+          ) : (
+            <>{holders} PG con questo ruolo · non disponibile all&apos;iscrizione</>
+          )}
+        </p>
+      )}
+      {feedback && <div className="mt-1">{feedback}</div>}
     </form>
+  );
+}
+
+function MiniField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[10px] tracking-wider text-muted uppercase">{label}</span>
+      {children}
+    </label>
   );
 }
 
