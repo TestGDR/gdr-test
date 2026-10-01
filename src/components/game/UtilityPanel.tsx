@@ -42,6 +42,7 @@ function UtilityPanel() {
   const [pgs, setPgs] = useState<Pg[] | null>(null);
   const [houses, setHouses] = useState<PlayableHouse[]>([]);
   const [query, setQuery] = useState("");
+  const [letter, setLetter] = useState<string | null>(null); // lettera scelta nell'indice A-Z
   const [sheetId, setSheetId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,6 +60,14 @@ function UtilityPanel() {
   const fullName = (p: Pg) => (p.house ? `${p.name} ${p.house.name}` : p.name);
   const visiblePgs = (pgs ?? []).filter((p) => !q || fullName(p).toLowerCase().includes(q) || (p.face_claim ?? "").toLowerCase().includes(q));
   const faceClaims = visiblePgs.filter((p) => p.face_claim).sort((a, b) => a.face_claim!.localeCompare(b.face_claim!));
+  // Indice alfabetico: iniziale del nome (personaggi) o del prestavolto
+  const keyOf = (p: Pg) => initial(tab === "prestavolti" ? (p.face_claim ?? "") : p.name);
+  const indexed = tab === "prestavolti" ? faceClaims : visiblePgs;
+  const available = new Set(indexed.map(keyOf));
+  const shown = letter ? indexed.filter((p) => keyOf(p) === letter) : indexed;
+  const groups = LETTERS.concat("#")
+    .map((l) => ({ letter: l, items: shown.filter((p) => keyOf(p) === l) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -75,6 +84,7 @@ function UtilityPanel() {
                     setTab(b.id);
                     setHouseId(null);
                     setQuery("");
+                    setLetter(null);
                   }}
                   className="group flex h-36 w-full flex-col items-center justify-center gap-4 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
                 >
@@ -113,10 +123,23 @@ function UtilityPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {pgs === null && <p className="text-center text-muted">Caricamento...</p>}
 
-        {/* Anagrafica giocatori: nome e cognome, cliccabili */}
-        {pgs !== null && tab === "pg" && (
+        {/* Indice A-Z (anagrafe personaggi e prestavolti) */}
+        {pgs !== null && (tab === "pg" || tab === "prestavolti") && (
+          <nav aria-label="Indice alfabetico" className="mb-4 flex flex-wrap justify-center gap-1">
+            <LetterButton label="Tutti" active={letter === null} onClick={() => setLetter(null)} />
+            {LETTERS.concat(available.has("#") ? ["#"] : []).map((l) => (
+              <LetterButton key={l} label={l} active={letter === l} disabled={!available.has(l)} onClick={() => setLetter(l)} />
+            ))}
+          </nav>
+        )}
+
+        {/* Anagrafica giocatori: nome e cognome, cliccabili, divisi per lettera */}
+        {pgs !== null && tab === "pg" &&
+          groups.map((g) => (
+            <section key={g.letter} className="mb-5">
+              <h3 className="mb-2 border-b border-blood/50 pb-1 font-serif text-xl text-accent">{g.letter}</h3>
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {visiblePgs.map((p) => (
+            {g.items.map((p) => (
               <li key={p.id}>
                 <button
                   type="button"
@@ -138,14 +161,18 @@ function UtilityPanel() {
                 </button>
               </li>
             ))}
-            {visiblePgs.length === 0 && <li className="text-muted">Nessun personaggio trovato.</li>}
           </ul>
-        )}
+            </section>
+          ))}
+        {pgs !== null && tab === "pg" && groups.length === 0 && <p className="text-muted">Nessun personaggio trovato.</p>}
 
         {/* Anagrafica prestavolti */}
-        {pgs !== null && tab === "prestavolti" && (
+        {pgs !== null && tab === "prestavolti" &&
+          groups.map((g) => (
+            <section key={g.letter} className="mb-5">
+              <h3 className="mb-1 border-b border-blood/50 pb-1 font-serif text-xl text-accent">{g.letter}</h3>
           <ul className="divide-y divide-border/60">
-            {faceClaims.map((p) => (
+            {g.items.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 py-2">
                 <span className="min-w-48 flex-1 font-serif text-foreground">{p.face_claim}</span>
                 <button type="button" onClick={() => setSheetId(p.id)} className="text-sm text-accent hover:underline">
@@ -153,12 +180,15 @@ function UtilityPanel() {
                 </button>
               </li>
             ))}
-            {faceClaims.length === 0 && (
-              <li className="py-2 text-muted">
-                Nessun prestavolto registrato. Ogni giocatore lo inserisce nella propria scheda (✎ Prestavolto e immagine).
-              </li>
-            )}
           </ul>
+            </section>
+          ))}
+        {pgs !== null && tab === "prestavolti" && groups.length === 0 && (
+          <p className="py-2 text-muted">
+            {faceClaims.length === 0 && !q
+              ? "Nessun prestavolto registrato. Ogni giocatore lo inserisce nella propria scheda (✎ Prestavolto e immagine)."
+              : "Nessun prestavolto trovato."}
+          </p>
         )}
 
         {/* Casate giocabili: aprono la pagina della casata */}
@@ -245,5 +275,46 @@ function ShieldIcon() {
     <svg {...big}>
       <path d="M12 2 4 5v6.5c0 5 3.4 9 8 10.5 4.6-1.5 8-5.5 8-10.5V5l-8-3Zm0 4.2 4 2.8-1.5 4.8h-5L8 9l4-2.8Z" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Indice alfabetico
+// ---------------------------------------------------------------------
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+// Iniziale senza accenti ("É" -> "E"); "#" per numeri e simboli
+function initial(text: string) {
+  const c = text.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").charAt(0).toUpperCase();
+  return LETTERS.includes(c) ? c : "#";
+}
+
+function LetterButton({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`h-8 min-w-8 rounded border px-2 font-serif text-sm transition ${
+        active
+          ? "border-accent bg-accent/20 text-accent"
+          : disabled
+            ? "cursor-not-allowed border-transparent text-muted/30"
+            : "border-border text-muted hover:border-accent/60 hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
