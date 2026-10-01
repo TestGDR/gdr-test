@@ -230,7 +230,7 @@ export default function GameShell({
             inert={!rightOpen}
             className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none md:static md:h-auto md:shrink-0 md:flex-col md:justify-start md:gap-2 md:border-t-0 md:border-l md:bg-black/40 md:px-0 md:py-4 ${
               rightOpen
-                ? "md:w-14 md:overflow-visible md:border-border md:opacity-100"
+                ? "md:w-24 md:overflow-visible md:border-border md:opacity-100"
                 : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
@@ -548,7 +548,7 @@ const railBtn =
 function Tip({ children }: { children: ReactNode }) {
   // Etichetta al passaggio del mouse (solo desktop)
   return (
-    <span className="pointer-events-none absolute right-12 hidden rounded border border-border bg-panel px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 md:block">
+    <span className="pointer-events-none absolute right-full z-50 mr-2 hidden rounded border border-border bg-panel px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 md:block">
       {children}
     </span>
   );
@@ -561,36 +561,38 @@ function RightRail({ characterId, isAdmin }: { characterId: string | null; isAdm
 
   return (
     <>
-      <button type="button" onClick={() => router.refresh()} className={railBtn} aria-label="Aggiorna">
-        <RefreshIcon />
-        <Tip>Aggiorna</Tip>
-      </button>
-      <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
-        <MapIcon />
-        <Tip>Mappa</Tip>
-      </Link>
-      {characterId && (
-        <SheetButton
-          characterId={characterId}
-          className={railBtn}
-          trigger={
-            <>
-              <SheetIcon />
-              <Tip>Scheda personaggio</Tip>
-            </>
-          }
-        />
-      )}
-      <Link href="/personaggi" className={`${railBtn} ${active("/personaggi")}`} aria-label="Personaggi">
-        <UsersIcon />
-        <Tip>Personaggi</Tip>
-      </Link>
-      {isAdmin && (
-        <Link href="/admin/accessi" className={`${railBtn} ${active("/admin")}`} aria-label="Registro accessi">
-          <EyeIcon />
-          <Tip>Registro accessi</Tip>
+      <div className="contents md:grid md:grid-cols-2 md:justify-items-center md:gap-2">
+        <button type="button" onClick={() => router.refresh()} className={railBtn} aria-label="Aggiorna">
+          <RefreshIcon />
+          <Tip>Aggiorna</Tip>
+        </button>
+        <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
+          <MapIcon />
+          <Tip>Mappa</Tip>
         </Link>
-      )}
+        {characterId && (
+          <SheetButton
+            characterId={characterId}
+            className={railBtn}
+            trigger={
+              <>
+                <SheetIcon />
+                <Tip>Scheda personaggio</Tip>
+              </>
+            }
+          />
+        )}
+        <Link href="/personaggi" className={`${railBtn} ${active("/personaggi")}`} aria-label="Personaggi">
+          <UsersIcon />
+          <Tip>Personaggi</Tip>
+        </Link>
+        {isAdmin && (
+          <Link href="/admin/accessi" className={`${railBtn} ${active("/admin")}`} aria-label="Registro accessi">
+            <EyeIcon />
+            <Tip>Registro accessi</Tip>
+          </Link>
+        )}
+      </div>
       <form action={logout} className="md:mt-auto">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">
           <PowerIcon />
