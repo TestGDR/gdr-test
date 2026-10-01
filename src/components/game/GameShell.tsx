@@ -15,7 +15,7 @@ import {
 import { logout } from "@/app/(pubblico)/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
 import ModalButton from "@/components/ui/ModalButton";
-import SheetButton from "@/components/scheda/SheetButton";
+import SheetButton, { SheetModal } from "@/components/scheda/SheetButton";
 import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
@@ -85,6 +85,7 @@ export default function GameShell({
   const [phrase, setPhrase] = useState(statusText);
   const [availability, setAvailability] = useState(initialAvailability);
   const [onlineOpen, setOnlineOpen] = useState(false);
+  const [sheetId, setSheetId] = useState<string | null>(null); // scheda aperta dalla lista dei presenti
   const [messages, setMessages] = useState<{
     open: boolean;
     kind: MessageKind;
@@ -229,6 +230,7 @@ export default function GameShell({
               unread={unread.counts}
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
+              onOpenSheet={setSheetId}
             />
             </div>
           </aside>
@@ -267,6 +269,7 @@ export default function GameShell({
           onRead={unread.refresh}
         />
       )}
+      <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <OnlineModal
         open={onlineOpen}
         onClose={() => setOnlineOpen(false)}
@@ -315,6 +318,7 @@ function LeftColumn({
   onOpenMessages,
   onOpenOnline,
   onChangeAvailability,
+  onOpenSheet,
 }: {
   area: Area;
   userId: string;
@@ -325,6 +329,7 @@ function LeftColumn({
   onOpenMessages: (kind: MessageKind) => void;
   onOpenOnline: () => void;
   onChangeAvailability: (value: Availability) => void;
+  onOpenSheet: (characterId: string) => void;
 }) {
   // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
   const me = online.find((p) => p.userId === userId);
@@ -425,7 +430,16 @@ function LeftColumn({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={p.sigil} alt="" title={`Casata ${p.house}`} className="h-4 w-4 shrink-0 object-contain" />
               )}
-              <span className={`truncate ${p.userId === userId ? "text-accent" : ""}`}>{p.name}</span>
+              {/* Il nome apre la scheda del personaggio */}
+              <button
+                type="button"
+                onClick={() => p.characterId && onOpenSheet(p.characterId)}
+                disabled={!p.characterId}
+                title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
+                className={`truncate text-left hover:underline disabled:no-underline ${p.userId === userId ? "text-accent" : ""}`}
+              >
+                {p.name}
+              </button>
               {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-orange-300">⧗</span>}
             </li>
           ))}
