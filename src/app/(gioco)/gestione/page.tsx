@@ -33,9 +33,9 @@ const PANELS = [
 
 export default async function GestionePage() {
   const { isStaff, isAdmin, role, permissions } = await getStaffContext();
-  if (!isStaff) notFound();
-
   const visible = PANELS.filter((p) => permissions.has(p.permission));
+  // Staff, oppure giocatori a cui il ruolo Giocatore da' accesso a qualche pannello
+  if (!isStaff && visible.length === 0) notFound();
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -47,7 +47,7 @@ export default async function GestionePage() {
           {isAdmin ? (
             <strong className="text-accent">Admin (tutti i permessi)</strong>
           ) : (
-            <strong style={{ color: role?.color }}>{role?.name}</strong>
+            <strong style={{ color: role?.color }}>{role?.name ?? "Giocatore"}</strong>
           )}
         </p>
       </div>
