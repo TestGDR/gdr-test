@@ -4,7 +4,7 @@ import { requirePermission, type StaffRole } from "@/lib/staff";
 import RolesManager, { type UserRow } from "./RolesManager";
 
 export default async function RuoliPage() {
-  const { supabase } = await requirePermission("gestione.ruoli");
+  const { supabase, isAdmin, user } = await requirePermission("gestione.ruoli");
 
   const [{ data: roles }, { data: users }] = await Promise.all([
     supabase.from("staff_roles").select("*").order("sort_order").order("name"),
@@ -18,7 +18,12 @@ export default async function RuoliPage() {
         ← Gestione
       </Link>
       <h1 className="mt-1 mb-5 font-serif text-3xl tracking-wide text-accent">Ruoli & Permessi</h1>
-      <RolesManager roles={(roles ?? []) as StaffRole[]} users={(users ?? []) as UserRow[]} />
+      <RolesManager
+        roles={(roles ?? []) as StaffRole[]}
+        users={(users ?? []) as UserRow[]}
+        currentIsAdmin={isAdmin}
+        currentUserId={user.id}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isPermissionKey } from "@/lib/permissions";
+import { ADMIN_CHOICE, PLAYER_CHOICE } from "@/lib/role-choices";
 import { getStaffContext } from "@/lib/staff";
 
 export type RoleResult = { error?: string; id?: string };
@@ -56,12 +57,32 @@ export async function deleteRole(id: string): Promise<RoleResult> {
   return {};
 }
 
-export async function assignRole(userId: string, roleId: string | null): Promise<RoleResult> {
+// Scelta dal menu "Assegna ruoli": Admin, Giocatore o id di un ruolo staff
+export async function assignRole(userId: string, choice: string): Promise<RoleResult> {
   const ctx = await authorized();
   if (!ctx) return { error: "Non hai il permesso di gestire i ruoli." };
 
-  const { error } = await ctx.supabase.rpc("assign_staff_role", { target: userId, role_id: roleId });
-  if (error) return { error: "Assegnazione non riuscita." };
+  const { data: target } = await ctx.supabase.from("profiles").select("role").eq("id", userId).single();
+  const targetIsAdmin = target?.role === "admin";
+
+  // Il database ricontrolla tutto: solo un admin nomina/toglie admin, e ne resta sempre uno
+  if (choice === ADMIN_CHOICE) {
+    if (!targetIsAdmin) {
+      const { error } = await ctx.supabase.rpc("set_admin", { target: userId, value: true });
+      if (error) return { error: error.message };
+    }
+  } else {
+    if (targetIsAdmin) {
+      const { error } = await ctx.supabase.rpc("set_admin", { target: userId, value: false });
+      if (error) return { error: error.message };
+    }
+    const { error } = await ctx.supabase.rpc("assign_staff_role", {
+      target: userId,
+      role_id: choice === PLAYER_CHOICE ? null : choice,
+    });
+    if (error) return { error: error.message };
+  }
+
   revalidatePath("/", "layout");
   return {};
 }
