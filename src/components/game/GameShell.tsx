@@ -125,17 +125,18 @@ export default function GameShell({
   return (
     <AreaContext.Provider value={setArea}>
       <div className="flex h-dvh flex-col overflow-hidden">
-        {/* Barra in alto: titolo del gioco, documentazione a sinistra, strumenti a destra */}
-        <header className="bar relative z-30 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b px-2 sm:px-4">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Apri pannello"
-              className={`${topBtn} md:hidden`}
-            >
-              <MenuIcon />
-            </button>
+        {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui */}
+        <header className="bar relative z-30 flex h-14 shrink-0 items-center justify-center border-b pr-2 pl-11 md:px-4">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Apri pannello"
+            className={`${topBtn} absolute left-1 md:hidden`}
+          >
+            <MenuIcon />
+          </button>
+
+          <div className="flex items-center gap-0.5 sm:gap-2">
             <GuideButton
               book="ambientazione"
               label="Ambientazione"
@@ -158,19 +159,17 @@ export default function GameShell({
                 </>
               }
             />
-          </div>
 
-          <h1 className="flex items-center gap-3 font-serif text-base tracking-[0.2em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:text-xl md:text-2xl">
-            <span className="hidden text-blood sm:inline">
-              <FlameIcon />
-            </span>
-            Westeros GDR
-            <span className="hidden text-blood sm:inline">
-              <FlameIcon />
-            </span>
-          </h1>
+            <h1 className="mx-1 flex items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] md:text-2xl">
+              <span className="hidden text-blood md:inline">
+                <FlameIcon />
+              </span>
+              Westeros GDR
+              <span className="hidden text-blood md:inline">
+                <FlameIcon />
+              </span>
+            </h1>
 
-          <div className="flex items-center justify-end gap-1">
             <ComingSoonButton title="Utility giocatore" icon={<ToolsIcon />} />
             <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
           </div>
@@ -505,7 +504,7 @@ function useUnread(characterId: string | null) {
 // Barra in alto: pulsanti a icona con fumetto sotto
 // ---------------------------------------------------------------------
 const topBtn =
-  "group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent focus-visible:text-accent focus-visible:outline-none";
+  "group relative flex h-8 w-8 shrink-0 sm:h-10 sm:w-10 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent focus-visible:text-accent focus-visible:outline-none";
 
 function TopTip({ children }: { children: ReactNode }) {
   return (
