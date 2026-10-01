@@ -307,6 +307,25 @@ export async function saveFamilyMember(input: {
   return done(data.id);
 }
 
+// Posizione di una carta trascinata nell'albero
+export async function saveTreePosition(id: string, x: number, y: number): Promise<HouseResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const clamp = (v: number) => Math.min(20000, Math.max(0, Math.round(v)));
+  const { error } = await ctx.supabase.from("house_family_members").update({ pos_x: clamp(x), pos_y: clamp(y) }).eq("id", id);
+  if (error) return { error: "Posizione non salvata." };
+  return done();
+}
+
+// Torna alla disposizione automatica per tutto l'albero della casata
+export async function resetTreePositions(houseId: string): Promise<HouseResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const { error } = await ctx.supabase.from("house_family_members").update({ pos_x: null, pos_y: null }).eq("house_id", houseId);
+  if (error) return { error: "Ripristino non riuscito." };
+  return done();
+}
+
 export async function deleteFamilyMember(id: string): Promise<HouseResult> {
   const ctx = await authorized();
   if (!ctx) return DENIED;

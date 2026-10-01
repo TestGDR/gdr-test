@@ -15,11 +15,11 @@ import {
   type HouseMember,
   type HouseNpc,
   type HouseRole,
-  type LifeDates,
   type RelationKind,
   type SignupRole,
 } from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
+import { buildTree, byOrder, FamilyCanvas } from "./FamilyTree";
 import {
   addMember,
   deleteFamilyMember,
@@ -33,6 +33,8 @@ import {
   saveHouseRole,
   saveNpc,
   saveRelation,
+  saveTreePosition,
+  resetTreePositions,
   setMemberRole,
   type HouseResult,
 } from "./actions";
@@ -510,70 +512,6 @@ function MiniField({ label, children }: { label: string; children: ReactNode }) 
 // ---------------------------------------------------------------------
 // Albero genealogico: genitori (fino a due) e rapporti tra membri
 // ---------------------------------------------------------------------
-type Tree = {
-  byId: Map<string, FamilyMember>;
-  roots: FamilyMember[];
-  childrenOf: (nodeId: string) => FamilyMember[];
-  besideOf: (nodeId: string) => FamilyMember[]; // coniugi mostrati accanto al membro
-  relationsOf: (memberId: string) => { relation: FamilyRelation; other: FamilyMember }[];
-  linkOf: (member: FamilyMember) => MemberLink; // PNG collegato e sua casata
-};
-
-// Per la carta: ritratto del PNG collegato e casata di provenienza se diversa
-type MemberLink = { image: string | null; externalHouse: House | null; life: LifeDates };
-
-const byOrder = (a: FamilyMember, b: FamilyMember) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
-
-// Chi entra in famiglia per matrimonio (nessun genitore nell'albero) viene disegnato
-// accanto al coniuge invece che come capostipite separato; i figli stanno sotto la coppia.
-function buildTree(
-  family: FamilyMember[],
-  relations: FamilyRelation[],
-  npcs: HouseNpc[],
-  houses: House[],
-  houseId: string,
-): Tree {
-  const byId = new Map(family.map((f) => [f.id, f]));
-  const npcById = new Map(npcs.map((n) => [n.id, n]));
-  const houseById = new Map(houses.map((h) => [h.id, h]));
-  const parentsOf = (m: FamilyMember) => [m.parent_id, m.parent2_id].filter((p): p is string => !!p && byId.has(p));
-  const hasParents = (m: FamilyMember) => parentsOf(m).length > 0;
-  const relationsOf = (id: string) =>
-    relations
-      .filter((r) => r.member_a === id || r.member_b === id)
-      .map((r) => ({ relation: r, other: byId.get(r.member_a === id ? r.member_b : r.member_a) }))
-      .filter((x): x is { relation: FamilyRelation; other: FamilyMember } => !!x.other);
-
-  const host = new Map<string, string>(); // membro disegnato accanto -> membro principale
-  for (const m of [...family].sort(byOrder)) {
-    if (hasParents(m)) continue;
-    const partners = relationsOf(m.id).map((x) => x.other);
-    const withParents = partners.find(hasParents);
-    const earlierRootless = partners.find((p) => !hasParents(p) && !host.has(p.id) && byOrder(p, m) < 0);
-    const target = withParents ?? earlierRootless;
-    if (target) host.set(m.id, target.id);
-  }
-  const nodeOf = (id: string) => host.get(id) ?? id;
-
-  return {
-    byId,
-    roots: family.filter((m) => !host.has(m.id) && !hasParents(m)).sort(byOrder),
-    childrenOf: (nodeId) =>
-      family.filter((c) => !host.has(c.id) && hasParents(c) && nodeOf(parentsOf(c)[0]) === nodeId).sort(byOrder),
-    besideOf: (nodeId) => family.filter((m) => host.get(m.id) === nodeId).sort(byOrder),
-    relationsOf,
-    linkOf: (m) => {
-      const npc = m.npc_id ? npcById.get(m.npc_id) : undefined;
-      const external = npc && npc.house_id !== houseId ? (houseById.get(npc.house_id) ?? null) : null;
-      // Nascita, morte e "deceduto" dei membri collegati vengono dalla scheda del PNG
-      const life: LifeDates = npc
-        ? { birth_year: npc.birth_year, death_year: npc.death_year, deceased: npc.deceased }
-        : { birth_year: m.birth_year, death_year: m.death_year, deceased: m.deceased };
-      return { image: npc?.image_url ?? null, externalHouse: external, life };
-    },
-  };
-}
-
 function TreeTab({
   houseId,
   family,
@@ -587,7 +525,9 @@ function TreeTab({
   allNpcs: HouseNpc[];
   allHouses: House[];
 }) {
+  const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [layoutVersion, setLayoutVersion] = useState(0); // cambia per scartare gli spostamenti locali
   const editing = family.find((f) => f.id === editingId) ?? null;
   const tree = buildTree(family, relations, allNpcs, allHouses, houseId);
 
@@ -602,25 +542,43 @@ function TreeTab({
           </span>
         ))}
         <span className="rounded-full border border-sky-700/60 px-2 py-0.5">bordo azzurro = PNG di un&apos;altra casata</span>
-        <span className="ml-auto">Clicca una persona per modificarla</span>
+        <span className="ml-auto">Clicca una persona per modificarla · trascinala per spostarla</span>
       </div>
 
-      {/* Albero dall'alto verso il basso; se e' largo si scorre di lato */}
-      <div className="overflow-x-auto rounded-md border border-border/60 bg-[radial-gradient(ellipse_at_top,#1d1512_0%,transparent_70%)] p-6">
+      {/* Albero: carte trascinabili, linee calcolate da genitori e rapporti; se e' grande si scorre */}
+      <div className="max-h-[70vh] overflow-auto rounded-md border border-border/60 bg-[radial-gradient(ellipse_at_top,#1d1512_0%,transparent_70%)]">
         {tree.roots.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">
+          <p className="py-10 text-center text-sm text-muted">
             L&apos;albero è vuoto: aggiungi il capostipite con il modulo qui sotto.
           </p>
         ) : (
-          <div className="ftree mx-auto w-max min-w-full">
-            <ul>
-              {tree.roots.map((r) => (
-                <TreeNode key={r.id} member={r} tree={tree} selectedId={editingId} onSelect={setEditingId} />
-              ))}
-            </ul>
-          </div>
+          <FamilyCanvas
+            key={layoutVersion}
+            tree={tree}
+            family={family}
+            selectedId={editingId}
+            onSelect={setEditingId}
+            onMove={(id, x, y) => saveTreePosition(id, x, y)}
+          />
         )}
       </div>
+      {family.some((f) => f.pos_x !== null) && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() =>
+              window.confirm("Rimettere tutte le carte nella disposizione automatica?") &&
+              resetTreePositions(houseId).then(() => {
+                setLayoutVersion((v) => v + 1);
+                router.refresh();
+              })
+            }
+            className="btn-ghost px-3 py-1.5 text-xs tracking-wider uppercase"
+          >
+            ↺ Disposizione automatica
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FamilyForm
@@ -635,164 +593,6 @@ function TreeTab({
         <RelationsForm houseId={houseId} family={family} relations={relations} />
       </div>
     </div>
-  );
-}
-
-// Carta di una persona nell'albero
-function MemberBox({
-  member,
-  link,
-  selected,
-  onSelect,
-  subtitle,
-  hideSpouse,
-}: {
-  member: FamilyMember;
-  link: MemberLink;
-  selected: boolean;
-  onSelect: (id: string) => void;
-  subtitle?: string;
-  hideSpouse?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(member.id)}
-      className={`group relative flex w-40 flex-col items-center rounded-lg border bg-gradient-to-b from-panel to-black px-3 pt-3 pb-2.5 text-center shadow-lg shadow-black/60 transition hover:-translate-y-0.5 hover:border-accent ${
-        selected ? "border-accent ring-2 ring-accent/40" : link.externalHouse ? "border-sky-700/70" : "border-border"
-      } ${link.life.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
-    >
-      {/* Ritratto del PNG collegato, altrimenti l'iniziale */}
-      {link.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={link.image}
-          alt=""
-          className={`mb-1.5 h-12 w-12 rounded-full border-2 object-cover ${link.life.deceased ? "border-muted/50" : "border-accent/70"}`}
-        />
-      ) : (
-        <span
-          className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border-2 font-serif text-lg ${
-            link.life.deceased ? "border-muted/50 text-muted" : "border-accent/70 bg-blood/20 text-accent"
-          }`}
-        >
-          {member.name[0]}
-        </span>
-      )}
-      {/* PNG di un'altra casata: stemma e nome della casata di provenienza */}
-      {link.externalHouse && (
-        <span className="absolute -top-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sky-700/70 bg-black px-2 py-0.5 text-[10px] whitespace-nowrap text-sky-200">
-          {link.externalHouse.sigil_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={link.externalHouse.sigil_url} alt="" className="h-3.5 w-3.5 object-contain" />
-          )}
-          {link.externalHouse.name}
-        </span>
-      )}
-      <span className="font-serif text-sm leading-tight text-foreground">
-        {member.name}
-        {link.life.deceased && <span className="ml-1 text-muted">†</span>}
-      </span>
-      {lifeLabel(link.life, GAME_YEAR) && (
-        <span className="mt-0.5 text-[10px] leading-tight text-foreground/70">{lifeLabel(link.life, GAME_YEAR)}</span>
-      )}
-      {member.note && <span className="mt-0.5 text-[11px] leading-tight text-accent/80 italic">{member.note}</span>}
-      {member.spouse && !hideSpouse && (
-        <span className="mt-1 text-[10px] leading-tight text-muted">⚭ {member.spouse}</span>
-      )}
-      {subtitle && <span className="mt-1 text-[10px] leading-tight text-muted">{subtitle}</span>}
-    </button>
-  );
-}
-
-function TreeNode({
-  member,
-  tree,
-  selectedId,
-  onSelect,
-}: {
-  member: FamilyMember;
-  tree: Tree;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const beside = tree.besideOf(member.id);
-  const kids = tree.childrenOf(member.id);
-  const relations = tree.relationsOf(member.id);
-  // Rapporti con chi non e' disegnato accanto (es. due sposati con i genitori entrambi nell'albero)
-  const otherRelations = relations.filter((x) => !beside.some((b) => b.id === x.other.id));
-  // Il coniuge scritto a mano si nasconde se e' gia' collegato nell'albero
-  const linkedNames = relations.map((x) => x.other.name.toLowerCase());
-  const spouseIsLinked = linkedNames.includes(member.spouse.trim().toLowerCase());
-
-  // "figlio/a di ..." solo se i genitori non sono gia' la coppia disegnata sopra
-  const parentsLabel = () => {
-    const parents = [member.parent_id, member.parent2_id].filter((p): p is string => !!p);
-    if (parents.length < 2) return undefined;
-    const [first, second] = parents;
-    const shownTogether = tree.besideOf(first).some((b) => b.id === second) || tree.besideOf(second).some((b) => b.id === first);
-    if (shownTogether) return undefined;
-    const names = parents.map((p) => tree.byId.get(p)?.name).filter(Boolean);
-    return names.length === 2 ? `figlio/a di ${names[0]} e ${names[1]}` : undefined;
-  };
-
-  return (
-    <li>
-      <div className="flex items-center">
-        <MemberBox
-          member={member}
-          link={tree.linkOf(member)}
-          selected={member.id === selectedId}
-          onSelect={onSelect}
-          subtitle={parentsLabel()}
-          hideSpouse={spouseIsLinked}
-        />
-        {beside.map((b) => {
-          const rel = relations.find((x) => x.other.id === b.id)?.relation;
-          const kind = rel ? RELATION_KINDS[rel.kind] : RELATION_KINDS.matrimonio;
-          return (
-            <div key={b.id} className="flex items-center">
-              {/* Legame della coppia */}
-              <span className="h-px w-4 bg-accent/60" />
-              <span
-                title={kind.label + (rel?.note ? ` — ${rel.note}` : "")}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/70 bg-black text-sm text-accent shadow-[0_0_10px_rgba(226,98,45,0.35)]"
-              >
-                {kind.symbol}
-              </span>
-              <span className="h-px w-4 bg-accent/60" />
-              <MemberBox
-                member={b}
-                link={tree.linkOf(b)}
-                selected={b.id === selectedId}
-                onSelect={onSelect}
-                hideSpouse={b.spouse.trim().toLowerCase() === member.name.toLowerCase()}
-              />
-            </div>
-          );
-        })}
-      </div>
-      {otherRelations.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap justify-center gap-1">
-          {otherRelations.map(({ relation, other }) => (
-            <span
-              key={relation.id}
-              title={RELATION_KINDS[relation.kind].label + (relation.note ? ` — ${relation.note}` : "")}
-              className="rounded-full border border-accent/40 bg-black/60 px-2 py-0.5 text-[10px] text-muted"
-            >
-              <span className="text-accent">{RELATION_KINDS[relation.kind].symbol}</span> {other.name}
-            </span>
-          ))}
-        </div>
-      )}
-      {kids.length > 0 && (
-        <ul>
-          {kids.map((k) => (
-            <TreeNode key={k.id} member={k} tree={tree} selectedId={selectedId} onSelect={onSelect} />
-          ))}
-        </ul>
-      )}
-    </li>
   );
 }
 

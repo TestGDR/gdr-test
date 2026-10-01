@@ -44,6 +44,8 @@ export type FamilyMember = {
   deceased: boolean;
   birth_year: number | null; // per i membri collegati a un PNG valgono quelli del PNG
   death_year: number | null;
+  pos_x: number | null; // posizione salvata se la carta e' stata trascinata
+  pos_y: number | null;
   sort_order: number;
 };
 
