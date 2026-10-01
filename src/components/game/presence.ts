@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isAvailability, type Availability } from "@/lib/availability";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,6 +32,12 @@ export function usePresence(me: OnlinePlayer) {
   const supabase = useMemo(() => createClient(), []);
   const [online, setOnline] = useState<OnlinePlayer[]>([]);
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  // Ultimi dati da annunciare: servono anche dopo una riconnessione
+  const payload = JSON.stringify(me);
+  const latest = useRef(payload);
+  useEffect(() => {
+    latest.current = payload;
+  }, [payload]);
 
   useEffect(() => {
     const ch = supabase.channel("online", { config: { presence: { key: me.userId } } });
@@ -63,16 +69,29 @@ export function usePresence(me: OnlinePlayer) {
         }),
       );
     }).subscribe((status) => {
-      if (status === "SUBSCRIBED") setChannel(ch);
+      if (status !== "SUBSCRIBED") return;
+      setChannel(ch);
+      // Dopo una caduta della connessione Supabase si ricollega da solo ma NON
+      // ripete l'annuncio di presenza: lo rifacciamo a ogni (ri)connessione
+      ch.track(JSON.parse(latest.current));
     });
+
+    // Tornando sulla scheda (dopo standby o scheda in secondo piano) ci si riannuncia
+    const onVisible = () => {
+      if (document.visibilityState === "visible") ch.track(JSON.parse(latest.current));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
+
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
       setChannel(null);
       supabase.removeChannel(ch);
     };
   }, [supabase, me.userId]);
 
   // Ogni volta che cambio posto, nome, frase... aggiorno cio' che vedono gli altri
-  const payload = JSON.stringify(me);
   useEffect(() => {
     channel?.track(JSON.parse(payload));
   }, [channel, payload]);
