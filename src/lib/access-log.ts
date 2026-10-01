@@ -42,7 +42,7 @@ function isPrivateIp(ip: string) {
 // Interroga proxycheck.io (piano gratuito: ~100 richieste/giorno senza chiave,
 // 1000/giorno con chiave gratuita in PROXYCHECK_API_KEY)
 async function lookupIp(ip: string): Promise<(IpInfo & { raw: unknown }) | null> {
-  const key = process.env.PROXYCHECK_API_KEY;
+  const key = process.env.PROXYCHECK_API_KEY?.trim();
   const url = `https://proxycheck.io/v3/${encodeURIComponent(ip)}${key ? `?key=${key}` : ""}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000), cache: "no-store" });

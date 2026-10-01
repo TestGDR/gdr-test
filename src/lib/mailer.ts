@@ -4,7 +4,10 @@ import nodemailer from "nodemailer";
 // Invio email tramite SMTP (Gmail, Brevo, Resend, ecc.): basta cambiare le variabili
 // SMTP_* senza toccare il codice. Senza configurazione l'invio viene saltato.
 function createTransport() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  // trim(): spazi o "a capo" incollati per sbaglio nelle variabili
+  const [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS] = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"].map(
+    (k) => process.env[k]?.trim() || undefined,
+  );
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
   const port = Number(SMTP_PORT ?? 465);
   return nodemailer.createTransport({
@@ -37,7 +40,7 @@ export async function sendWelcomeEmail(params: {
 
   const { to, characterName, siteUrl } = params;
   const name = escapeHtml(characterName);
-  const from = `"${SENDER_NAME}" <${process.env.MAIL_FROM ?? process.env.SMTP_USER}>`;
+  const from = `"${SENDER_NAME}" <${(process.env.MAIL_FROM ?? process.env.SMTP_USER ?? "").trim()}>`;
 
   const text = `Benvenuto su Westeros GDR!
 

@@ -6,7 +6,7 @@ import { supabaseUrl } from "./env";
 // Da usare esclusivamente per operazioni che l'utente non deve poter fare da solo
 // (es. scrivere nel registro accessi).
 export function createAdminClient() {
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!secretKey) return null;
   return createClient(supabaseUrl, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
