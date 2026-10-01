@@ -69,7 +69,7 @@ export function SheetContent({ characterId }: { characterId: string }) {
   }, [load, supabase]);
 
   if (!character) return <p className="text-center text-muted">Caricamento...</p>;
-  // La scheda e' modificabile (creazione, prestavolto, immagine) solo dal proprietario
+  // La scheda e' modificabile (creazione; prestavolto e immagine solo a PG attivo) solo dal proprietario
   const isOwn = viewerId !== null && viewerId === character.owner_id;
 
   if (mode === "creazione" && isOwn) {
@@ -108,7 +108,7 @@ function CharacterSheet({
   return (
     <div>
       <div className="flex items-center gap-4 border-b border-border pb-4">
-        {character.avatar_url ? (
+        {active && character.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={character.avatar_url} alt="" className="h-20 w-20 rounded-md object-cover" />
         ) : (
@@ -131,7 +131,7 @@ function CharacterSheet({
               {character.house_role && <> · {character.house_role.name}</>}
             </p>
           )}
-          {character.face_claim && (
+          {active && character.face_claim && (
             <p className="text-sm text-muted">
               Prestavolto: <span className="text-foreground">{character.face_claim}</span>
             </p>
@@ -144,14 +144,14 @@ function CharacterSheet({
             {active ? "Attivo" : "Non attivo"}
           </span>
         </div>
-        {isOwn && !editing && (
+        {active && isOwn && !editing && (
           <button type="button" onClick={() => setEditing(true)} className="btn-ghost shrink-0 px-3 py-1.5 text-xs">
             ✎ Prestavolto e immagine
           </button>
         )}
       </div>
 
-      {isOwn && editing && (
+      {active && isOwn && editing && (
         <ExtrasForm
           character={character}
           onDone={(saved) => {
