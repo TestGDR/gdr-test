@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
+import SheetButton from "@/components/scheda/SheetButton";
+import { getMainCharacter, type MainCharacter } from "@/lib/main-character";
 
 export default async function Header() {
   const supabase = await createClient();
@@ -11,14 +13,15 @@ export default async function Header() {
 
   let username: string | null = null;
   let isAdmin = false;
+  let character: MainCharacter | null = null;
   if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("username, role")
-      .eq("id", user.id)
-      .single();
+    const [{ data }, main] = await Promise.all([
+      supabase.from("profiles").select("username, role").eq("id", user.id).single(),
+      getMainCharacter(supabase, user.id),
+    ]);
     username = data?.username ?? null;
     isAdmin = data?.role === "admin";
+    character = main;
   }
 
   return (
@@ -54,7 +57,11 @@ export default async function Header() {
         <div className="flex items-center justify-end gap-4">
           {user && (
             <>
-              <span className="text-muted">{username}</span>
+              {character ? (
+                <SheetButton characterId={character.id} name={character.name} />
+              ) : (
+                <span className="text-muted">{username}</span>
+              )}
               <form action={logout}>
                 <button className="hover:text-accent">Esci</button>
               </form>

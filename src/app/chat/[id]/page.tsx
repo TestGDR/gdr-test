@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import InactiveBanner from "@/components/InactiveBanner";
 import { requireUser } from "@/lib/supabase/server";
 import type { Character, Location, Message, Room } from "@/lib/types";
 import ChatRoom from "./ChatRoom";
@@ -24,9 +25,26 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       .eq("room_id", id)
       .order("created_at", { ascending: false })
       .limit(HISTORY_SIZE),
-    supabase.from("characters").select("*").eq("owner_id", user.id).order("created_at"),
+    // Solo i personaggi attivi possono giocare (lo impone anche il database)
+    supabase
+      .from("characters")
+      .select("*")
+      .eq("owner_id", user.id)
+      .eq("status", "attivo")
+      .order("created_at"),
     supabase.from("profiles").select("role").eq("id", user.id).single(),
   ]);
+
+  if (!characters?.length) {
+    return (
+      <div className="mx-auto mt-10 max-w-xl">
+        <InactiveBanner />
+        <Link href={`/luogo/${room.location.id}`} className="btn-ghost">
+          ← Torna a {room.location.name}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">

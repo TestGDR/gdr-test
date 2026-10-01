@@ -139,7 +139,7 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   // Se la conferma email e' disattivata su Supabase, l'utente e' gia' loggato
-  if (data.session) redirect("/personaggi");
+  if (data.session) redirect("/mappa");
   return { message: "Iscrizione completata! Controlla la tua email per confermare l'account." };
 }
 

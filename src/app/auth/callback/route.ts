@@ -6,9 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/personaggi";
+  const next = searchParams.get("next") ?? "/mappa";
   // Solo percorsi interni al sito, mai redirect verso altri domini
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/personaggi";
+  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/mappa";
 
   if (code) {
     const supabase = await createClient();

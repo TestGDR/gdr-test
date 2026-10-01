@@ -1,7 +1,6 @@
 "use client";
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
@@ -93,20 +92,6 @@ export default function ChatRoom({ roomId, userId, isStaff, characters, initialM
     }
     addMessage(data);
     setText("");
-  }
-
-  if (characters.length === 0) {
-    return (
-      <div className="panel">
-        <p>
-          Per scrivere in una lista ti serve un personaggio.{" "}
-          <Link href="/personaggi" className="text-accent underline">
-            Creane uno
-          </Link>
-          .
-        </p>
-      </div>
-    );
   }
 
   return (

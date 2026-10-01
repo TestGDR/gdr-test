@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import InactiveBanner from "@/components/InactiveBanner";
+import { getMainCharacter } from "@/lib/main-character";
 import { requireUser } from "@/lib/supabase/server";
 import type { Location, Room } from "@/lib/types";
 
 export default async function LuogoPage({ params }: PageProps<"/luogo/[id]">) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const character = await getMainCharacter(supabase, user.id);
 
   const { data: location } = await supabase
     .from("locations")
@@ -23,6 +26,7 @@ export default async function LuogoPage({ params }: PageProps<"/luogo/[id]">) {
 
   return (
     <div>
+      {character?.status !== "attivo" && <InactiveBanner />}
       <Link href={`/mappa?id=${location.map_id}`} className="text-sm text-muted hover:text-accent">
         ← Torna alla mappa
       </Link>

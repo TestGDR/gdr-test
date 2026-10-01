@@ -2,10 +2,11 @@
 
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
-type Size = "md" | "xl";
+type Size = "md" | "lg" | "xl";
 
 const SIZE_CLASS: Record<Size, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
+  lg: "w-[min(46rem,calc(100vw-2rem))] max-h-[90vh]",
   xl: "w-[min(80rem,calc(100vw-2rem))] h-[min(52rem,calc(100vh-2rem))]",
 };
 

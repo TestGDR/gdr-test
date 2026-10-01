@@ -1,9 +1,12 @@
 import Link from "next/link";
+import InactiveBanner from "@/components/InactiveBanner";
+import { getMainCharacter } from "@/lib/main-character";
 import { requireUser } from "@/lib/supabase/server";
 import type { GameMap, Location } from "@/lib/types";
 
 export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const character = await getMainCharacter(supabase, user.id);
   const { id } = await searchParams;
 
   const { data: maps } = await supabase.from("maps").select("*").order("sort_order");
@@ -19,6 +22,7 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
 
   return (
     <div>
+      {character?.status !== "attivo" && <InactiveBanner />}
       <div className="mb-4 flex flex-wrap items-baseline gap-4">
         <h1 className="font-serif text-3xl text-accent">{map.name}</h1>
         {allMaps.length > 1 &&

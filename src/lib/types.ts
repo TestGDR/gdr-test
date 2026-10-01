@@ -1,3 +1,5 @@
+import type { CreationData } from "@/lib/character-creation";
+
 export type Character = {
   id: string;
   owner_id: string;
@@ -5,6 +7,16 @@ export type Character = {
   description: string;
   avatar_url: string | null;
   created_at: string;
+  status: "bozza" | "attivo";
+  creation_step: number;
+  creation_data: CreationData;
+  sex: string | null;
+  age: number | null;
+  region: string | null;
+  social_class: string | null;
+  attributes: Record<string, number> | null;
+  appearance: string | null;
+  activated_at: string | null;
 };
 
 export type GameMap = {
