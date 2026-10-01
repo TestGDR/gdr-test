@@ -18,6 +18,12 @@ const PANELS = [
     description: "IP di accesso, controllo VPN e IP condivisi tra account.",
   },
   {
+    permission: "casate.gestire",
+    href: "/gestione/casate",
+    title: "Casate",
+    description: "Stemmi, ruoli e stipendi, alberi genealogici, PNG e PG di ogni casata.",
+  },
+  {
     permission: "mondo.gestire",
     href: null,
     title: "Gestione mondo",

@@ -96,6 +96,8 @@ export default function GameShell({
     characterId: character?.id ?? null,
     name: character?.name ?? displayName,
     avatar: character?.avatar_url ?? null,
+    house: character?.house?.name ?? null,
+    sigil: character?.house?.sigil_url ?? null,
     staffRole: staffRole?.name ?? null,
     staffColor: staffRole?.color ?? null,
     active: character?.status === "attivo",
@@ -402,6 +404,10 @@ function LeftColumn({
                 value={p.availability}
                 onChange={p.userId === userId ? onChangeAvailability : undefined}
               />
+              {p.sigil && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.sigil} alt="" title={`Casata ${p.house}`} className="h-4 w-4 shrink-0 object-contain" />
+              )}
               <span className={`truncate ${p.userId === userId ? "text-accent" : ""}`}>{p.name}</span>
               {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-orange-300">⧗</span>}
             </li>

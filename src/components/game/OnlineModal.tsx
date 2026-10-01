@@ -136,7 +136,14 @@ function PlayerRow({
       <Avatar name={player.name} url={player.avatar} size="h-9 w-9 sm:h-11 sm:w-11" />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2">
-          <span className="truncate font-serif tracking-wide text-accent uppercase">{player.name}</span>
+          {player.sigil && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-5 w-5 shrink-0 object-contain" />
+          )}
+          <span className="truncate font-serif tracking-wide text-accent uppercase">
+            {player.name}
+            {player.house && <span className="text-foreground/70"> {player.house}</span>}
+          </span>
           {!isMe && player.characterId && (
             <button
               type="button"

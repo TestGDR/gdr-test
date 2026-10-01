@@ -21,6 +21,8 @@ export type OnlinePlayer = {
   staffColor: string | null;
   active: boolean; // PG attivo (creazione completata)
   phrase: string;
+  house: string | null; // casata (cognome)
+  sigil: string | null; // stemma della casata
   place: "mappa" | "chat";
   placeKey: string; // "mappa" oppure "chat:<id lista>": chi ha la stessa chiave e' nello stesso posto
   placeLabel: string; // nome del posto (mappa, luogo o lista)
@@ -52,6 +54,8 @@ export function usePresence(me: OnlinePlayer) {
             staffColor: p.staffColor ?? null,
             active: p.active ?? false,
             phrase: p.phrase ?? "",
+            house: p.house ?? null,
+            sigil: p.sigil ?? null,
             place: p.place ?? "mappa",
             placeKey: p.placeKey ?? "mappa",
             placeLabel: p.placeLabel ?? "",

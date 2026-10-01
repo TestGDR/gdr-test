@@ -50,7 +50,7 @@ function SheetContent({ characterId }: { characterId: string }) {
     () =>
       supabase
         .from("characters")
-        .select("*")
+        .select("*, house:houses(name, sigil_url), house_role:house_roles(name)")
         .eq("id", characterId)
         .single<Character>()
         .then(({ data }) => setCharacter(data)),
@@ -97,7 +97,20 @@ function CharacterSheet({ character, onCreate }: { character: Character; onCreat
           </div>
         )}
         <div>
-          <h3 className="font-serif text-2xl text-foreground">{character.name}</h3>
+          <h3 className="font-serif text-2xl text-foreground">
+            {character.name}
+            {character.house && <span className="text-accent"> {character.house.name}</span>}
+          </h3>
+          {character.house && (
+            <p className="flex items-center gap-2 text-sm text-muted">
+              {character.house.sigil_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={character.house.sigil_url} alt="" className="h-6 w-6 object-contain" />
+              )}
+              Casata {character.house.name}
+              {character.house_role && <> · {character.house_role.name}</>}
+            </p>
+          )}
           <span
             className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-semibold tracking-wider uppercase ${
               active ? "bg-green-900/50 text-green-300" : "bg-blood/30 text-orange-200"

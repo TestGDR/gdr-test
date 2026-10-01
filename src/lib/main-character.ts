@@ -5,6 +5,7 @@ export type MainCharacter = {
   name: string;
   status: "bozza" | "attivo";
   avatar_url: string | null;
+  house: { name: string; sigil_url: string | null } | null;
 };
 
 // Il personaggio principale dell'account: quello creato all'iscrizione (il piu' vecchio)
@@ -14,7 +15,7 @@ export async function getMainCharacter(
 ): Promise<MainCharacter | null> {
   const { data } = await supabase
     .from("characters")
-    .select("id, name, status, avatar_url")
+    .select("id, name, status, avatar_url, house:houses(name, sigil_url)")
     .eq("owner_id", userId)
     .order("created_at")
     .limit(1)

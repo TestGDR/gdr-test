@@ -17,6 +17,11 @@ export type Character = {
   attributes: Record<string, number> | null;
   appearance: string | null;
   activated_at: string | null;
+  house_id?: string | null;
+  house_role_id?: string | null;
+  // presenti solo quando la query li richiede
+  house?: { name: string; sigil_url: string | null } | null;
+  house_role?: { name: string } | null;
 };
 
 export type GameMap = {

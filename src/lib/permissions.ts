@@ -18,6 +18,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "gestione.ruoli", label: "Ruoli & Permessi", description: "Creare, modificare, eliminare e assegnare i ruoli staff" },
       { key: "gestione.accessi", label: "Registro accessi", description: "IP, controllo VPN e IP condivisi tra account" },
       { key: "mondo.gestire", label: "Gestione mondo", description: "Mappe, luoghi e liste di gioco" },
+      { key: "casate.gestire", label: "Gestione casate", description: "Casate, ruoli e stipendi, alberi genealogici, PNG e membri" },
       { key: "documentazione.scrivere", label: "Manuale e Ambientazione", description: "Scrivere e modificare le pagine della documentazione" },
       { key: "utenti.gestire", label: "Gestione utenti", description: "Sospensioni ed eliminazioni degli account", soon: true },
     ],
