@@ -285,7 +285,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 // Iniziale senza accenti ("É" -> "E"); "#" per numeri e simboli
 function initial(text: string) {
-  const c = text.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").charAt(0).toUpperCase();
+  const c = text.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").charAt(0).toUpperCase();
   return LETTERS.includes(c) ? c : "#";
 }
 
