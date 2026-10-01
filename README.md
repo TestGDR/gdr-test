@@ -51,6 +51,10 @@ solo staff). Il parlato scritto tra «caporali» o "virgolette" viene evidenziat
 5. **Authentication → URL Configuration**: imposta *Site URL* con l'indirizzo Vercel e aggiungi
    `http://localhost:3000/**` e `https://<tuo-progetto>.vercel.app/**` ai *Redirect URLs*.
 
+Per **eliminare un utente** usa **Authentication → Users → Delete user**: cancella account,
+profilo, personaggi e messaggi insieme. Cancellare solo la riga in `profiles` lascia l'account
+(email e password) in `auth.users` e l'email risulta ancora "già registrata".
+
 Per rendere un utente master/admin: **Table Editor → profiles** → cambia `role`.
 Nuovi luoghi e liste si aggiungono da **Table Editor** (`locations` con coordinate x/y in
 percentuale sull'immagine della mappa, `rooms` collegate al luogo).
