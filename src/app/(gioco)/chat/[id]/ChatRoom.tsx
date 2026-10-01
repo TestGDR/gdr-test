@@ -1,21 +1,17 @@
 "use client";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
 
 type Props = {
   roomId: string;
-  userId: string;
   isStaff: boolean;
   characters: Character[];
   initialMessages: Message[];
 };
 
-type PresenceState = { character: string };
-
-export default function ChatRoom({ roomId, userId, isStaff, characters, initialMessages }: Props) {
+export default function ChatRoom({ roomId, isStaff, characters, initialMessages }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
@@ -23,53 +19,26 @@ export default function ChatRoom({ roomId, userId, isStaff, characters, initialM
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [present, setPresent] = useState<string[]>([]);
-  const [subscribed, setSubscribed] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  const character = characters.find((c) => c.id === characterId);
 
   function addMessage(msg: Message) {
     setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
   }
 
-  // Nuovi messaggi in tempo reale + presenze nella lista
+  // Nuovi messaggi in tempo reale (chi e' presente lo mostra la colonna sinistra)
   useEffect(() => {
-    const channel = supabase.channel(`room:${roomId}`, {
-      config: { presence: { key: userId } },
-    });
-
-    channel
+    const channel = supabase
+      .channel(`room:${roomId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` },
         (payload) => addMessage(payload.new as Message),
       )
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState<PresenceState>();
-        const names = Object.values(state).flatMap((entries) => entries.map((e) => e.character));
-        setPresent([...new Set(names)].sort());
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          channelRef.current = channel;
-          setSubscribed(true);
-        }
-      });
-
+      .subscribe();
     return () => {
-      channelRef.current = null;
-      setSubscribed(false);
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, userId]);
-
-  // Annuncia con quale personaggio si e' presenti
-  const characterName = character?.name;
-  useEffect(() => {
-    if (subscribed && characterName) channelRef.current?.track({ character: characterName });
-  }, [subscribed, characterName]);
+  }, [supabase, roomId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,17 +128,6 @@ export default function ChatRoom({ roomId, userId, isStaff, characters, initialM
         </form>
       </div>
 
-      <aside className="hidden w-52 shrink-0 md:block">
-        <div className="panel">
-          <h2 className="mb-2 font-serif text-accent">Presenti</h2>
-          {present.length === 0 && <p className="text-sm text-muted">Nessuno</p>}
-          <ul className="space-y-1 text-sm">
-            {present.map((name) => (
-              <li key={name}>• {name}</li>
-            ))}
-          </ul>
-        </div>
-      </aside>
     </div>
   );
 }

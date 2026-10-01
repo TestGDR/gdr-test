@@ -60,7 +60,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       </div>
       <ChatRoom
         roomId={room.id}
-        userId={user.id}
         isStaff={profile?.role === "master" || profile?.role === "admin"}
         characters={(characters ?? []) as Character[]}
         initialMessages={((messages ?? []) as Message[]).reverse()}

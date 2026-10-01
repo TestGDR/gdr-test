@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/supabase/server";
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const { supabase, user } = await requireUser();
   const [{ data: profile }, character] = await Promise.all([
-    supabase.from("profiles").select("username, role").eq("id", user.id).single(),
+    supabase.from("profiles").select("username, role, status_text").eq("id", user.id).single(),
     getMainCharacter(supabase, user.id),
   ]);
 
@@ -16,7 +16,8 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       userId={user.id}
       displayName={profile?.username ?? "Viandante"}
       character={character}
-      isAdmin={profile?.role === "admin"}
+      role={profile?.role ?? "player"}
+      statusText={profile?.status_text ?? ""}
     >
       {children}
     </GameShell>

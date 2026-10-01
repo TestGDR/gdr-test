@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -31,6 +32,9 @@ import {
   SheetIcon,
   UsersIcon,
 } from "./icons";
+import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
+import OnlineModal, { BubbleIcon } from "./OnlineModal";
+import { usePresence, type OnlinePlayer } from "./presence";
 
 // ---------------------------------------------------------------------
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
@@ -49,15 +53,52 @@ type Props = {
   userId: string;
   displayName: string;
   character: MainCharacter | null;
-  isAdmin: boolean;
+  role: OnlinePlayer["role"];
+  statusText: string;
   children: ReactNode;
 };
 
-export default function GameShell({ userId, displayName, character, isAdmin, children }: Props) {
+export default function GameShell({ userId, displayName, character, role, statusText, children }: Props) {
+  const supabase = useMemo(() => createClient(), []);
+  const pathname = usePathname();
   const [area, setArea] = useState<Area>({ title: "Westeros" });
   const [leftOpen, setLeftOpen] = useState(true); // desktop
   const [rightOpen, setRightOpen] = useState(true); // desktop
   const [drawerOpen, setDrawerOpen] = useState(false); // cellulare
+  const [phrase, setPhrase] = useState(statusText);
+  const [onlineOpen, setOnlineOpen] = useState(false);
+  const [messages, setMessages] = useState<{
+    open: boolean;
+    kind: MessageKind;
+    to: Contact | null;
+    session: number;
+  }>({ open: false, kind: "off", to: null, session: 0 });
+
+  // Presenze: dove sono io e chi c'e' online
+  const chatId = pathname.startsWith("/chat/") ? pathname.split("/")[2] : null;
+  const online = usePresence({
+    userId,
+    characterId: character?.id ?? null,
+    name: character?.name ?? displayName,
+    avatar: character?.avatar_url ?? null,
+    role,
+    active: character?.status === "attivo",
+    phrase,
+    place: chatId ? "chat" : "mappa",
+    placeKey: chatId ? `chat:${chatId}` : "mappa",
+    placeLabel: area.title,
+  });
+
+  const unread = useUnread(character?.id ?? null);
+
+  function openMessages(kind: MessageKind, to: Contact | null = null) {
+    setMessages((m) => ({ open: true, kind, to, session: m.session + 1 }));
+  }
+
+  async function savePhrase(value: string) {
+    await supabase.from("profiles").update({ status_text: value || null }).eq("id", userId);
+    setPhrase(value);
+  }
 
   return (
     <AreaContext.Provider value={setArea}>
@@ -112,6 +153,10 @@ export default function GameShell({ userId, displayName, character, isAdmin, chi
               userId={userId}
               displayName={displayName}
               character={character}
+              online={online}
+              unread={unread.counts}
+              onOpenMessages={openMessages}
+              onOpenOnline={() => setOnlineOpen(true)}
             />
           </aside>
 
@@ -129,10 +174,32 @@ export default function GameShell({ userId, displayName, character, isAdmin, chi
               rightOpen ? "" : "md:hidden"
             }`}
           >
-            <RightRail characterId={character?.id ?? null} isAdmin={isAdmin} />
+            <RightRail characterId={character?.id ?? null} isAdmin={role === "admin"} />
           </nav>
         </div>
       </div>
+
+      {/* Modali sempre disponibili nel gioco */}
+      {character && (
+        <MessagesModal
+          kind={messages.kind}
+          open={messages.open}
+          onClose={() => setMessages((m) => ({ ...m, open: false }))}
+          me={character}
+          initialTo={messages.to}
+          session={messages.session}
+          onRead={unread.refresh}
+        />
+      )}
+      <OnlineModal
+        open={onlineOpen}
+        onClose={() => setOnlineOpen(false)}
+        online={online}
+        myUserId={userId}
+        phrase={phrase}
+        onSavePhrase={savePhrase}
+        onMessageOff={(to) => openMessages("off", to)}
+      />
     </AreaContext.Provider>
   );
 }
@@ -166,12 +233,24 @@ function LeftColumn({
   userId,
   displayName,
   character,
+  online,
+  unread,
+  onOpenMessages,
+  onOpenOnline,
 }: {
   area: Area;
   userId: string;
   displayName: string;
   character: MainCharacter | null;
+  online: OnlinePlayer[];
+  unread: Record<MessageKind, number>;
+  onOpenMessages: (kind: MessageKind) => void;
+  onOpenOnline: () => void;
 }) {
+  // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
+  const me = online.find((p) => p.userId === userId);
+  const here = me ? online.filter((p) => p.placeKey === me.placeKey) : [];
+
   return (
     <div className="space-y-3">
       {/* Zona attuale */}
@@ -193,93 +272,137 @@ function LeftColumn({
         {GAME_DATE}
       </div>
 
-      {/* Personaggio */}
-      <div className="flex items-center gap-3 rounded-md border border-border bg-black/40 p-3">
-        {character?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={character.avatar_url} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />
-        ) : (
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-blood/60 bg-background font-serif text-2xl text-accent">
-            {(character?.name ?? displayName)[0]}
+      {/* Personaggio + messaggi */}
+      <div className="rounded-md border border-border bg-black/40 p-3">
+        <div className="flex items-center gap-3">
+          <Avatar name={character?.name ?? displayName} url={character?.avatar_url} size="h-14 w-14" />
+          <div className="min-w-0">
+            {character ? (
+              <SheetButton
+                characterId={character.id}
+                trigger={<span className="block truncate">{character.name}</span>}
+                className="max-w-full text-left font-serif text-accent hover:underline"
+              />
+            ) : (
+              <p className="truncate font-serif text-accent">{displayName}</p>
+            )}
+            <p className={`text-xs ${character?.status === "attivo" ? "text-green-400" : "text-orange-300"}`}>
+              {character?.status === "attivo" ? "Attivo" : "Non attivo"}
+            </p>
+          </div>
+        </div>
+        {character && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <MessageButton label="Missive" count={unread.missiva} onClick={() => onOpenMessages("missiva")}>
+              <ScrollIcon />
+            </MessageButton>
+            <MessageButton label="OFF" count={unread.off} onClick={() => onOpenMessages("off")}>
+              <BubbleIcon />
+            </MessageButton>
           </div>
         )}
-        <div className="min-w-0">
-          {character ? (
-            <SheetButton
-              characterId={character.id}
-              trigger={<span className="block truncate">{character.name}</span>}
-              className="max-w-full text-left font-serif text-accent hover:underline"
-            />
-          ) : (
-            <p className="truncate font-serif text-accent">{displayName}</p>
-          )}
-          <p className={`text-xs ${character?.status === "attivo" ? "text-green-400" : "text-orange-300"}`}>
-            {character?.status === "attivo" ? "Attivo" : "Non attivo"}
-          </p>
-        </div>
       </div>
 
-      <OnlineList userId={userId} name={character?.name ?? displayName} />
+      {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me */}
+      <div className="rounded-md border border-border bg-black/40 p-3">
+        <button
+          type="button"
+          onClick={onOpenOnline}
+          className="w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent"
+          title="Apri l'elenco di tutti i presenti"
+        >
+          <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
+        </button>
+        <h3 className="mt-3 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
+          {me?.place === "chat" ? me.placeLabel : `In mappa · ${area.title}`}
+        </h3>
+        <ul className="mt-2 space-y-1.5 text-sm">
+          {here.map((p) => (
+            <li key={p.userId} className="flex items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+              <span className={`truncate ${p.userId === userId ? "text-accent" : ""}`}>{p.name}</span>
+              {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-orange-300">⧗</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------
-// Chi e' online: presenza in tempo reale (Supabase Realtime)
-// ---------------------------------------------------------------------
-type Presence = { name: string; place: "mappa" | "chat" };
+function MessageButton({
+  label,
+  count,
+  onClick,
+  children,
+}: {
+  label: string;
+  count: number;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex items-center justify-center gap-2 rounded border border-border bg-background px-2 py-1.5 text-xs tracking-wider uppercase transition hover:border-accent hover:text-accent"
+    >
+      {children}
+      {label}
+      {count > 0 && (
+        <span className="absolute -top-2 -right-2 min-w-5 rounded-full bg-blood px-1.5 text-[11px] font-bold text-white shadow">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
 
-function OnlineList({ userId, name }: { userId: string; name: string }) {
+const ScrollIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M8 4h11v13a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1h11v1a3 3 0 0 0 3 3M8 4a3 3 0 0 0-3 3v9M11 8h5M11 12h5" />
+  </svg>
+);
+
+// Messaggi non letti per tipo, aggiornati in tempo reale
+function useUnread(characterId: string | null) {
   const supabase = useMemo(() => createClient(), []);
-  const pathname = usePathname();
-  const place: Presence["place"] = pathname.startsWith("/chat") ? "chat" : "mappa";
-  const [online, setOnline] = useState<Presence[]>([]);
-  const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  const [counts, setCounts] = useState<Record<MessageKind, number>>({ missiva: 0, off: 0 });
+
+  const fetchCounts = useCallback(async (): Promise<Record<MessageKind, number>> => {
+    const count = (kind: MessageKind) =>
+      supabase
+        .from("private_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_id", characterId)
+        .eq("kind", kind)
+        .is("read_at", null)
+        .then(({ count }) => count ?? 0);
+    const [missiva, off] = await Promise.all([count("missiva"), count("off")]);
+    return { missiva, off };
+  }, [supabase, characterId]);
+
+  const refresh = useCallback(() => {
+    fetchCounts().then(setCounts);
+  }, [fetchCounts]);
 
   useEffect(() => {
-    const ch = supabase.channel("online", { config: { presence: { key: userId } } });
-    ch.on("presence", { event: "sync" }, () => {
-      // Una voce per utente (piu' schede aperte contano una volta sola)
-      const state = ch.presenceState<Presence>();
-      setOnline(Object.values(state).map((entries) => entries[entries.length - 1]));
-    }).subscribe((status) => {
-      if (status === "SUBSCRIBED") setChannel(ch);
-    });
+    if (!characterId) return;
+    fetchCounts().then(setCounts);
+    const ch = supabase
+      .channel(`unread:${characterId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "private_messages", filter: `recipient_id=eq.${characterId}` },
+        () => refresh(),
+      )
+      .subscribe();
     return () => {
-      setChannel(null);
       supabase.removeChannel(ch);
     };
-  }, [supabase, userId]);
+  }, [supabase, characterId, fetchCounts, refresh]);
 
-  // Aggiorna dove mi trovo quando cambio pagina
-  useEffect(() => {
-    channel?.track({ name, place });
-  }, [channel, name, place]);
-
-  const onMap = online.filter((p) => p.place === "mappa").sort((a, b) => a.name.localeCompare(b.name));
-  const elsewhere = online.length - onMap.length;
-
-  return (
-    <div className="rounded-md border border-border bg-black/40 p-3">
-      <h2 className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
-        <MapIcon /> Sulla mappa
-        <span className="rounded-full border border-accent px-1.5 text-[10px]">{onMap.length}</span>
-      </h2>
-      <ul className="space-y-1 text-sm">
-        {onMap.map((p) => (
-          <li key={p.name} className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
-            {p.name}
-          </li>
-        ))}
-      </ul>
-      {elsewhere > 0 && (
-        <p className="mt-3 border-t border-border pt-2 text-xs text-muted">
-          +{elsewhere} online nelle chat
-        </p>
-      )}
-    </div>
-  );
+  return { counts, refresh };
 }
 
 // ---------------------------------------------------------------------
