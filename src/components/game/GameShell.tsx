@@ -154,11 +154,15 @@ export default function GameShell({
               onClick={() => setDrawerOpen(false)}
             />
           )}
+          {/* Desktop: la larghezza si anima fino a zero; il contenuto ha larghezza fissa
+              cosi' non si deforma durante la transizione */}
           <aside
-            className={`fixed inset-y-0 left-0 z-40 w-72 overflow-y-auto border-r border-border bg-panel p-3 transition-transform md:static md:z-auto md:w-64 md:shrink-0 md:translate-x-0 md:bg-black/40 ${
+            inert={!leftOpen}
+            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none md:static md:z-auto md:shrink-0 md:translate-x-0 md:overflow-hidden md:bg-black/40 ${
               drawerOpen ? "translate-x-0" : "-translate-x-full"
-            } ${leftOpen ? "md:block" : "md:hidden"}`}
+            } ${leftOpen ? "md:w-64 md:opacity-100" : "md:w-0 md:border-transparent md:opacity-0"}`}
           >
+            <div className="h-full w-72 overflow-y-auto p-3 md:w-64">
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
@@ -178,6 +182,7 @@ export default function GameShell({
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
             />
+            </div>
           </aside>
 
           <EdgeToggle side="left" open={leftOpen} onClick={() => setLeftOpen((v) => !v)} />
@@ -190,8 +195,11 @@ export default function GameShell({
           {/* Colonna destra: icone (in basso su cellulare) */}
           <nav
             aria-label="Menu di gioco"
-            className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 md:static md:h-auto md:w-14 md:shrink-0 md:flex-col md:justify-start md:gap-2 md:border-t-0 md:border-l md:border-border md:bg-black/40 md:px-0 md:py-4 ${
-              rightOpen ? "" : "md:hidden"
+            inert={!rightOpen}
+            className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none md:static md:h-auto md:shrink-0 md:flex-col md:justify-start md:gap-2 md:border-t-0 md:border-l md:bg-black/40 md:px-0 md:py-4 ${
+              rightOpen
+                ? "md:w-14 md:overflow-visible md:border-border md:opacity-100"
+                : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
             <RightRail characterId={character?.id ?? null} isAdmin={role === "admin"} />
