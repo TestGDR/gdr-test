@@ -73,6 +73,16 @@ body {
 .guide-content a {
   @apply text-accent underline;
 }
+.guide-content hr {
+  @apply my-6 border-border;
+}
+.guide-content u {
+  @apply underline-offset-2;
+}
+/* Editor visuale: il cursore resta visibile sul fondo scuro */
+.guide-content.ProseMirror {
+  caret-color: var(--accent);
+}
 /* Riquadro "Esempio" */
 .guide-content blockquote {
   @apply my-4 rounded-r-md border-l-4 border-accent bg-accent/10 px-4 py-2;

@@ -61,6 +61,7 @@ type Props = {
   staffRole: { name: string; color: string } | null;
   statusText: string;
   initialAvailability: Availability;
+  canEditDocs: boolean; // puo' modificare Manuale e Ambientazione
   children: ReactNode;
 };
 
@@ -71,6 +72,7 @@ export default function GameShell({
   staffRole,
   statusText,
   initialAvailability,
+  canEditDocs,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -143,6 +145,7 @@ export default function GameShell({
             <GuideButton
               book="ambientazione"
               label="Ambientazione"
+              canEdit={canEditDocs}
               className={topBtn}
               trigger={
                 <>
@@ -154,6 +157,7 @@ export default function GameShell({
             <GuideButton
               book="manuale"
               label="Manuale di Gioco"
+              canEdit={canEditDocs}
               className={topBtn}
               trigger={
                 <>
