@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
-import { signup, type AuthState } from "@/app/login/actions";
+import { signup, type AuthState } from "@/app/(pubblico)/login/actions";
 import { AtIcon, IconField, KeyIcon, UserIcon } from "@/components/auth/fields";
 import ModalButton from "@/components/ui/ModalButton";
 import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import ModalButton from "@/components/ui/ModalButton";
 import {
   ATTRIBUTES,
@@ -14,17 +14,25 @@ import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
 
-// Nome del personaggio nella barra in alto: apre la sua scheda in una modale
-export default function SheetButton({ characterId, name }: { characterId: string; name: string }) {
+// Apre la scheda del personaggio in una modale (dal nome o da un'icona)
+export default function SheetButton({
+  characterId,
+  trigger,
+  className = "font-serif text-accent hover:underline",
+}: {
+  characterId: string;
+  trigger: ReactNode;
+  className?: string;
+}) {
   // Ogni apertura ricarica la scheda aggiornata dal database
   const [openCount, setOpenCount] = useState(0);
 
   return (
     <ModalButton
-      label={name}
+      label={trigger}
       title="Scheda personaggio"
       size="lg"
-      className="font-serif text-accent hover:underline"
+      className={className}
       onOpen={() => setOpenCount((c) => c + 1)}
     >
       {() => (openCount > 0 ? <SheetContent key={openCount} characterId={characterId} /> : null)}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { updatePassword, type AuthState } from "@/app/login/actions";
+import { updatePassword, type AuthState } from "@/app/(pubblico)/login/actions";
 
 export default function NewPasswordForm() {
   const [state, action, pending] = useActionState<AuthState, FormData>(updatePassword, {});

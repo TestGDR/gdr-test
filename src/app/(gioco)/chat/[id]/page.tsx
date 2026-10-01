@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
+import { GameArea } from "@/components/game/GameShell";
 import { requireUser } from "@/lib/supabase/server";
 import type { Character, Location, Message, Room } from "@/lib/types";
 import ChatRoom from "./ChatRoom";
@@ -38,6 +39,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   if (!characters?.length) {
     return (
       <div className="mx-auto mt-10 max-w-xl">
+        <GameArea title={room.name} image={room.location.image_url} />
         <InactiveBanner />
         <Link href={`/luogo/${room.location.id}`} className="btn-ghost">
           ← Torna a {room.location.name}
@@ -47,7 +49,8 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div className="flex h-full min-h-[24rem] flex-col">
+      <GameArea title={room.name} image={room.location.image_url} />
       <div className="mb-3">
         <Link href={`/luogo/${room.location.id}`} className="text-sm text-muted hover:text-accent">
           ← {room.location.name}

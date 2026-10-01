@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { login, requestPasswordReset, type AuthState } from "@/app/login/actions";
+import { login, requestPasswordReset, type AuthState } from "@/app/(pubblico)/login/actions";
 import { AtIcon, IconField, KeyIcon, UserIcon } from "@/components/auth/fields";
 import ModalButton from "@/components/ui/ModalButton";
 

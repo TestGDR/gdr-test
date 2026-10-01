@@ -1,3 +1,4 @@
+import { GameArea } from "@/components/game/GameShell";
 import { requireUser } from "@/lib/supabase/server";
 import type { Character } from "@/lib/types";
 import CharacterForm from "./CharacterForm";
@@ -15,6 +16,7 @@ export default async function PersonaggiPage() {
   return (
     <div className="grid gap-8 md:grid-cols-[1fr_380px]">
       <section>
+        <GameArea title="Personaggi" />
         <h1 className="mb-4 font-serif text-3xl text-accent">I tuoi personaggi</h1>
         {characters.length === 0 && (
           <p className="text-muted">Non hai ancora nessun personaggio. Creane uno per iniziare!</p>

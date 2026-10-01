@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
+import { GameArea } from "@/components/game/GameShell";
 import { getMainCharacter } from "@/lib/main-character";
 import { requireUser } from "@/lib/supabase/server";
 import type { Location, Room } from "@/lib/types";
@@ -25,7 +26,8 @@ export default async function LuogoPage({ params }: PageProps<"/luogo/[id]">) {
   const rooms = (data ?? []) as Room[];
 
   return (
-    <div>
+    <div className="mx-auto max-w-5xl">
+      <GameArea title={location.name} image={location.image_url} />
       {character?.status !== "attivo" && <InactiveBanner />}
       <Link href={`/mappa?id=${location.map_id}`} className="text-sm text-muted hover:text-accent">
         ← Torna alla mappa

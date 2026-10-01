@@ -1,3 +1,4 @@
+import { GameArea } from "@/components/game/GameShell";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -43,6 +44,7 @@ export default async function AccessiPage() {
 
   return (
     <div className="space-y-8">
+      <GameArea title="Registro accessi" />
       <h1 className="font-serif text-3xl text-accent">Registro accessi</h1>
 
       <section className="panel">

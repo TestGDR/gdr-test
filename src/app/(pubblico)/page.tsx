@@ -4,8 +4,8 @@ import AgeRating from "@/components/AgeRating";
 import { LoginButton } from "@/components/auth/LoginPanel";
 import RegisterButton from "@/components/auth/RegisterModal";
 import { createClient } from "@/lib/supabase/server";
-import homeBg from "../../public/images/home-bg.jpg";
-import logo from "../../public/images/logo-westeros.png";
+import homeBg from "../../../public/images/home-bg.jpg";
+import logo from "../../../public/images/logo-westeros.png";
 
 export default async function Home() {
   const supabase = await createClient();

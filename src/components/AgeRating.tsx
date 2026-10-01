@@ -62,7 +62,7 @@ const DESCRIPTORS: { label: string; icon: ReactNode }[] = [
 
 export default function AgeRating() {
   return (
-    <ul className="flex items-end justify-center gap-2" aria-label="Classificazione dei contenuti">
+    <ul className="flex flex-wrap items-end justify-center gap-2" aria-label="Classificazione dei contenuti">
       <li
         title="Vietato ai minori di 18 anni"
         className="flex h-14 w-12 flex-col items-center justify-center rounded-sm border-2 border-white bg-red-700 text-white"

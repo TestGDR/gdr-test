@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ModalButton from "@/components/ui/ModalButton";
@@ -18,17 +18,28 @@ type PageMeta = {
 
 const META_COLUMNS = "id, section, section_order, title, sort_order";
 
-// Link della barra in alto che apre Manuale di Gioco o Ambientazione in una modale
-export default function GuideButton({ book, label }: { book: Book; label: string }) {
+// Pulsante che apre Manuale di Gioco o Ambientazione in una modale.
+// "trigger" permette di mostrare un'icona al posto del testo (barra del gioco).
+export default function GuideButton({
+  book,
+  label,
+  trigger,
+  className = "hover:text-accent",
+}: {
+  book: Book;
+  label: string;
+  trigger?: ReactNode;
+  className?: string;
+}) {
   // Il contenuto si carica solo alla prima apertura, non a ogni pagina visitata
   const [opened, setOpened] = useState(false);
 
   return (
     <ModalButton
-      label={label}
+      label={trigger ?? label}
       title={label}
       size="xl"
-      className="hover:text-accent"
+      className={className}
       onOpen={() => setOpened(true)}
     >
       {() => (opened ? <GuideBrowser book={book} label={label} /> : null)}
