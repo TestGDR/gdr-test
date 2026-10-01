@@ -2,6 +2,7 @@
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import TextAlign from "@tiptap/extension-text-align";
 import { useState, type ReactNode } from "react";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
@@ -9,7 +10,11 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
   const [mode, setMode] = useState<"visuale" | "html">("visuale");
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: { openOnClick: false } })],
+    extensions: [
+      StarterKit.configure({ link: { openOnClick: false } }),
+      // Allineamento di paragrafi e titoli (salvato come style="text-align: ...")
+      TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right", "justify"] }),
+    ],
     content: value,
     immediatelyRender: false, // la pagina viene generata anche sul server
     editorProps: { attributes: { class: "guide-content min-h-64 p-4 outline-none" } },
@@ -91,6 +96,11 @@ function Toolbar({ editor }: { editor: Editor }) {
       {btn("T1", "Titolo", editor.isActive("heading", { level: 2 }), () => chain().toggleHeading({ level: 2 }).run())}
       {btn("T2", "Sottotitolo", editor.isActive("heading", { level: 3 }), () => chain().toggleHeading({ level: 3 }).run())}
       <span className="mx-1 h-5 w-px bg-border" />
+      {btn(<AlignIcon kind="left" />, "Allinea a sinistra", editor.isActive({ textAlign: "left" }), () => chain().setTextAlign("left").run())}
+      {btn(<AlignIcon kind="center" />, "Centra", editor.isActive({ textAlign: "center" }), () => chain().setTextAlign("center").run())}
+      {btn(<AlignIcon kind="right" />, "Allinea a destra", editor.isActive({ textAlign: "right" }), () => chain().setTextAlign("right").run())}
+      {btn(<AlignIcon kind="justify" />, "Giustifica", editor.isActive({ textAlign: "justify" }), () => chain().setTextAlign("justify").run())}
+      <span className="mx-1 h-5 w-px bg-border" />
       {btn("•", "Elenco puntato", editor.isActive("bulletList"), () => chain().toggleBulletList().run())}
       {btn("1.", "Elenco numerato", editor.isActive("orderedList"), () => chain().toggleOrderedList().run())}
       {btn("❝", "Riquadro esempio / citazione", editor.isActive("blockquote"), () => chain().toggleBlockquote().run())}
@@ -100,5 +110,22 @@ function Toolbar({ editor }: { editor: Editor }) {
       {btn("↶", "Annulla", false, () => chain().undo().run())}
       {btn("↷", "Ripeti", false, () => chain().redo().run())}
     </>
+  );
+}
+
+// Icona delle righe di testo allineate
+function AlignIcon({ kind }: { kind: "left" | "center" | "right" | "justify" }) {
+  const lines: Record<typeof kind, [number, number][]> = {
+    left: [[3, 21], [3, 15], [3, 21], [3, 13]],
+    center: [[3, 21], [6, 18], [3, 21], [7, 17]],
+    right: [[3, 21], [9, 21], [3, 21], [11, 21]],
+    justify: [[3, 21], [3, 21], [3, 21], [3, 21]],
+  };
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="mx-auto">
+      {lines[kind].map(([x1, x2], i) => (
+        <path key={i} d={`M${x1} ${5 + i * 5}H${x2}`} />
+      ))}
+    </svg>
   );
 }
