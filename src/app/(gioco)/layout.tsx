@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import GameShell from "@/components/game/GameShell";
 import { AVAILABILITY_COOKIE, isAvailability } from "@/lib/availability";
 import { getMainCharacter } from "@/lib/main-character";
+import { MANAGEMENT_PERMISSIONS } from "@/lib/permissions";
 import { getStaffContext } from "@/lib/staff";
 
 type Profile = {
@@ -39,6 +40,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       statusText={profile?.status_text ?? ""}
       initialAvailability={isAvailability(savedAvailability) ? savedAvailability : "disponibile"}
       canEditDocs={permissions.has("documentazione.scrivere")}
+      canManage={MANAGEMENT_PERMISSIONS.some((p) => permissions.has(p))}
     >
       {children}
     </GameShell>

@@ -61,3 +61,12 @@ export const ALL_PERMISSION_KEYS = PERMISSION_SECTIONS.flatMap((s) => s.items.ma
 export function isPermissionKey(key: string) {
   return ALL_PERMISSION_KEYS.includes(key);
 }
+
+// Permessi che aprono un pannello di Gestione: chi non ne ha nessuno non vede la rotella
+export const MANAGEMENT_PERMISSIONS = [
+  "gestione.ruoli",
+  "gestione.accessi",
+  "casate.gestire",
+  "mondo.gestire",
+  "documentazione.scrivere",
+];

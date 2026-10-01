@@ -31,10 +31,8 @@ import {
   MenuIcon,
   PowerIcon,
   RefreshIcon,
-  SheetIcon,
   TicketIcon,
   ToolsIcon,
-  UsersIcon,
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
@@ -63,6 +61,7 @@ type Props = {
   statusText: string;
   initialAvailability: Availability;
   canEditDocs: boolean; // puo' modificare Manuale e Ambientazione
+  canManage: boolean; // vede la rotella della Gestione (moderatori e admin)
   children: ReactNode;
 };
 
@@ -74,6 +73,7 @@ export default function GameShell({
   statusText,
   initialAvailability,
   canEditDocs,
+  canManage,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -252,7 +252,7 @@ export default function GameShell({
                 : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
-            <RightRail characterId={character?.id ?? null} isStaff={staffRole !== null} />
+            <RightRail canManage={canManage} />
           </nav>
         </div>
       </div>
@@ -592,7 +592,7 @@ function Tip({ children }: { children: ReactNode }) {
   );
 }
 
-function RightRail({ characterId, isStaff }: { characterId: string | null; isStaff: boolean }) {
+function RightRail({ canManage }: { canManage: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
@@ -617,24 +617,8 @@ function RightRail({ characterId, isStaff }: { characterId: string | null; isSta
           <MapIcon />
           <Tip>Mappa</Tip>
         </Link>
-        {characterId && (
-          <SheetButton
-            characterId={characterId}
-            className={railBtn}
-            trigger={
-              <>
-                <SheetIcon />
-                <Tip>Scheda personaggio</Tip>
-              </>
-            }
-          />
-        )}
-        <Link href="/personaggi" className={`${railBtn} ${active("/personaggi")}`} aria-label="Personaggi">
-          <UsersIcon />
-          <Tip>Personaggi</Tip>
-        </Link>
-        {/* Pannelli di gestione: solo staff */}
-        {isStaff && (
+        {/* Pannelli di gestione: solo moderatori e admin */}
+        {canManage && (
           <Link href="/gestione" className={`${railBtn} ${active("/gestione")}`} aria-label="Gestione">
             <GearIcon />
             <Tip>Gestione</Tip>
