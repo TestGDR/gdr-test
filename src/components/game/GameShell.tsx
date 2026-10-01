@@ -296,26 +296,33 @@ function LeftColumn({
       </div>
 
       {/* Personaggio + messaggi */}
-      <div className="rounded-md border border-border bg-black/40 p-3">
-        <div className="flex items-center gap-3">
-          <Avatar name={character?.name ?? displayName} url={character?.avatar_url} size="h-14 w-14" />
-          <div className="min-w-0">
-            {character ? (
-              <SheetButton
-                characterId={character.id}
-                trigger={<span className="block truncate">{character.name}</span>}
-                className="max-w-full text-left font-serif text-accent hover:underline"
-              />
-            ) : (
-              <p className="truncate font-serif text-accent">{displayName}</p>
-            )}
-            <p className={`text-xs ${character?.status === "attivo" ? "text-green-400" : "text-orange-300"}`}>
-              {character?.status === "attivo" ? "Attivo" : "Non attivo"}
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center gap-3 rounded-md border border-border bg-black/40 p-3">
+        {/* L'immagine apre la scheda */}
+        {character ? (
+          <SheetButton
+            characterId={character.id}
+            className="group relative shrink-0 rounded focus-visible:outline-none"
+            trigger={
+              <>
+                <span className="block rounded ring-accent transition group-hover:ring-2 group-focus-visible:ring-2">
+                  <Avatar name={character.name} url={character.avatar_url} size="h-14 w-14" />
+                </span>
+                {character.status !== "attivo" && (
+                  <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[11px] text-orange-300">
+                    ⧗
+                  </span>
+                )}
+                <Balloon>
+                  {character.status === "attivo" ? "Apri la scheda" : "Apri la scheda (PG non ancora attivo)"}
+                </Balloon>
+              </>
+            }
+          />
+        ) : (
+          <Avatar name={displayName} size="h-14 w-14" />
+        )}
         {character && (
-          <div className="mt-3 flex gap-2">
+          <div className="flex gap-2">
             <MessageButton
               label="Missive (messaggi in gioco)"
               count={unread.missiva}
@@ -389,13 +396,20 @@ function MessageButton({
           {count}
         </span>
       )}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-blood/60 after:content-['']"
-      >
-        {label}
-      </span>
+      <Balloon>{label}</Balloon>
     </button>
+  );
+}
+
+// Fumetto sopra l'elemento al passaggio del mouse (il genitore deve avere "group relative")
+function Balloon({ children }: { children: ReactNode }) {
+  return (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs font-normal whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-blood/60 after:content-['']"
+    >
+      {children}
+    </span>
   );
 }
 
