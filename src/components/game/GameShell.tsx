@@ -15,6 +15,7 @@ import {
 import { logout } from "@/app/(pubblico)/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
 import SheetButton from "@/components/scheda/SheetButton";
+import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
@@ -34,6 +35,7 @@ import {
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
+import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
 
 // ---------------------------------------------------------------------
@@ -55,10 +57,19 @@ type Props = {
   character: MainCharacter | null;
   role: OnlinePlayer["role"];
   statusText: string;
+  initialAvailability: Availability;
   children: ReactNode;
 };
 
-export default function GameShell({ userId, displayName, character, role, statusText, children }: Props) {
+export default function GameShell({
+  userId,
+  displayName,
+  character,
+  role,
+  statusText,
+  initialAvailability,
+  children,
+}: Props) {
   const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname();
   const [area, setArea] = useState<Area>({ title: "Westeros" });
@@ -66,6 +77,7 @@ export default function GameShell({ userId, displayName, character, role, status
   const [rightOpen, setRightOpen] = useState(true); // desktop
   const [drawerOpen, setDrawerOpen] = useState(false); // cellulare
   const [phrase, setPhrase] = useState(statusText);
+  const [availability, setAvailability] = useState(initialAvailability);
   const [onlineOpen, setOnlineOpen] = useState(false);
   const [messages, setMessages] = useState<{
     open: boolean;
@@ -84,6 +96,7 @@ export default function GameShell({ userId, displayName, character, role, status
     role,
     active: character?.status === "attivo",
     phrase,
+    availability,
     place: chatId ? "chat" : "mappa",
     placeKey: chatId ? `chat:${chatId}` : "mappa",
     placeLabel: area.title,
@@ -93,6 +106,12 @@ export default function GameShell({ userId, displayName, character, role, status
 
   function openMessages(kind: MessageKind, to: Contact | null = null) {
     setMessages((m) => ({ open: true, kind, to, session: m.session + 1 }));
+  }
+
+  // La disponibilita' resta salvata in un cookie (letto dal server al prossimo caricamento)
+  function changeAvailability(value: Availability) {
+    document.cookie = `${AVAILABILITY_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`;
+    setAvailability(value);
   }
 
   async function savePhrase(value: string) {
@@ -154,6 +173,7 @@ export default function GameShell({ userId, displayName, character, role, status
               displayName={displayName}
               character={character}
               online={online}
+              onChangeAvailability={changeAvailability}
               unread={unread.counts}
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
@@ -198,6 +218,7 @@ export default function GameShell({ userId, displayName, character, role, status
         myUserId={userId}
         phrase={phrase}
         onSavePhrase={savePhrase}
+        onChangeAvailability={changeAvailability}
         onMessageOff={(to) => openMessages("off", to)}
       />
     </AreaContext.Provider>
@@ -237,6 +258,7 @@ function LeftColumn({
   unread,
   onOpenMessages,
   onOpenOnline,
+  onChangeAvailability,
 }: {
   area: Area;
   userId: string;
@@ -246,6 +268,7 @@ function LeftColumn({
   unread: Record<MessageKind, number>;
   onOpenMessages: (kind: MessageKind) => void;
   onOpenOnline: () => void;
+  onChangeAvailability: (value: Availability) => void;
 }) {
   // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
   const me = online.find((p) => p.userId === userId);
@@ -319,7 +342,10 @@ function LeftColumn({
         <ul className="mt-2 space-y-1.5 text-sm">
           {here.map((p) => (
             <li key={p.userId} className="flex items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+              <AvailabilityDot
+                value={p.availability}
+                onChange={p.userId === userId ? onChangeAvailability : undefined}
+              />
               <span className={`truncate ${p.userId === userId ? "text-accent" : ""}`}>{p.name}</span>
               {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-orange-300">⧗</span>}
             </li>

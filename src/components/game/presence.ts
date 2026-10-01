@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isAvailability, type Availability } from "@/lib/availability";
 import { createClient } from "@/lib/supabase/client";
+
+// Chi e' "in cerca di gioco" va in cima, poi in ordine alfabetico
+export function byAvailabilityThenName(a: OnlinePlayer, b: OnlinePlayer) {
+  const rank = (p: OnlinePlayer) => (p.availability === "cerca" ? 0 : 1);
+  return rank(a) - rank(b) || a.name.localeCompare(b.name);
+}
 
 // Cosa ogni giocatore online condivide con gli altri (Supabase Realtime Presence)
 export type OnlinePlayer = {
+  availability: Availability;
   userId: string;
   characterId: string | null;
   name: string;
@@ -35,6 +43,7 @@ export function usePresence(me: OnlinePlayer) {
           const p = entries[entries.length - 1];
           return {
             userId: key,
+            availability: isAvailability(p.availability) ? p.availability : "disponibile",
             characterId: p.characterId ?? null,
             name: p.name ?? "?",
             avatar: p.avatar ?? null,
@@ -62,5 +71,5 @@ export function usePresence(me: OnlinePlayer) {
     channel?.track(JSON.parse(payload));
   }, [channel, payload]);
 
-  return useMemo(() => [...online].sort((a, b) => a.name.localeCompare(b.name)), [online]);
+  return useMemo(() => [...online].sort(byAvailabilityThenName), [online]);
 }

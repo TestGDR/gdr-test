@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import Modal from "@/components/ui/Modal";
+import type { Availability } from "@/lib/availability";
+import AvailabilityDot from "./AvailabilityDot";
 import { Avatar, type Contact } from "./MessagesModal";
 import type { OnlinePlayer } from "./presence";
 
@@ -24,6 +26,7 @@ type Props = {
   phrase: string;
   onSavePhrase: (phrase: string) => Promise<void>;
   onMessageOff: (to: Contact) => void;
+  onChangeAvailability: (value: Availability) => void;
 };
 
 // Elenco esteso di tutti i presenti, raggruppati per posto
@@ -39,15 +42,21 @@ export default function OnlineModal(props: Props) {
       (filter === "staff" && isStaff(p)),
   );
 
-  // Gruppi: prima chi e' fuori dalle chat, poi una sezione per ogni lista
+  // Gruppi: in cima chi cerca gioco, poi chi e' fuori dalle chat, poi una sezione per lista
   const groups = new Map<string, { label: string; players: OnlinePlayer[] }>();
   for (const p of visible) {
-    const key = p.place === "chat" ? p.placeKey : "fuori";
-    const label = p.place === "chat" ? `In chat · ${p.placeLabel}` : "Online fuori chat";
+    const key = p.availability === "cerca" ? "cerca" : p.place === "chat" ? p.placeKey : "fuori";
+    const label =
+      key === "cerca"
+        ? "In cerca di gioco adesso"
+        : p.place === "chat"
+          ? `In chat · ${p.placeLabel}`
+          : "Online fuori chat";
     if (!groups.has(key)) groups.set(key, { label, players: [] });
     groups.get(key)!.players.push(p);
   }
-  const sorted = [...groups.entries()].sort(([a], [b]) => (a === "fuori" ? -1 : b === "fuori" ? 1 : a.localeCompare(b)));
+  const order = (key: string) => (key === "cerca" ? 0 : key === "fuori" ? 1 : 2);
+  const sorted = [...groups.entries()].sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b));
 
   return (
     <Modal open={open} onClose={onClose} title="Elenco online" size="xl">
@@ -80,7 +89,13 @@ export default function OnlineModal(props: Props) {
           {sorted.length === 0 && <p className="text-center text-muted">Nessuno in questa sezione.</p>}
           {sorted.map(([key, group]) => (
             <section key={key}>
-              <h3 className="mb-2 flex items-center justify-center gap-2 rounded-md border border-blood/50 bg-gradient-to-r from-blood/10 via-blood/30 to-blood/10 py-1.5 text-xs font-semibold tracking-[0.15em] uppercase">
+              <h3
+                className={`mb-2 flex items-center justify-center gap-2 rounded-md border py-1.5 text-xs font-semibold tracking-[0.15em] uppercase ${
+                  key === "cerca"
+                    ? "border-yellow-500/60 bg-gradient-to-r from-yellow-500/5 via-yellow-500/20 to-yellow-500/5 text-yellow-200"
+                    : "border-blood/50 bg-gradient-to-r from-blood/10 via-blood/30 to-blood/10"
+                }`}
+              >
                 {group.label}
                 <span className="rounded-full border border-accent/60 px-1.5 text-[10px] text-accent">
                   {group.players.length}
@@ -93,6 +108,7 @@ export default function OnlineModal(props: Props) {
                     player={p}
                     isMe={p.userId === props.myUserId}
                     onMessageOff={props.onMessageOff}
+                    onChangeAvailability={props.onChangeAvailability}
                   />
                 ))}
               </ul>
@@ -108,10 +124,12 @@ function PlayerRow({
   player,
   isMe,
   onMessageOff,
+  onChangeAvailability,
 }: {
   player: OnlinePlayer;
   isMe: boolean;
   onMessageOff: (to: Contact) => void;
+  onChangeAvailability: (value: Availability) => void;
 }) {
   return (
     <li className="flex items-center gap-3 rounded-md border border-border/70 bg-black/40 px-3 py-2">
@@ -145,7 +163,11 @@ function PlayerRow({
             <HourglassIcon />
           </span>
         )}
-        <span title="Online" className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.8)]" />
+        <AvailabilityDot
+          value={player.availability}
+          onChange={isMe ? onChangeAvailability : undefined}
+          align="right"
+        />
       </div>
     </li>
   );
