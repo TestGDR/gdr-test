@@ -14,6 +14,7 @@ import {
 } from "react";
 import { logout } from "@/app/(pubblico)/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
+import ModalButton from "@/components/ui/ModalButton";
 import SheetButton from "@/components/scheda/SheetButton";
 import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
@@ -31,6 +32,8 @@ import {
   PowerIcon,
   RefreshIcon,
   SheetIcon,
+  TicketIcon,
+  ToolsIcon,
   UsersIcon,
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -122,25 +125,55 @@ export default function GameShell({
   return (
     <AreaContext.Provider value={setArea}>
       <div className="flex h-dvh flex-col overflow-hidden">
-        {/* Barra in alto: zona attuale */}
-        <header className="bar relative flex h-14 shrink-0 items-center justify-center border-b px-12">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Apri pannello"
-            className="absolute left-3 text-muted hover:text-accent md:hidden"
-          >
-            <MenuIcon />
-          </button>
-          <h1 className="flex items-center gap-3 truncate font-serif text-lg tracking-[0.2em] text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] md:text-2xl">
+        {/* Barra in alto: titolo del gioco, documentazione a sinistra, strumenti a destra */}
+        <header className="bar relative z-30 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b px-2 sm:px-4">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Apri pannello"
+              className={`${topBtn} md:hidden`}
+            >
+              <MenuIcon />
+            </button>
+            <GuideButton
+              book="ambientazione"
+              label="Ambientazione"
+              className={topBtn}
+              trigger={
+                <>
+                  <CastleIcon />
+                  <TopTip>Ambientazione</TopTip>
+                </>
+              }
+            />
+            <GuideButton
+              book="manuale"
+              label="Manuale di Gioco"
+              className={topBtn}
+              trigger={
+                <>
+                  <BookIcon />
+                  <TopTip>Manuale di Gioco</TopTip>
+                </>
+              }
+            />
+          </div>
+
+          <h1 className="flex items-center gap-3 font-serif text-base tracking-[0.2em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:text-xl md:text-2xl">
             <span className="hidden text-blood sm:inline">
               <FlameIcon />
             </span>
-            <span className="truncate">{area.title}</span>
+            Westeros GDR
             <span className="hidden text-blood sm:inline">
               <FlameIcon />
             </span>
           </h1>
+
+          <div className="flex items-center justify-end gap-1">
+            <ComingSoonButton title="Utility giocatore" icon={<ToolsIcon />} />
+            <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
+          </div>
         </header>
 
         <div className="relative flex min-h-0 flex-1">
@@ -469,6 +502,45 @@ function useUnread(characterId: string | null) {
 }
 
 // ---------------------------------------------------------------------
+// Barra in alto: pulsanti a icona con fumetto sotto
+// ---------------------------------------------------------------------
+const topBtn =
+  "group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent focus-visible:text-accent focus-visible:outline-none";
+
+function TopTip({ children }: { children: ReactNode }) {
+  return (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute top-full left-1/2 z-50 mt-2 hidden -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-b-blood/60 before:content-[''] md:block"
+    >
+      {children}
+    </span>
+  );
+}
+
+// Sezioni non ancora realizzate: l'icona c'e' gia', il contenuto arrivera'
+function ComingSoonButton({ title, icon }: { title: string; icon: ReactNode }) {
+  return (
+    <ModalButton
+      title={title}
+      className={topBtn}
+      label={
+        <>
+          {icon}
+          <TopTip>{title}</TopTip>
+        </>
+      }
+    >
+      {() => (
+        <p className="py-6 text-center text-muted">
+          La sezione <strong className="text-accent">{title}</strong> è in preparazione.
+        </p>
+      )}
+    </ModalButton>
+  );
+}
+
+// ---------------------------------------------------------------------
 // Colonna destra: icone di navigazione
 // ---------------------------------------------------------------------
 const railBtn =
@@ -510,28 +582,6 @@ function RightRail({ characterId, isAdmin }: { characterId: string | null; isAdm
           }
         />
       )}
-      <GuideButton
-        book="manuale"
-        label="Manuale di Gioco"
-        className={railBtn}
-        trigger={
-          <>
-            <BookIcon />
-            <Tip>Manuale di Gioco</Tip>
-          </>
-        }
-      />
-      <GuideButton
-        book="ambientazione"
-        label="Ambientazione"
-        className={railBtn}
-        trigger={
-          <>
-            <CastleIcon />
-            <Tip>Ambientazione</Tip>
-          </>
-        }
-      />
       <Link href="/personaggi" className={`${railBtn} ${active("/personaggi")}`} aria-label="Personaggi">
         <UsersIcon />
         <Tip>Personaggi</Tip>

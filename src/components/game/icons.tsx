@@ -83,3 +83,16 @@ export const ChevronIcon = ({ left }: { left?: boolean }) => (
     <path d="m9 6 6 6-6 6" />
   </svg>
 );
+
+export const ToolsIcon = () => (
+  <svg {...base}>
+    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z" />
+  </svg>
+);
+
+export const TicketIcon = () => (
+  <svg {...base}>
+    <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7Z" />
+    <path d="M14 5v2M14 11v2M14 17v2" />
+  </svg>
+);
