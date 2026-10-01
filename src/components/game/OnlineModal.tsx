@@ -59,9 +59,9 @@ export default function OnlineModal(props: Props) {
   const sorted = [...groups.entries()].sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b));
 
   return (
-    <Modal open={open} onClose={onClose} title="Elenco online" size="xl">
+    <Modal open={open} onClose={onClose} title="Elenco online" size="tall">
       <div className="flex h-full flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
           <p className="font-serif text-xl tracking-[0.15em] uppercase">
             <span className="text-accent">{online.length}</span> online
           </p>
@@ -85,7 +85,7 @@ export default function OnlineModal(props: Props) {
 
         <PhraseEditor phrase={props.phrase} onSave={props.onSavePhrase} />
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-2 sm:p-4">
           {sorted.length === 0 && <p className="text-center text-muted">Nessuno in questa sezione.</p>}
           {sorted.map(([key, group]) => (
             <section key={key}>
@@ -132,8 +132,8 @@ function PlayerRow({
   onChangeAvailability: (value: Availability) => void;
 }) {
   return (
-    <li className="flex items-center gap-3 rounded-md border border-border/70 bg-black/40 px-3 py-2">
-      <Avatar name={player.name} url={player.avatar} size="h-11 w-11" />
+    <li className="flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-2 sm:gap-3 sm:px-3">
+      <Avatar name={player.name} url={player.avatar} size="h-9 w-9 sm:h-11 sm:w-11" />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2">
           <span className="truncate font-serif tracking-wide text-accent uppercase">{player.name}</span>
@@ -187,7 +187,7 @@ function PhraseEditor({ phrase, onSave }: { phrase: string; onSave: (p: string) 
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 sm:px-4">
       <label htmlFor="phrase" className="text-xs tracking-wider text-muted uppercase">
         La tua frase
       </label>
