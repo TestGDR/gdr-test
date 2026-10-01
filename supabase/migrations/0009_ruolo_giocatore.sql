@@ -30,7 +30,10 @@ as $$
       and (
         p.role = 'admin'
         or perm = any(r.permissions)
-        or perm = any((select g.permissions from public.staff_roles g where g.system_key = 'giocatore'))
+        or exists (
+          select 1 from public.staff_roles g
+          where g.system_key = 'giocatore' and perm = any(g.permissions)
+        )
       )
   );
 $$;
