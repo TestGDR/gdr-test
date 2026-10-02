@@ -178,3 +178,7 @@ body {
   border-width: 5px;
   border-image-width: 5px;
 }
+.frame-bronze-lg {
+  border-width: 12px;
+  border-image-width: 12px;
+}
