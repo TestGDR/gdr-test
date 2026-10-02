@@ -415,17 +415,18 @@ function LeftColumn({
         )}
       </div>
 
-      {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me */}
-      <div className="rounded-md border border-border bg-black/40 p-3">
+      {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me.
+          Solo computer: su cellulare c'e' l'icona dei presenti nel pannello */}
+      <div className="hidden rounded-md border border-border bg-black/40 p-3 md:block">
         <button
           type="button"
           onClick={onOpenOnline}
-          className="hidden w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent md:block"
+          className="w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent"
           title="Apri l'elenco di tutti i presenti"
         >
           <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
         </button>
-        <h3 className="truncate border-b md:mt-3 border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
+        <h3 className="mt-3 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
           {me?.place === "chat" ? me.placeLabel : `In mappa · ${area.title}`}
         </h3>
         <ul className="mt-2 space-y-1.5 text-sm">
