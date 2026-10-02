@@ -179,7 +179,7 @@ body {
   border-image-width: 5px;
 }
 
-/* Cornice della mappa: bordo scuro con doppio filo dorato e ornamenti agli
+/* Cornice della mappa: bordo nero e grigio con doppio filo dorato e ornamenti agli
    angoli (public/images/cornice-mappa.svg); piu' sottile su cellulare */
 .frame-ornate {
   border: 22px solid transparent;
