@@ -189,3 +189,14 @@ $$;
 -- ---------------------------------------------------------------------
 create extension if not exists pg_cron with schema pg_catalog;
 select cron.schedule('pulizia-stanze-affitto', '*/5 * * * *', 'select public.purge_idle_rented_rooms()');
+
+-- ---------------------------------------------------------------------
+-- Chiave segreta del server (mai nel browser): serve per preparare e
+-- verificare i test automatici (chat di prova, monete, ruoli, casate)
+-- ---------------------------------------------------------------------
+grant select, insert, update, delete on
+  public.maps, public.locations, public.rooms, public.messages,
+  public.room_rentals, public.room_guests, public.bank_transactions,
+  public.houses, public.house_roles
+to service_role;
+grant select, update on public.profiles, public.characters to service_role;
