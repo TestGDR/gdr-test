@@ -30,6 +30,8 @@ export type GameMap = {
   name: string;
   description: string;
   image_url: string;
+  sort_order: number;
+  active: boolean; // i giocatori vedono solo le mappe attive
 };
 
 export type Location = {
@@ -42,11 +44,19 @@ export type Location = {
   y: number;
 };
 
+export type RoomAccess = "pubblica" | "casata" | "affitto";
+
 export type Room = {
   id: string;
   location_id: string;
   name: string;
   description: string;
+  sort_order: number;
+  image_url: string | null;
+  access: RoomAccess;
+  house_id: string | null; // chat della casata
+  price_per_hour: number; // chat in affitto
+  max_hours: number;
 };
 
 export type MessageKind = "azione" | "fuori_gioco" | "master";

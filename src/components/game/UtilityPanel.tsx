@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
+import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
 
 type Pg = {
@@ -21,6 +22,7 @@ const BOXES = [
   { id: "pg", label: "Anagrafe personaggi", icon: <AddressBookIcon />, color: "text-accent" },
   { id: "prestavolti", label: "Anagrafe prestavolti", icon: <MasksIcon />, color: "text-amber-400" },
   { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
+  { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
 ] as const;
 type Section = (typeof BOXES)[number]["id"];
 
@@ -110,7 +112,7 @@ function UtilityPanel() {
         <h2 className="font-serif text-lg tracking-[0.15em] text-accent uppercase">
           {openHouse ? `Casata ${openHouse.name}` : BOXES.find((b) => b.id === tab)?.label}
         </h2>
-        {tab !== "casate" && (
+        {(tab === "pg" || tab === "prestavolti") && (
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -121,7 +123,7 @@ function UtilityPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {pgs === null && <p className="text-center text-muted">Caricamento...</p>}
+        {pgs === null && tab !== "stanze" && <p className="text-center text-muted">Caricamento...</p>}
 
         {/* Indice A-Z (anagrafe personaggi e prestavolti) */}
         {pgs !== null && (tab === "pg" || tab === "prestavolti") && (
@@ -190,6 +192,9 @@ function UtilityPanel() {
               : "Nessun prestavolto trovato."}
           </p>
         )}
+
+        {/* Stanze in affitto */}
+        {tab === "stanze" && <RoomBooking />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
         {/* Pagina della casata aperta, al posto dell'elenco */}
@@ -266,6 +271,15 @@ function MasksIcon() {
     <svg {...big}>
       <path d="M2 4c3 .9 6 .9 9 0v6.5c0 3-2 5.3-4.5 5.3S2 13.5 2 10.5V4Zm2.6 4.1c.8-.6 1.8-.6 2.6 0 .2-.6-.5-1.2-1.3-1.2s-1.5.6-1.3 1.2Zm.8 3.6c.8.8 2.4.8 3.2 0-.9-.4-2.3-.4-3.2 0Z" opacity=".75" />
       <path d="M12 8c3 .9 6 .9 9 0v6.5c0 3-2 5.5-4.5 5.5S12 17.5 12 14.5V8Zm2.4 3.6c.2.6.8 1 1.4 1s1.2-.4 1.4-1c-.8-.3-2-.3-2.8 0Zm4.6 0c-.8-.3-2-.3-2.8 0 .2.6.8 1 1.4 1s1.2-.4 1.4-1Zm-4.2 4c.8 1.1 2.6 1.1 3.4 0-.9.3-2.5.3-3.4 0Z" />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg {...big}>
+      <path d="M8 3a5 5 0 0 0-1.2 9.85L6 21l2.5 1L10 20.5 9.4 19l1.4-1-1-1.3 1.1-1.2-.6-2.7A5 5 0 0 0 8 3Zm0 2.5a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2Z" />
+      <path d="M14 9h7v2h-1.5v2.5h-2V11H14z" opacity=".75" />
     </svg>
   );
 }

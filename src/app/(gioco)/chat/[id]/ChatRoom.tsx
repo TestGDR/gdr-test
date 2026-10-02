@@ -66,7 +66,8 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
       .single<Message>();
     setSending(false);
     if (error) {
-      setError(error.message);
+      // Regole del database: chat privata senza accesso (affitto scaduto, espulsione...)
+      setError(error.code === "42501" ? "Non puoi scrivere in questa chat: non hai (più) accesso." : error.message);
       return;
     }
     addMessage(data);

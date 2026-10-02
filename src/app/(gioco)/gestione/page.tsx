@@ -25,9 +25,9 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
-    href: null,
+    href: "/gestione/mondo",
     title: "Gestione mondo",
-    description: "Mappe, luoghi e liste di gioco.",
+    description: "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",
   },
 ];
 
