@@ -238,7 +238,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
     // Libro aperto: copertina di cuoio, a sinistra l'indice, a destra il contenuto
     <div className="book flex h-full flex-col p-2 md:flex-row md:p-4">
       {/* Pagina sinistra: macrosezioni (si aprono/chiudono) e sezioni */}
-      <aside className="book-page book-page-left max-h-60 shrink-0 space-y-3 overflow-y-auto px-5 py-4 md:max-h-none md:w-80">
+      <aside className="book-page book-page-left max-h-60 shrink-0 space-y-3 overflow-y-auto px-8 py-8 md:max-h-none md:w-80">
         {loadError && <p className="text-sm text-red-800">Impossibile caricare i contenuti.</p>}
         {sections === null && !loadError && <p className="text-sm text-[#7a6248]">Caricamento...</p>}
         {sections?.length === 0 && <p className="text-sm text-[#7a6248]">Nessun contenuto.</p>}
@@ -347,7 +347,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
       <div className="book-spine hidden md:block" aria-hidden />
 
       {/* Pagina destra: ricerca + documento. In modifica l'editor resta su fondo scuro */}
-      <section className={`flex min-h-0 min-w-0 flex-1 flex-col px-6 py-4 ${editing ? "book-page-editing" : "book-page book-page-right"}`}>
+      <section className={`flex min-h-0 min-w-0 flex-1 flex-col px-10 py-8 ${editing ? "book-page-editing" : "book-page book-page-right"}`}>
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
           {!editing && (
             <form onSubmit={search} className="flex min-w-0 flex-1 items-center gap-2">
