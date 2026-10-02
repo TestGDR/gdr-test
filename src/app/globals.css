@@ -194,3 +194,7 @@ body {
   border-image: url("/images/cornice-medievale.svg") 16 / 10px stretch;
   box-shadow: 0 4px 10px rgb(0 0 0 / 0.85);
 }
+.frame-medieval-sm {
+  border-width: 6px;
+  border-image-width: 6px;
+}

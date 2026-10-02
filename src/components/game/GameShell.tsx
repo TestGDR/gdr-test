@@ -189,7 +189,7 @@ export default function GameShell({
             </h1>
 
             <span className="mx-2 md:hidden">
-              <CharacterPicture character={character} displayName={displayName} size="h-9 w-9" small />
+              <CharacterPicture character={character} displayName={displayName} size="h-9 w-9" small medieval />
             </span>
 
             <span className="hidden md:contents">
@@ -479,9 +479,11 @@ function CharacterPicture({
   size: string;
   balloon?: boolean;
   small?: boolean; // cornice sottile (barra in alto del cellulare)
-  medieval?: boolean; // cornice di ferro con piastre chiodate (colonna sinistra)
+  medieval?: boolean; // cornice di ferro con piastre chiodate
 }) {
-  const frame = medieval ? "frame-medieval block" : `frame-gold ${small ? "frame-gold-sm" : ""} block`;
+  const frame = medieval
+    ? `frame-medieval ${small ? "frame-medieval-sm" : ""} block`
+    : `frame-gold ${small ? "frame-gold-sm" : ""} block`;
   if (!character)
     return (
       <span className={frame}>
