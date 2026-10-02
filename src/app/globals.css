@@ -198,3 +198,23 @@ body {
   border-width: 6px;
   border-image-width: 6px;
 }
+
+/* Striscia di pergamena (data di gioco): carta chiara ingiallita ai bordi,
+   grana leggera e code intagliate alle due estremita' */
+.parchment {
+  position: relative;
+  width: fit-content;
+  color: #3b2a1a;
+  background:
+    radial-gradient(ellipse at center, #f2e8cc 30%, #e0cda4 70%, #c2a575 100%);
+  clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.6));
+}
+.parchment::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='60'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.35' numOctaves='3' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.33 0 0 0 0 0.18 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}

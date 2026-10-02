@@ -27,8 +27,8 @@ import {
   BookIcon,
   CastleIcon,
   ChevronIcon,
-  FlameIcon,
   GearIcon,
+  InfoIcon,
   MapIcon,
   MenuIcon,
   PowerIcon,
@@ -36,6 +36,7 @@ import {
   TicketIcon,
   ToolsIcon,
   UsersIcon,
+  WeatherIcon,
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
@@ -48,12 +49,12 @@ import SalaryCollector from "./SalaryCollector";
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
 // ogni pagina del gioco la imposta con <GameArea title="..." />
 // ---------------------------------------------------------------------
-type Area = { title: string; image?: string | null };
+type Area = { title: string; image?: string | null; description?: string | null };
 const AreaContext = createContext<(area: Area) => void>(() => {});
 
-export function GameArea({ title, image }: Area) {
+export function GameArea({ title, image, description }: Area) {
   const setArea = useContext(AreaContext);
-  useEffect(() => setArea({ title, image }), [setArea, title, image]);
+  useEffect(() => setArea({ title, image, description }), [setArea, title, image, description]);
   return null;
 }
 
@@ -144,7 +145,7 @@ export default function GameShell({
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
-        <header className="bar relative z-30 flex h-14 shrink-0 items-center justify-center border-b pr-2 pl-11 md:px-4">
+        <header className="relative z-30 flex h-14 shrink-0 items-center justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm md:px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -181,13 +182,7 @@ export default function GameShell({
             />
 
             <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] md:flex md:text-2xl">
-              <span className="hidden text-blood md:inline">
-                <FlameIcon />
-              </span>
               Westeros GDR
-              <span className="hidden text-blood md:inline">
-                <FlameIcon />
-              </span>
             </h1>
 
             <span className="mx-2 md:hidden">
@@ -383,10 +378,44 @@ function LeftColumn({
         <p className="absolute inset-x-2 bottom-2 truncate font-serif text-sm text-foreground">
           {area.title}
         </p>
+        {/* Info luogo e meteo */}
+        <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+          <ModalButton
+            title={area.title}
+            size="lg"
+            className={areaBtn}
+            label={
+              <>
+                <InfoIcon />
+                <span className="sr-only">Info luogo</span>
+                <Balloon>Info luogo</Balloon>
+              </>
+            }
+          >
+            {() => <PlaceInfo area={area} />}
+          </ModalButton>
+          <ModalButton
+            title="Meteo"
+            className={areaBtn}
+            label={
+              <>
+                <WeatherIcon />
+                <span className="sr-only">Meteo</span>
+                <Balloon>Meteo</Balloon>
+              </>
+            }
+          >
+            {() => (
+              <p className="py-6 text-center text-muted">
+                Il <strong className="text-accent">meteo</strong> di {area.title} è in preparazione.
+              </p>
+            )}
+          </ModalButton>
+        </div>
       </div>
 
       {/* Data di gioco */}
-      <div className="rounded-md border border-border bg-black/40 px-3 py-2 text-center font-serif text-xs tracking-[0.15em] text-accent uppercase">
+      <div className="parchment mx-auto px-6 py-1.5 text-center font-serif text-[10px] font-semibold tracking-[0.06em] whitespace-nowrap uppercase">
         {GAME_DATE}
       </div>
 
@@ -394,7 +423,7 @@ function LeftColumn({
       <div className="md:hidden">{mobileTools}</div>
 
       {/* Personaggio + messaggi (computer) */}
-      <div className="hidden items-center bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
+      <div className="hidden items-center py-1 md:flex">
         {/* L'immagine apre la scheda */}
         <CharacterPicture character={character} displayName={displayName} size="h-[4.5rem] w-[4.5rem]" balloon medieval />
         {character && (
@@ -720,6 +749,28 @@ function useUnread(characterId: string | null) {
 // ---------------------------------------------------------------------
 // Barra in alto: pulsanti a icona con fumetto sotto
 // ---------------------------------------------------------------------
+// Pulsanti piccoli sull'immagine del luogo (stesso rombo della barra in alto)
+const areaBtn =
+  "group relative isolate flex h-8 w-8 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-[15px] [&_svg]:w-[15px] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.8)] before:transition hover:before:brightness-125";
+
+// Info luogo: immagine, nome e descrizione della zona in cui ci si trova
+function PlaceInfo({ area }: { area: Area }) {
+  return (
+    <div className="space-y-4">
+      {area.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={area.image} alt="" className="max-h-64 w-full object-cover" />
+      )}
+      <h3 className="font-serif text-2xl text-accent">{area.title}</h3>
+      {area.description ? (
+        <p className="text-sm leading-relaxed whitespace-pre-line">{area.description}</p>
+      ) : (
+        <p className="text-sm text-muted">Nessuna descrizione per questo luogo.</p>
+      )}
+    </div>
+  );
+}
+
 // Ogni icona sta in un rombo rosso scuro, stoffa come lo stendardo dei messaggi (senza bordo)
 const topBtn =
   "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[18px] sm:[&_svg]:w-[18px] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.7)] before:transition hover:before:brightness-125";

@@ -25,6 +25,23 @@ export const SheetIcon = () => (
   </svg>
 );
 
+// Info luogo: una "i" in un cerchio
+export const InfoIcon = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="M12 11v6M12 7.5v.01" />
+  </svg>
+);
+
+// Meteo: sole dietro una nuvola
+export const WeatherIcon = () => (
+  <svg {...base}>
+    <path d="M12 2v2M4.9 4.9l1.4 1.4M2 12h2M19.1 4.9l-1.4 1.4" />
+    <path d="M8.2 10.2a4 4 0 0 1 7.3-1.9" />
+    <path d="M17.5 21H9a4 4 0 1 1 .9-7.9 5 5 0 0 1 9.6 1.9 3 3 0 0 1-2 6Z" />
+  </svg>
+);
+
 // Libro aperto (Manuale)
 export const BookIcon = () => (
   <svg {...base}>

@@ -60,7 +60,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   if (!canEnter) {
     return (
       <div className="mx-auto mt-6 max-w-xl text-center">
-        <GameArea title={room.name} image={image} />
+        <GameArea title={room.name} image={image} description={room.description} />
         {header}
         <p className="panel text-muted">
           {room.access === "casata"
@@ -81,7 +81,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
 
   return (
     <div className="flex h-full min-h-[24rem] flex-col">
-      <GameArea title={room.name} image={image} />
+      <GameArea title={room.name} image={image} description={room.description} />
       {header}
       {isPrivate && (
         <RoomAccessBar
