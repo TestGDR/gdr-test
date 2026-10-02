@@ -208,7 +208,7 @@ export default function GameShell({
             {character && (
               <span className="contents md:hidden">
                 <TopMessageButton label="Missive" count={unread.counts.missiva} onClick={() => openMessages("missiva")}>
-                  <ScrollIcon />
+                  <QuillIcon />
                 </TopMessageButton>
                 <TopMessageButton label="Messaggi OFF" count={unread.counts.off} onClick={() => openMessages("off")}>
                   <BubbleIcon />
@@ -402,7 +402,7 @@ function LeftColumn({
               count={unread.missiva}
               onClick={() => onOpenMessages("missiva")}
             >
-              <ScrollIcon />
+              <QuillIcon />
             </MessageButton>
             <MessageButton
               label="Messaggi OFF (fuori gioco)"
@@ -501,7 +501,7 @@ function CharacterPicture({
 
 // Cellulare: icone del pannello a scomparsa
 const drawerBtn =
-  "group relative flex h-12 w-full items-center justify-center rounded-md border border-border bg-black/40 text-muted transition hover:border-accent hover:text-accent";
+  "group relative flex h-12 w-full items-center justify-center text-muted transition hover:text-accent";
 
 function MobileTools({ canManage, onlineCount, onOpenOnline }: { canManage: boolean; onlineCount: number; onOpenOnline: () => void }) {
   return (
@@ -560,7 +560,7 @@ function MessageButton({
       type="button"
       onClick={onClick}
       aria-label={count > 0 ? `${label}: ${count} non letti` : label}
-      className="group relative flex h-9 w-11 items-center justify-center rounded border border-border bg-background text-muted transition hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
+      className="group relative flex h-9 w-9 items-center justify-center text-muted transition hover:text-accent focus-visible:text-accent focus-visible:outline-none"
     >
       {children}
       {count > 0 && (
@@ -585,9 +585,13 @@ function Balloon({ children }: { children: ReactNode }) {
   );
 }
 
-const ScrollIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M8 4h11v13a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1h11v1a3 3 0 0 0 3 3M8 4a3 3 0 0 0-3 3v9M11 8h5M11 12h5" />
+// Missive (messaggi in gioco): piuma d'oca
+const QuillIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M20.5 3.5C14 3.5 8.5 7.5 7 14l-1.5 1.5" />
+    <path d="M20.5 3.5c0 6.5-4 12-10.5 13.5L8.5 18.5" />
+    <path d="M10 13.5l3.5-3.5M12.5 15.5l3-3M9 11l2.5-2.5" />
+    <path d="M7 14l3.5 3.5M3.5 20.5l4-4" />
   </svg>
 );
 

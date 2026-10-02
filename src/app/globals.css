@@ -21,6 +21,17 @@
   --color-muted: var(--muted);
   --font-sans: var(--font-body);
   --font-serif: var(--font-title);
+
+  /* Angoli squadrati ovunque (rounded-full resta tondo: puntini, pallini) */
+  --radius: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 body {
