@@ -92,6 +92,7 @@ export default function RoomBooking() {
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-3">
         <p className="text-sm text-muted">
           Chi affitta una stanza ne diventa il padrone finché dura l&apos;affitto: può invitare e cacciare altri personaggi.
+          Scaduto l&apos;affitto, la chat si cancella dopo 30 minuti se non la riaffitti; se la affitta un altro, subito.
         </p>
         {me && (
           <p className="font-serif text-accent">

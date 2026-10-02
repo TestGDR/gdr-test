@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
+import Bank from "./Bank";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +24,7 @@ const BOXES = [
   { id: "prestavolti", label: "Anagrafe prestavolti", icon: <MasksIcon />, color: "text-amber-400" },
   { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
+  { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
 ] as const;
 type Section = (typeof BOXES)[number]["id"];
 
@@ -123,7 +125,7 @@ function UtilityPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {pgs === null && tab !== "stanze" && <p className="text-center text-muted">Caricamento...</p>}
+        {pgs === null && tab !== "stanze" && tab !== "banca" && <p className="text-center text-muted">Caricamento...</p>}
 
         {/* Indice A-Z (anagrafe personaggi e prestavolti) */}
         {pgs !== null && (tab === "pg" || tab === "prestavolti") && (
@@ -195,6 +197,7 @@ function UtilityPanel() {
 
         {/* Stanze in affitto */}
         {tab === "stanze" && <RoomBooking />}
+        {tab === "banca" && <Bank />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
         {/* Pagina della casata aperta, al posto dell'elenco */}
@@ -271,6 +274,18 @@ function MasksIcon() {
     <svg {...big}>
       <path d="M2 4c3 .9 6 .9 9 0v6.5c0 3-2 5.3-4.5 5.3S2 13.5 2 10.5V4Zm2.6 4.1c.8-.6 1.8-.6 2.6 0 .2-.6-.5-1.2-1.3-1.2s-1.5.6-1.3 1.2Zm.8 3.6c.8.8 2.4.8 3.2 0-.9-.4-2.3-.4-3.2 0Z" opacity=".75" />
       <path d="M12 8c3 .9 6 .9 9 0v6.5c0 3-2 5.5-4.5 5.5S12 17.5 12 14.5V8Zm2.4 3.6c.2.6.8 1 1.4 1s1.2-.4 1.4-1c-.8-.3-2-.3-2.8 0Zm4.6 0c-.8-.3-2-.3-2.8 0 .2.6.8 1 1.4 1s1.2-.4 1.4-1Zm-4.2 4c.8 1.1 2.6 1.1 3.4 0-.9.3-2.5.3-3.4 0Z" />
+    </svg>
+  );
+}
+
+function CoinsIcon() {
+  return (
+    <svg {...big}>
+      <ellipse cx="9" cy="6" rx="6" ry="2.6" />
+      <path d="M3 7.6v2.6C3 11.6 5.7 12.8 9 12.8s6-1.2 6-2.6V7.6c-1.2 1-3.4 1.6-6 1.6s-4.8-.6-6-1.6Z" opacity=".8" />
+      <path d="M3 12.2v2.6C3 16.2 5.7 17.4 9 17.4c.6 0 1.2 0 1.8-.1A6 6 0 0 1 11 13c-.6.1-1.3.1-2 .1-2.6 0-4.8-.4-6-1Z" opacity=".65" />
+      <circle cx="16.5" cy="16.5" r="5" />
+      <path d="M16.5 13.5v6M14.8 15h2.6a1 1 0 0 1 0 2h-1.8a1 1 0 0 0 0 2h2.6" stroke="#000" strokeWidth="1.1" fill="none" opacity=".6" />
     </svg>
   );
 }

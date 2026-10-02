@@ -39,6 +39,7 @@ import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
+import SalaryCollector from "./SalaryCollector";
 
 // ---------------------------------------------------------------------
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
@@ -270,6 +271,7 @@ export default function GameShell({
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
+      <SalaryCollector />
       <OnlineModal
         open={onlineOpen}
         onClose={() => setOnlineOpen(false)}
