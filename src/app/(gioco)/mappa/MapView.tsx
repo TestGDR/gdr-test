@@ -51,7 +51,7 @@ export default function MapView({ map, locations, rooms, houses, rentals, userId
         {map.description && <p className="mt-1 text-sm leading-relaxed text-muted">{map.description}</p>}
       </div>
 
-      <Modal open={!!open} onClose={() => setOpenId(null)} title={open?.name ?? ""} size="lg">
+      <Modal open={!!open} onClose={() => setOpenId(null)} title={open?.name ?? ""} size="area">
         {open && (
           <RoomList
             location={open}
