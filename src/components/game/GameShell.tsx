@@ -378,22 +378,8 @@ function LeftColumn({
         <p className="absolute inset-x-2 bottom-2 truncate font-serif text-sm text-foreground">
           {area.title}
         </p>
-        {/* Info luogo e meteo */}
-        <div className="absolute top-1.5 right-1.5 flex gap-0.5">
-          <ModalButton
-            title={area.title}
-            size="lg"
-            className={areaBtn}
-            label={
-              <>
-                <InfoIcon />
-                <span className="sr-only">Info luogo</span>
-                <Balloon>Info luogo</Balloon>
-              </>
-            }
-          >
-            {() => <PlaceInfo area={area} />}
-          </ModalButton>
+        {/* Meteo e info luogo: quadratini neri a destra, al centro in verticale */}
+        <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 flex-col gap-1.5">
           <ModalButton
             title="Meteo"
             className={areaBtn}
@@ -410,6 +396,20 @@ function LeftColumn({
                 Il <strong className="text-accent">meteo</strong> di {area.title} è in preparazione.
               </p>
             )}
+          </ModalButton>
+          <ModalButton
+            title={area.title}
+            size="lg"
+            className={areaBtn}
+            label={
+              <>
+                <InfoIcon />
+                <span className="sr-only">Info luogo</span>
+                <Balloon>Info luogo</Balloon>
+              </>
+            }
+          >
+            {() => <PlaceInfo area={area} />}
           </ModalButton>
         </div>
       </div>
@@ -749,9 +749,9 @@ function useUnread(characterId: string | null) {
 // ---------------------------------------------------------------------
 // Barra in alto: pulsanti a icona con fumetto sotto
 // ---------------------------------------------------------------------
-// Pulsanti piccoli sull'immagine del luogo (stesso rombo della barra in alto)
+// Pulsanti piccoli sull'immagine del luogo: quadratini neri
 const areaBtn =
-  "group relative isolate flex h-8 w-8 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-[15px] [&_svg]:w-[15px] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.8)] before:transition hover:before:brightness-125";
+  "group relative flex h-7 w-7 items-center justify-center bg-black/85 text-[#e2c99a] shadow-[0_2px_6px_rgb(0_0_0/0.8)] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4";
 
 // Info luogo: immagine, nome e descrizione della zona in cui ci si trova
 function PlaceInfo({ area }: { area: Area }) {
