@@ -218,3 +218,88 @@ body {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='60'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.35' numOctaves='3' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.33 0 0 0 0 0.18 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------------------
+   Manuale e Ambientazione come un libro aperto
+   --------------------------------------------------------------------- */
+/* copertina di cuoio */
+.book {
+  background: radial-gradient(ellipse at center, #3a2418 0%, #24150d 60%, #140a05 100%);
+  box-shadow: inset 0 0 40px rgb(0 0 0 / 0.8);
+}
+/* pagine di pergamena con grana leggera */
+.book-page {
+  color: #3b2a1a;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8 0.3' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.32 0 0 0 0 0.15 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 40%, #f2e7c9 0%, #e3d0a5 60%, #c8ab7a 100%);
+}
+/* ombra verso il dorso, come una pagina che si incurva */
+.book-page-left {
+  box-shadow: inset -18px 0 22px -12px rgb(70 40 12 / 0.6), 0 4px 12px rgb(0 0 0 / 0.6);
+}
+.book-page-right {
+  box-shadow: inset 18px 0 22px -12px rgb(70 40 12 / 0.6), 0 4px 12px rgb(0 0 0 / 0.6);
+}
+.book-page-editing {
+  background: var(--panel);
+}
+/* dorso con gli anelli di metallo */
+.book-spine {
+  width: 22px;
+  flex-shrink: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 4.5px, #c79e62 5px, #6e5030 6.5px, #2a1c10 7.2px, transparent 7.6px) 0 18px / 22px 64px repeat-y,
+    linear-gradient(90deg, #0e0704, #2b1a10 50%, #0e0704);
+}
+/* pulsante rosso scuro sulle pagine */
+.book-btn {
+  @apply px-3 py-1 font-serif text-xs tracking-widest uppercase transition disabled:opacity-50;
+  color: #f2e7c9;
+  background: linear-gradient(180deg, #7a2212, #4e140a);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+}
+.book-btn:hover {
+  background: linear-gradient(180deg, #8f2a16, #5e180c);
+}
+/* testo sulla pergamena: inchiostro scuro, titoli rossi, capolettera */
+.guide-content.on-parchment {
+  color: #2e2014;
+}
+.guide-content.on-parchment h2 {
+  @apply text-center;
+  color: #8b2a14;
+}
+.guide-content.on-parchment h3 {
+  color: #7a1f10;
+}
+.guide-content.on-parchment strong {
+  color: #1f140b;
+}
+.guide-content.on-parchment em {
+  color: #5a3b1c;
+}
+.guide-content.on-parchment a {
+  color: #8b2a14;
+}
+.guide-content.on-parchment hr {
+  border-color: rgb(138 106 62 / 0.45);
+}
+.guide-content.on-parchment blockquote {
+  border-color: #8b2a14;
+  background: rgb(139 42 20 / 0.08);
+}
+.guide-content.on-parchment th {
+  border-color: #8b2a14;
+}
+.guide-content.on-parchment td {
+  border-color: rgb(138 106 62 / 0.35);
+}
+.guide-content.on-parchment > p:first-of-type::first-letter,
+.guide-content.on-parchment > div > p:first-of-type::first-letter {
+  float: left;
+  margin: 0.08em 0.1em 0 0;
+  font-size: 3.2em;
+  line-height: 0.85;
+  color: #8b2a14;
+}
