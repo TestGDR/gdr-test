@@ -284,7 +284,8 @@ export function FamilyCanvas({
   }
 
   return (
-    <div className="relative" style={{ width, height }}>
+    // In consultazione l'albero sta al centro (se e' piu' largo dello spazio si scorre)
+    <div className={`relative ${readOnly ? "mx-auto" : ""}`} style={{ width, height }}>
       <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden>
         {lines.map((l, i) => (
           <path
