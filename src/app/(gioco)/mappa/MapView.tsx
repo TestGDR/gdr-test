@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import Modal from "@/components/ui/Modal";
-import type { GameMap, Location, Room } from "@/lib/types";
+import type { GameMap, Location, Room, RoomGroup } from "@/lib/types";
 import { untilLabel, type ActiveRental } from "@/lib/world";
 
 type Props = {
   map: GameMap;
   locations: Location[];
   rooms: Room[];
+  groups: RoomGroup[];
   houses: { id: string; name: string }[];
   rentals: ActiveRental[];
   userId: string;
@@ -18,10 +19,8 @@ type Props = {
 
 // Mappa principale (max 600px) con i puntini delle macroaree:
 // cliccandone uno si apre la modale con le chat della macroarea
-export default function MapView({ map, locations, rooms, houses, rentals, userId, initialLocationId }: Props) {
-  const [openId, setOpenId] = useState<string | null>(
-    locations.some((l) => l.id === initialLocationId) ? initialLocationId : null,
-  );
+export default function MapView({ map, locations, rooms, groups, houses, rentals, userId, initialLocationId }: Props) {
+  const [openId, setOpenId] = useState<string | null>(locations.some((l) => l.id === initialLocationId) ? initialLocationId : null);
   const open = locations.find((l) => l.id === openId);
 
   return (
@@ -56,6 +55,7 @@ export default function MapView({ map, locations, rooms, houses, rentals, userId
           <RoomList
             location={open}
             rooms={rooms.filter((r) => r.location_id === open.id)}
+            groups={groups.filter((g) => g.location_id === open.id)}
             houses={houses}
             rentals={rentals}
             userId={userId}
@@ -81,26 +81,39 @@ const noop = () => () => {};
 function RoomList({
   location,
   rooms,
+  groups,
   houses,
   rentals,
   userId,
 }: {
   location: Location;
   rooms: Room[];
+  groups: RoomGroup[];
   houses: { id: string; name: string }[];
   rentals: ActiveRental[];
   userId: string;
 }) {
   // Gli orari d'affitto si scrivono nel fuso orario del giocatore: solo nel browser
-  const inBrowser = useSyncExternalStore(noop, () => true, () => false);
+  const inBrowser = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
 
   function status(room: Room) {
     if (room.access === "casata") {
-      return { text: `Casata ${houses.find((h) => h.id === room.house_id)?.name ?? "—"}`, tone: "text-red-300" };
+      return {
+        text: `Casata ${houses.find((h) => h.id === room.house_id)?.name ?? "—"}`,
+        tone: "text-red-300",
+      };
     }
     if (room.access === "affitto") {
       const rental = rentals.find((r) => r.room_id === room.id);
-      if (!rental) return { text: `Libera · ${room.price_per_hour} monete/ora`, tone: "text-green-300" };
+      if (!rental)
+        return {
+          text: `Libera · ${room.price_per_hour} monete/ora`,
+          tone: "text-green-300",
+        };
       const until = inBrowser ? ` ${untilLabel(rental.ends_at)}` : "";
       return rental.character?.owner_id === userId
         ? { text: `Affittata da te${until}`, tone: "text-accent" }
@@ -109,39 +122,68 @@ function RoomList({
     return null;
   }
 
+  const sections = [
+    {
+      id: "senza-gruppo",
+      name: null as string | null,
+      rooms: rooms.filter((r) => !groups.some((g) => g.id === r.group_id)),
+    },
+    ...groups.map((g) => ({
+      id: g.id,
+      name: g.name as string | null,
+      rooms: rooms.filter((r) => r.group_id === g.id),
+    })),
+  ].filter((s) => s.rooms.length > 0);
+
   return (
     <div>
       {location.description && <p className="mb-4 text-sm leading-relaxed whitespace-pre-line text-muted">{location.description}</p>}
       {rooms.length === 0 && <p className="text-center text-muted">Nessuna chat in questa zona.</p>}
-      <ul className="space-y-3">
-        {rooms.map((room) => {
-          const st = status(room);
-          return (
-            <li key={room.id} className="flex gap-3 rounded-md border border-border bg-black/40 p-3">
-              {room.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={room.image_url} alt="" className="h-16 w-16 shrink-0 rounded object-cover" />
-              ) : (
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-border font-serif text-2xl text-muted">
-                  {room.name[0]}
-                </span>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                  <Link href={`/chat/${room.id}`} className="font-serif text-lg text-accent hover:underline">
-                    {room.access !== "pubblica" && <span aria-label="Privata" title="Chat privata">🔒 </span>}
-                    {room.name}
-                  </Link>
-                  {st && <span className={`text-xs ${st.tone}`}>{st.text}</span>}
-                </div>
-                {room.description && (
-                  <p className="mt-1 max-h-20 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-muted">{room.description}</p>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {/* Prima le chat senza gruppo, poi un blocco per ogni gruppo con il suo nome */}
+      {sections.map((section) => (
+        <section key={section.id} className="mb-5 last:mb-0">
+          {section.name && (
+            <h3 className="mb-2 border-b border-blood/50 pb-1 font-serif text-lg tracking-[0.12em] text-accent uppercase">
+              {section.name}
+            </h3>
+          )}
+          <ul className="space-y-3">
+            {section.rooms.map((room) => {
+              const st = status(room);
+              return (
+                <li key={room.id} className="flex gap-3 rounded-md border border-border bg-black/40 p-3">
+                  {room.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={room.image_url} alt="" className="h-16 w-16 shrink-0 rounded object-cover" />
+                  ) : (
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-border font-serif text-2xl text-muted">
+                      {room.name[0]}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                      <Link href={`/chat/${room.id}`} className="font-serif text-lg text-accent hover:underline">
+                        {room.access !== "pubblica" && (
+                          <span aria-label="Privata" title="Chat privata">
+                            🔒{" "}
+                          </span>
+                        )}
+                        {room.name}
+                      </Link>
+                      {st && <span className={`text-xs ${st.tone}`}>{st.text}</span>}
+                    </div>
+                    {room.description && (
+                      <p className="mt-1 max-h-20 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-muted">
+                        {room.description}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

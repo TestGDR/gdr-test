@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { GameArea } from "@/components/game/GameShell";
 import { requirePermission } from "@/lib/staff";
-import type { GameMap, Location, Room } from "@/lib/types";
+import type { GameMap, Location, Room, RoomGroup } from "@/lib/types";
 import WorldManager from "./WorldManager";
 
 export default async function MondoPage() {
   const { supabase } = await requirePermission("mondo.gestire");
 
   // Con il permesso si vedono anche le mappe spente (regole del database)
-  const [maps, locations, rooms, houses] = await Promise.all([
+  const [maps, locations, rooms, groups, houses] = await Promise.all([
     supabase.from("maps").select("*").order("sort_order").order("name"),
     supabase.from("locations").select("*").order("name"),
     supabase.from("rooms").select("*").order("sort_order").order("name"),
+    supabase.from("room_groups").select("*").order("sort_order").order("name"),
     supabase.from("houses").select("id, name").order("name"),
   ]);
 
@@ -26,6 +27,7 @@ export default async function MondoPage() {
         maps={(maps.data ?? []) as GameMap[]}
         locations={(locations.data ?? []) as Location[]}
         rooms={(rooms.data ?? []) as Room[]}
+        groups={(groups.data ?? []) as RoomGroup[]}
         houses={houses.data ?? []}
       />
     </div>

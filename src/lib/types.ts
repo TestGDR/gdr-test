@@ -57,6 +57,15 @@ export type Room = {
   house_id: string | null; // chat della casata
   price_per_hour: number; // chat in affitto
   max_hours: number;
+  group_id: string | null; // gruppo dentro la macroarea (facoltativo)
+};
+
+// Contenitore di chat dentro una macroarea (es. "Fortezza Rossa")
+export type RoomGroup = {
+  id: string;
+  location_id: string;
+  name: string;
+  sort_order: number;
 };
 
 export type MessageKind = "azione" | "fuori_gioco" | "master";

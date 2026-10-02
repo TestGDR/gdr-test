@@ -3,16 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import { MapDot } from "@/app/(gioco)/mappa/MapView";
-import type { GameMap, Location, Room, RoomAccess } from "@/lib/types";
+import type { GameMap, Location, Room, RoomAccess, RoomGroup } from "@/lib/types";
 import { ROOM_ACCESS } from "@/lib/world";
 import {
   deleteLocation,
   deleteMap,
   deleteRoom,
+  deleteRoomGroup,
+  moveRoomGroup,
   saveLocation,
   saveLocationPositions,
   saveMap,
   saveRoom,
+  saveRoomGroup,
   setMapActive,
   type WorldResult,
 } from "./actions";
@@ -21,6 +24,7 @@ type Data = {
   maps: GameMap[];
   locations: Location[];
   rooms: Room[];
+  groups: RoomGroup[];
   houses: { id: string; name: string }[];
 };
 
@@ -116,7 +120,10 @@ function MapsTab({
         </p>
         <ul className="space-y-1">
           {maps.map((m) => (
-            <li key={m.id} className={`flex items-center gap-2 rounded px-2 py-1.5 ${m.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}>
+            <li
+              key={m.id}
+              className={`flex items-center gap-2 rounded px-2 py-1.5 ${m.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}
+            >
               <button type="button" onClick={() => onSelect(m.id)} className="min-w-0 flex-1 text-left">
                 <span className="block truncate font-serif">{m.name}</span>
                 <span className="text-xs text-muted">{locations.filter((l) => l.map_id === m.id).length} macroaree</span>
@@ -158,13 +165,21 @@ function MapForm({ map, onSaved }: { map: GameMap | null; onSaved: (id: string) 
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     if (map) form.set("id", map.id);
-    run(() => saveMap(form), "Mappa salvata.", (res) => !map && res.id && onSaved(res.id));
+    run(
+      () => saveMap(form),
+      "Mappa salvata.",
+      (res) => !map && res.id && onSaved(res.id),
+    );
   }
 
   function remove() {
     if (!map) return;
     if (!window.confirm(`Eliminare la mappa ${map.name}? Verranno cancellate anche tutte le sue macroaree, le chat e i messaggi.`)) return;
-    run(() => deleteMap(map.id), "Mappa eliminata.", () => onSaved(NEW));
+    run(
+      () => deleteMap(map.id),
+      "Mappa eliminata.",
+      () => onSaved(NEW),
+    );
   }
 
   return (
@@ -201,7 +216,12 @@ function MapForm({ map, onSaved }: { map: GameMap | null; onSaved: (id: string) 
           {pending ? "Salvataggio..." : map ? "Salva" : "Crea mappa"}
         </button>
         {map && (
-          <button type="button" onClick={remove} disabled={pending} className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300">
+          <button
+            type="button"
+            onClick={remove}
+            disabled={pending}
+            className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300"
+          >
             Elimina mappa
           </button>
         )}
@@ -218,7 +238,11 @@ function MapPicker({ maps, mapId, onSelect }: { maps: GameMap[]; mapId: string; 
   return (
     <label className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-xs tracking-wider text-muted uppercase">Mappa</span>
-      <select value={maps.some((m) => m.id === mapId) ? mapId : ""} onChange={(e) => onSelect(e.target.value)} className="input w-auto py-1.5">
+      <select
+        value={maps.some((m) => m.id === mapId) ? mapId : ""}
+        onChange={(e) => onSelect(e.target.value)}
+        className="input w-auto py-1.5"
+      >
         {!maps.some((m) => m.id === mapId) && <option value="">Scegli una mappa...</option>}
         {maps.map((m) => (
           <option key={m.id} value={m.id}>
@@ -385,13 +409,21 @@ function LocationForm({
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     if (location) form.set("id", location.id);
-    run(() => saveLocation(form), location ? "Macroarea salvata." : "Macroarea creata: è al centro della mappa, trascinala dove vuoi.", (res) => !location && res.id && onSaved(res.id));
+    run(
+      () => saveLocation(form),
+      location ? "Macroarea salvata." : "Macroarea creata: è al centro della mappa, trascinala dove vuoi.",
+      (res) => !location && res.id && onSaved(res.id),
+    );
   }
 
   function remove() {
     if (!location) return;
     if (!window.confirm(`Eliminare la macroarea ${location.name}? Verranno cancellate anche le sue chat e i messaggi.`)) return;
-    run(() => deleteLocation(location.id), "Macroarea eliminata.", () => onSaved(NEW));
+    run(
+      () => deleteLocation(location.id),
+      "Macroarea eliminata.",
+      () => onSaved(NEW),
+    );
   }
 
   return (
@@ -417,7 +449,12 @@ function LocationForm({
           {pending ? "Salvataggio..." : location ? "Salva" : "Crea macroarea"}
         </button>
         {location && (
-          <button type="button" onClick={remove} disabled={pending} className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300">
+          <button
+            type="button"
+            onClick={remove}
+            disabled={pending}
+            className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300"
+          >
             Elimina
           </button>
         )}
@@ -430,13 +467,27 @@ function LocationForm({
 // ---------------------------------------------------------------------
 // Chat: collegate a una macroarea; pubbliche, della casata o in affitto
 // ---------------------------------------------------------------------
-function RoomsTab({ maps, locations, rooms, houses, mapId, onSelectMap }: Data & { mapId: string; onSelectMap: (id: string) => void }) {
+function RoomsTab({
+  maps,
+  locations,
+  rooms,
+  groups,
+  houses,
+  mapId,
+  onSelectMap,
+}: Data & { mapId: string; onSelectMap: (id: string) => void }) {
   const mapLocations = locations.filter((l) => l.map_id === mapId);
   const [locationId, setLocationId] = useState<string>(mapLocations[0]?.id ?? "");
   const [selectedId, setSelectedId] = useState<string>(NEW);
   const current = mapLocations.find((l) => l.id === locationId) ?? mapLocations[0];
   const locationRooms = rooms.filter((r) => r.location_id === current?.id);
   const room = locationRooms.find((r) => r.id === selectedId) ?? null;
+  const locationGroups = groups.filter((g) => g.location_id === current?.id);
+  // Elenco a sinistra diviso come nella modale dei giocatori
+  const roomSections = [
+    { id: "senza", name: "Senza gruppo", rooms: locationRooms.filter((r) => !locationGroups.some((g) => g.id === r.group_id)) },
+    ...locationGroups.map((g) => ({ id: g.id, name: g.name, rooms: locationRooms.filter((r) => r.group_id === g.id) })),
+  ].filter((sec) => sec.rooms.length > 0);
 
   if (maps.length === 0) return <p className="text-muted">Crea prima una mappa.</p>;
 
@@ -478,19 +529,25 @@ function RoomsTab({ maps, locations, rooms, houses, mapId, onSelectMap }: Data &
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
           <aside className="h-fit space-y-1">
-            {locationRooms.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setSelectedId(r.id)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${r.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}
-              >
-                <RoomThumb url={r.image_url} name={r.name} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-serif">{r.name}</span>
-                  <span className="text-xs text-muted">{ROOM_ACCESS.find((a) => a.id === r.access)?.label}</span>
-                </span>
-              </button>
+            <GroupsEditor locationId={current.id} groups={locationGroups} rooms={locationRooms} />
+            {roomSections.map((section) => (
+              <div key={section.id} className="space-y-1">
+                <p className="px-2 pt-2 text-[11px] tracking-[0.15em] text-accent/80 uppercase">{section.name}</p>
+                {section.rooms.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedId(r.id)}
+                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${r.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}
+                  >
+                    <RoomThumb url={r.image_url} name={r.name} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-serif">{r.name}</span>
+                      <span className="text-xs text-muted">{ROOM_ACCESS.find((a) => a.id === r.access)?.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             ))}
             {locationRooms.length === 0 && <p className="px-2 text-xs text-muted">Nessuna chat in questa macroarea.</p>}
             <button
@@ -506,6 +563,7 @@ function RoomsTab({ maps, locations, rooms, houses, mapId, onSelectMap }: Data &
             room={room}
             maps={maps}
             locations={locations}
+            groups={groups}
             houses={houses}
             locationId={current.id}
             onSaved={(id, newLocationId) => {
@@ -519,12 +577,130 @@ function RoomsTab({ maps, locations, rooms, houses, mapId, onSelectMap }: Data &
   );
 }
 
+// Gruppi della macroarea: crea, rinomina, ordina, elimina
+function GroupsEditor({ locationId, groups, rooms }: { locationId: string; groups: RoomGroup[]; rooms: Room[] }) {
+  const { run, pending, feedback } = useAction();
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+
+  function remove(group: RoomGroup) {
+    if (!window.confirm(`Eliminare il gruppo ${group.name}? Le sue chat restano, senza gruppo.`)) return;
+    run(() => deleteRoomGroup(group.id), "Gruppo eliminato.");
+  }
+
+  return (
+    <div className="mb-3 space-y-2 rounded-md border border-border/60 p-2">
+      <p className="text-xs tracking-wider text-muted uppercase">Gruppi</p>
+      {groups.length === 0 && <p className="text-xs text-muted">Nessun gruppo: le chat compaiono tutte insieme.</p>}
+      <ul className="space-y-1">
+        {groups.map((g, i) => (
+          <li key={g.id} className="flex items-center gap-1 text-sm">
+            {editing?.id === g.id ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  run(
+                    () => saveRoomGroup(locationId, editing.name, g.id),
+                    "Gruppo rinominato.",
+                    () => setEditing(null),
+                  );
+                }}
+                className="flex flex-1 gap-1"
+              >
+                <input
+                  autoFocus
+                  value={editing.name}
+                  onChange={(e) => setEditing({ id: g.id, name: e.target.value })}
+                  maxLength={80}
+                  aria-label="Nome del gruppo"
+                  className="input min-w-0 flex-1 py-0.5 text-sm"
+                />
+                <button className="px-1 text-xs text-accent" disabled={pending}>
+                  OK
+                </button>
+              </form>
+            ) : (
+              <>
+                <span className="min-w-0 flex-1 truncate font-serif">
+                  {g.name} <span className="text-xs text-muted">({rooms.filter((r) => r.group_id === g.id).length})</span>
+                </span>
+                <IconBtn
+                  label="Sposta su"
+                  disabled={pending || i === 0}
+                  onClick={() => run(() => moveRoomGroup(g.id, -1), "Ordine salvato.")}
+                >
+                  ↑
+                </IconBtn>
+                <IconBtn
+                  label="Sposta giù"
+                  disabled={pending || i === groups.length - 1}
+                  onClick={() => run(() => moveRoomGroup(g.id, 1), "Ordine salvato.")}
+                >
+                  ↓
+                </IconBtn>
+                <IconBtn label="Rinomina" disabled={pending} onClick={() => setEditing({ id: g.id, name: g.name })}>
+                  ✎
+                </IconBtn>
+                <IconBtn label="Elimina" disabled={pending} onClick={() => remove(g)}>
+                  ✕
+                </IconBtn>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim())
+            run(
+              () => saveRoomGroup(locationId, name),
+              "Gruppo creato.",
+              () => setName(""),
+            );
+        }}
+        className="flex gap-1"
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={80}
+          placeholder="Nuovo gruppo"
+          aria-label="Nome del nuovo gruppo"
+          className="input min-w-0 flex-1 py-1 text-sm"
+        />
+        <button className="btn-ghost px-2 py-1 text-xs" disabled={pending || !name.trim()}>
+          + Aggiungi
+        </button>
+      </form>
+      {feedback}
+    </div>
+  );
+}
+
+function IconBtn({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="h-6 w-6 shrink-0 rounded text-xs text-muted hover:bg-blood/20 hover:text-accent disabled:opacity-30"
+    >
+      {children}
+    </button>
+  );
+}
+
 function RoomThumb({ url, name, size = "h-9 w-9" }: { url: string | null; name: string; size?: string }) {
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" className={`${size} shrink-0 rounded object-cover`} />
   ) : (
-    <span className={`${size} flex shrink-0 items-center justify-center rounded border border-border font-serif text-muted`}>{name[0] ?? "?"}</span>
+    <span className={`${size} flex shrink-0 items-center justify-center rounded border border-border font-serif text-muted`}>
+      {name[0] ?? "?"}
+    </span>
   );
 }
 
@@ -532,6 +708,7 @@ function RoomForm({
   room,
   maps,
   locations,
+  groups,
   houses,
   locationId,
   onSaved,
@@ -539,10 +716,14 @@ function RoomForm({
   room: Room | null;
   maps: GameMap[];
   locations: Location[];
+  groups: RoomGroup[];
   houses: { id: string; name: string }[];
   locationId: string;
   onSaved: (id: string, locationId?: string) => void;
 }) {
+  // La macroarea scelta decide quali gruppi si possono scegliere
+  const [formLocation, setFormLocation] = useState(room?.location_id ?? locationId);
+  const formGroups = groups.filter((g) => g.location_id === formLocation);
   const { run, pending, feedback } = useAction();
   const [access, setAccess] = useState<RoomAccess>(room?.access ?? "pubblica");
   const [preview, setPreview] = useState<string | null>(room?.image_url ?? null);
@@ -554,13 +735,21 @@ function RoomForm({
     if (room) form.set("id", room.id);
     if (removeImage) form.set("remove_image", "1");
     const target = String(form.get("location_id"));
-    run(() => saveRoom(form), "Chat salvata.", (res) => res.id && onSaved(res.id, target));
+    run(
+      () => saveRoom(form),
+      "Chat salvata.",
+      (res) => res.id && onSaved(res.id, target),
+    );
   }
 
   function remove() {
     if (!room) return;
     if (!window.confirm(`Eliminare la chat ${room.name} con tutti i suoi messaggi?`)) return;
-    run(() => deleteRoom(room.id), "Chat eliminata.", () => onSaved(NEW));
+    run(
+      () => deleteRoom(room.id),
+      "Chat eliminata.",
+      () => onSaved(NEW),
+    );
   }
 
   return (
@@ -572,7 +761,7 @@ function RoomForm({
             <input name="name" defaultValue={room?.name} required maxLength={80} className="input" />
           </Field>
           <Field label="Macroarea">
-            <select name="location_id" defaultValue={room?.location_id ?? locationId} className="input">
+            <select name="location_id" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} className="input">
               {maps.map((m) => (
                 <optgroup key={m.id} label={m.name}>
                   {locations
@@ -583,6 +772,21 @@ function RoomForm({
                       </option>
                     ))}
                 </optgroup>
+              ))}
+            </select>
+          </Field>
+          <Field label="Gruppo">
+            <select
+              key={formLocation}
+              name="group_id"
+              defaultValue={formGroups.some((g) => g.id === room?.group_id) ? (room?.group_id ?? "") : ""}
+              className="input"
+            >
+              <option value="">Nessun gruppo</option>
+              {formGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
               ))}
             </select>
           </Field>
@@ -651,7 +855,15 @@ function RoomForm({
       {access === "affitto" && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Prezzo (monete all'ora)">
-            <input name="price_per_hour" type="number" min={0} max={1000000} defaultValue={room?.price_per_hour ?? 10} required className="input" />
+            <input
+              name="price_per_hour"
+              type="number"
+              min={0}
+              max={1000000}
+              defaultValue={room?.price_per_hour ?? 10}
+              required
+              className="input"
+            />
           </Field>
           <Field label="Ore massime per affitto">
             <input name="max_hours" type="number" min={1} max={168} defaultValue={room?.max_hours ?? 24} required className="input" />
@@ -664,7 +876,12 @@ function RoomForm({
           {pending ? "Salvataggio..." : room ? "Salva" : "Crea chat"}
         </button>
         {room && (
-          <button type="button" onClick={remove} disabled={pending} className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300">
+          <button
+            type="button"
+            onClick={remove}
+            disabled={pending}
+            className="btn-ghost border-red-900 text-red-400 hover:border-red-500 hover:text-red-300"
+          >
             Elimina chat
           </button>
         )}

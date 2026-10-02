@@ -3,7 +3,7 @@ import InactiveBanner from "@/components/InactiveBanner";
 import { GameArea } from "@/components/game/GameShell";
 import { getMainCharacter } from "@/lib/main-character";
 import { requireUser } from "@/lib/supabase/server";
-import type { GameMap, Location, Room } from "@/lib/types";
+import type { GameMap, Location, Room, RoomGroup } from "@/lib/types";
 import type { ActiveRental } from "@/lib/world";
 import MapView from "./MapView";
 
@@ -30,8 +30,9 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
   const locations = (locs ?? []) as Location[];
   const locationIds = locations.map((l) => l.id);
 
-  const [{ data: rooms }, { data: houses }, { data: rentals }] = await Promise.all([
+  const [{ data: rooms }, { data: groups }, { data: houses }, { data: rentals }] = await Promise.all([
     supabase.from("rooms").select("*").in("location_id", locationIds).order("sort_order").order("name"),
+    supabase.from("room_groups").select("*").in("location_id", locationIds).order("sort_order").order("name"),
     supabase.from("houses").select("id, name"),
     supabase
       .from("room_rentals")
@@ -64,6 +65,7 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
         map={map}
         locations={locations}
         rooms={(rooms ?? []) as Room[]}
+        groups={(groups ?? []) as RoomGroup[]}
         houses={houses ?? []}
         rentals={(rentals ?? []) as unknown as ActiveRental[]}
         userId={user.id}

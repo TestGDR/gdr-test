@@ -176,6 +176,11 @@ export async function saveRoom(form: FormData): Promise<WorldResult> {
   if (!locationId) return { error: "Scegli la macroarea a cui appartiene." };
   if (!["pubblica", "casata", "affitto"].includes(access)) return { error: "Scegli il tipo di chat." };
   const houseId = text(form, "house_id", 36);
+  // Il gruppo deve essere della stessa macroarea
+  const groupId = text(form, "group_id", 36);
+  const { data: group } = groupId
+    ? await ctx.supabase.from("room_groups").select("location_id").eq("id", groupId).maybeSingle()
+    : { data: null };
   if (access === "casata" && !houseId) return { error: "Scegli la casata a cui appartiene la chat." };
 
   const row: Record<string, unknown> = {
@@ -184,6 +189,7 @@ export async function saveRoom(form: FormData): Promise<WorldResult> {
     description: text(form, "description", 4000),
     access,
     house_id: access === "casata" ? houseId : null,
+    group_id: group?.location_id === locationId ? groupId : null,
     price_per_hour: access === "affitto" ? int(form, "price_per_hour", 0, 1000000, 0) : 0,
     max_hours: access === "affitto" ? int(form, "max_hours", 1, 168, 24) : 24,
   };
@@ -220,4 +226,65 @@ export async function deleteRoom(id: string): Promise<WorldResult> {
   if (error) return { error: "Eliminazione non riuscita." };
   await removeImage(room?.image_url);
   return done();
+}
+
+// ---------------------------------------------------------------------
+// Gruppi di chat (contenitori con un nome dentro una macroarea)
+// ---------------------------------------------------------------------
+export async function saveRoomGroup(locationId: string, name: string, id?: string): Promise<WorldResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const clean = name.trim().slice(0, 80);
+  if (!clean) return { error: "Dai un nome al gruppo." };
+
+  if (id) {
+    const { error } = await ctx.supabase.from("room_groups").update({ name: clean }).eq("id", id);
+    return error ? { error: "Salvataggio non riuscito." } : done(id);
+  }
+  // In fondo all'elenco della macroarea
+  const { data: last } = await ctx.supabase
+    .from("room_groups")
+    .select("sort_order")
+    .eq("location_id", locationId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data, error } = await ctx.supabase
+    .from("room_groups")
+    .insert({ location_id: locationId, name: clean, sort_order: (last?.sort_order ?? -1) + 1 })
+    .select("id")
+    .single();
+  return error ? { error: "Salvataggio non riuscito." } : done(data.id);
+}
+
+// Scambia la posizione del gruppo con quello prima (-1) o dopo (+1)
+export async function moveRoomGroup(id: string, direction: -1 | 1): Promise<WorldResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const { data: group } = await ctx.supabase.from("room_groups").select("location_id").eq("id", id).single();
+  if (!group) return { error: "Gruppo non trovato." };
+  const { data: list } = await ctx.supabase
+    .from("room_groups")
+    .select("id")
+    .eq("location_id", group.location_id)
+    .order("sort_order")
+    .order("name");
+  const ids = (list ?? []).map((g) => g.id);
+  const from = ids.indexOf(id);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= ids.length) return done();
+  [ids[from], ids[to]] = [ids[to], ids[from]];
+  for (const [i, gid] of ids.entries()) {
+    const { error } = await ctx.supabase.from("room_groups").update({ sort_order: i }).eq("id", gid);
+    if (error) return { error: "Spostamento non riuscito." };
+  }
+  return done();
+}
+
+export async function deleteRoomGroup(id: string): Promise<WorldResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  // Le chat del gruppo restano, senza gruppo
+  const { error } = await ctx.supabase.from("room_groups").delete().eq("id", id);
+  return error ? { error: "Eliminazione non riuscita." } : done();
 }
