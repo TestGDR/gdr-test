@@ -179,16 +179,10 @@ body {
   border-image-width: 5px;
 }
 
-/* Cornice della mappa: bordo nero e grigio con doppio filo dorato e ornamenti agli
-   angoli (public/images/cornice-mappa.svg); piu' sottile su cellulare */
+/* Cornice della mappa: filo dorato con un bordino scuro verso l'immagine
+   (public/images/cornice-mappa.svg) */
 .frame-ornate {
-  border: 22px solid transparent;
-  border-image: url("/images/cornice-mappa.svg") 32 / 22px stretch;
+  border: 5px solid transparent;
+  border-image: url("/images/cornice-mappa.svg") 5 / 5px stretch;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.85);
-}
-@media (max-width: 767px) {
-  .frame-ornate {
-    border-width: 15px;
-    border-image-width: 15px;
-  }
 }
