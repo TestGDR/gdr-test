@@ -26,7 +26,7 @@ export default function SalaryCollector() {
           <p className="font-serif text-accent">Stipendio ritirato</p>
           {paid.map((p) => (
             <p key={p.pg_name} className="text-muted">
-              {p.pg_name}: <strong className="text-foreground">+{p.collected}</strong> monete
+              {p.pg_name}: <strong className="text-foreground">+{p.collected}</strong> monete sul conto
             </p>
           ))}
         </div>

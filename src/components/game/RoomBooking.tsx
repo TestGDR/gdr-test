@@ -96,7 +96,7 @@ export default function RoomBooking() {
         </p>
         {me && (
           <p className="font-serif text-accent">
-            {me.name}: <strong>{me.coins}</strong> monete
+            {me.name}: <strong>{me.coins}</strong> monete in banca
           </p>
         )}
       </div>
