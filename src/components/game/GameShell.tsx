@@ -41,6 +41,7 @@ import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
 import SalaryCollector from "./SalaryCollector";
+import { MessagePlate, RoundPortrait, SocketButton } from "./CharacterBadge";
 
 // ---------------------------------------------------------------------
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
@@ -391,27 +392,23 @@ function LeftColumn({
       {/* Cellulare: gestione, utility, ticket e presenti (il personaggio e' nella barra in alto) */}
       <div className="md:hidden">{mobileTools}</div>
 
-      {/* Personaggio + messaggi (computer) */}
-      <div className="hidden items-center gap-3 bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
-        {/* L'immagine apre la scheda */}
-        <CharacterPicture character={character} displayName={displayName} size="h-14 w-14" balloon />
+      {/* Personaggio + messaggi (computer): ritratto tondo al centro, sotto la piastra
+          con i due alloggi per missive e messaggi OFF */}
+      <div className="hidden flex-col items-center gap-2 bg-black/75 px-3 pt-4 pb-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
+        <RoundPortrait character={character} displayName={displayName} />
         {character && (
-          <div className="flex gap-2">
-            <MessageButton
-              label="Missive (messaggi in gioco)"
-              count={unread.missiva}
-              onClick={() => onOpenMessages("missiva")}
-            >
-              <QuillIcon />
-            </MessageButton>
-            <MessageButton
-              label="Messaggi OFF (fuori gioco)"
-              count={unread.off}
-              onClick={() => onOpenMessages("off")}
-            >
-              <BubbleIcon />
-            </MessageButton>
-          </div>
+          <MessagePlate
+            left={
+              <SocketButton label="Missive (messaggi in gioco)" count={unread.missiva} onClick={() => onOpenMessages("missiva")}>
+                <QuillIcon />
+              </SocketButton>
+            }
+            right={
+              <SocketButton label="Messaggi OFF (fuori gioco)" count={unread.off} onClick={() => onOpenMessages("off")}>
+                <BubbleIcon />
+              </SocketButton>
+            }
+          />
         )}
       </div>
 
@@ -548,36 +545,6 @@ function TopMessageButton({ label, count, onClick, children }: { label: string; 
       {count > 0 && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
       )}
-    </button>
-  );
-}
-
-function MessageButton({
-  label,
-  count,
-  onClick,
-  children,
-}: {
-  label: string;
-  count: number;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  // Solo l'icona; il nome compare nel fumetto al passaggio del mouse (o al focus da tastiera)
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={count > 0 ? `${label}: ${count} non letti` : label}
-      className="group relative flex h-9 w-9 items-center justify-center text-muted transition hover:text-accent focus-visible:text-accent focus-visible:outline-none"
-    >
-      {children}
-      {count > 0 && (
-        <span className="absolute -top-2 -right-2 min-w-5 rounded-full bg-blood px-1.5 text-[11px] font-bold text-white shadow">
-          {count}
-        </span>
-      )}
-      <Balloon>{label}</Balloon>
     </button>
   );
 }
