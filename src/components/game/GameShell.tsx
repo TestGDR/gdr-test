@@ -189,7 +189,7 @@ export default function GameShell({
             </h1>
 
             <span className="mx-2 md:hidden">
-              <CharacterPicture character={character} displayName={displayName} size="h-10 w-10" />
+              <CharacterPicture character={character} displayName={displayName} size="h-9 w-9" small />
             </span>
 
             <span className="hidden md:contents">
@@ -392,7 +392,7 @@ function LeftColumn({
       <div className="md:hidden">{mobileTools}</div>
 
       {/* Personaggio + messaggi (computer) */}
-      <div className="hidden items-center gap-3 rounded-md border border-border bg-black/40 p-3 md:flex">
+      <div className="hidden items-center gap-3 bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
         {/* L'immagine apre la scheda */}
         <CharacterPicture character={character} displayName={displayName} size="h-14 w-14" balloon />
         {character && (
@@ -469,21 +469,30 @@ function CharacterPicture({
   displayName,
   size,
   balloon,
+  small,
 }: {
   character: MainCharacter | null;
   displayName: string;
   size: string;
   balloon?: boolean;
+  small?: boolean; // cornice sottile (barra in alto del cellulare)
 }) {
-  if (!character) return <Avatar name={displayName} size={size} />;
+  const frame = `frame-bronze ${small ? "frame-bronze-sm" : ""} block`;
+  if (!character)
+    return (
+      <span className={frame}>
+        <Avatar name={displayName} size={size} bare />
+      </span>
+    );
   return (
     <SheetButton
       characterId={character.id}
       className="group relative block shrink-0 rounded focus-visible:outline-none"
       trigger={
         <>
-          <span className="block rounded ring-accent transition group-hover:ring-2 group-focus-visible:ring-2">
-            <Avatar name={character.name} url={character.avatar_url} size={size} />
+          {/* Immagine dentro la cornice di bronzo; al passaggio si illumina */}
+          <span className={`${frame} transition group-hover:brightness-125 group-focus-visible:brightness-125`}>
+            <Avatar name={character.name} url={character.avatar_url} size={size} bare />
           </span>
           {character.status !== "attivo" && (
             <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[11px] text-orange-300">

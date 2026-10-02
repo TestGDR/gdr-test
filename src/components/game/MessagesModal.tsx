@@ -337,13 +337,14 @@ function Messages({
   );
 }
 
-export function Avatar({ name, url, size = "h-9 w-9" }: { name: string; url?: string | null; size?: string }) {
+// bare: senza bordo (quando l'immagine sta gia' dentro una cornice)
+export function Avatar({ name, url, size = "h-9 w-9", bare = false }: { name: string; url?: string | null; size?: string; bare?: boolean }) {
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" className={`${size} shrink-0 rounded object-cover`} />
   ) : (
     <span
-      className={`${size} flex shrink-0 items-center justify-center rounded border border-blood/60 bg-background font-serif text-accent`}
+      className={`${size} flex shrink-0 items-center justify-center rounded bg-background font-serif text-accent ${bare ? "" : "border border-blood/60"}`}
     >
       {name[0]}
     </span>
