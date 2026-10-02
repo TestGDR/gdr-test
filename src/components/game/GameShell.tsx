@@ -149,7 +149,7 @@ export default function GameShell({
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="Apri pannello"
-            className={`${topBtn.replace("relative ", "")} absolute left-2 md:hidden`}
+            className={`${menuBtn} absolute left-2 md:hidden`}
           >
             <MenuIcon />
           </button>
@@ -720,8 +720,12 @@ function useUnread(characterId: string | null) {
 // ---------------------------------------------------------------------
 // Barra in alto: pulsanti a icona con fumetto sotto
 // ---------------------------------------------------------------------
+// Ogni icona sta in un rombo rosso scuro, stoffa come lo stendardo dei messaggi (senza bordo)
 const topBtn =
-  "group relative flex h-8 w-8 shrink-0 sm:h-10 sm:w-10 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent focus-visible:text-accent focus-visible:outline-none";
+  "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[18px] sm:[&_svg]:w-[18px] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.7)] before:transition hover:before:brightness-125";
+// Pulsante del menu (cellulare): senza rombo
+const menuBtn =
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent";
 
 function TopTip({ children }: { children: ReactNode }) {
   return (
