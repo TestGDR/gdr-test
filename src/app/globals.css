@@ -186,3 +186,11 @@ body {
   border-image: url("/images/cornice-mappa.svg") 5 / 5px stretch;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.85);
 }
+
+/* Cornice medievale del ritratto: ferro scuro con filo di bronzo e piastre
+   chiodate agli angoli (public/images/cornice-medievale.svg) */
+.frame-medieval {
+  border: 10px solid transparent;
+  border-image: url("/images/cornice-medievale.svg") 16 / 10px stretch;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.85);
+}

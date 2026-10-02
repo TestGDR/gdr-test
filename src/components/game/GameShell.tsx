@@ -394,9 +394,11 @@ function LeftColumn({
       {/* Personaggio + messaggi (computer) */}
       <div className="hidden items-center gap-3 bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
         {/* L'immagine apre la scheda */}
-        <CharacterPicture character={character} displayName={displayName} size="h-14 w-14" balloon />
+        <CharacterPicture character={character} displayName={displayName} size="h-[4.5rem] w-[4.5rem]" balloon medieval />
         {character && (
-          <div className="flex gap-2">
+          // Missive e OFF davanti a uno stendardo
+          <div className="relative flex flex-1 items-center justify-center gap-3 py-3 pr-3 pl-1">
+            <BannerArt />
             <MessageButton
               label="Missive (messaggi in gioco)"
               count={unread.missiva}
@@ -470,14 +472,16 @@ function CharacterPicture({
   size,
   balloon,
   small,
+  medieval,
 }: {
   character: MainCharacter | null;
   displayName: string;
   size: string;
   balloon?: boolean;
   small?: boolean; // cornice sottile (barra in alto del cellulare)
+  medieval?: boolean; // cornice di ferro con piastre chiodate (colonna sinistra)
 }) {
-  const frame = `frame-gold ${small ? "frame-gold-sm" : ""} block`;
+  const frame = medieval ? "frame-medieval block" : `frame-gold ${small ? "frame-gold-sm" : ""} block`;
   if (!character)
     return (
       <span className={frame}>
@@ -569,7 +573,7 @@ function MessageButton({
       type="button"
       onClick={onClick}
       aria-label={count > 0 ? `${label}: ${count} non letti` : label}
-      className="group relative flex h-9 w-9 items-center justify-center text-muted transition hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+      className="group relative z-10 flex h-9 w-9 items-center justify-center text-[#e2c99a] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none"
     >
       {children}
       {count > 0 && (
@@ -579,6 +583,46 @@ function MessageButton({
       )}
       <Balloon>{label}</Balloon>
     </button>
+  );
+}
+
+// Stendardo di stoffa rosso scuro con asta e coda a rondine, sullo sfondo dei messaggi
+function BannerArt() {
+  return (
+    <svg
+      viewBox="0 0 120 52"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)]"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id="banner-cloth" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#5e1611" />
+          <stop offset=".18" stopColor="#3d0d0a" />
+          <stop offset=".38" stopColor="#62180f" />
+          <stop offset=".6" stopColor="#3a0c09" />
+          <stop offset=".8" stopColor="#5a150f" />
+          <stop offset="1" stopColor="#300a07" />
+        </linearGradient>
+        <linearGradient id="banner-shade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity=".45" />
+        </linearGradient>
+        <linearGradient id="banner-pole" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#d9b47a" />
+          <stop offset=".5" stopColor="#7a5a34" />
+          <stop offset="1" stopColor="#3a2a16" />
+        </linearGradient>
+      </defs>
+      {/* asta con puntale */}
+      <rect x="3" y="4" width="2.6" height="46" rx="1" fill="url(#banner-pole)" />
+      <polygon points="4.3,0 6.6,4.5 2,4.5" fill="url(#banner-pole)" />
+      {/* stoffa con coda a rondine */}
+      <path d="M5.6 7 H116 L104 26 L116 45 H5.6 Z" fill="url(#banner-cloth)" />
+      <path d="M5.6 7 H116 L104 26 L116 45 H5.6 Z" fill="url(#banner-shade)" />
+      {/* bordo dorato cucito */}
+      <path d="M8 9.6 H111 L101 26 L111 42.4 H8 Z" fill="none" stroke="#c9a05a" strokeOpacity=".7" strokeWidth=".8" strokeDasharray="2.2 1.4" />
+    </svg>
   );
 }
 
