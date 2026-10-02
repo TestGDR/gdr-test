@@ -24,8 +24,8 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
   const open = locations.find((l) => l.id === openId);
 
   return (
-    <div className="mx-auto w-full max-w-[600px]">
-      <div className="frame-gold frame-gold-lg relative overflow-hidden">
+    <div className="mx-auto w-full max-w-[644px]">{/* mappa 600px + cornice 2 x 22px */}
+      <div className="frame-ornate relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.image_url} alt={map.name} className="block w-full select-none" draggable={false} />
         {locations.map((loc) => (
