@@ -219,8 +219,8 @@ export default function GameShell({
         </header>
 
         <div className="relative flex min-h-0 flex-1">
-          {/* Sfondo scuro */}
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,#1b1412_0%,#0b0a0a_70%)]" />
+          {/* Sfondo: pietra scura */}
+          <div className="stone-bg pointer-events-none absolute inset-0 -z-10" />
 
           {/* Colonna sinistra: desktop fissa e richiudibile, cellulare a scomparsa */}
           {drawerOpen && (
