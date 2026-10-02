@@ -25,7 +25,7 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
 
   return (
     <div className="mx-auto w-full max-w-[600px]">
-      <div className="frame-bronze frame-bronze-lg relative overflow-hidden">
+      <div className="frame-gold frame-gold-lg relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.image_url} alt={map.name} className="block w-full select-none" draggable={false} />
         {locations.map((loc) => (

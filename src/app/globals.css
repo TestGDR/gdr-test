@@ -167,18 +167,18 @@ body {
   background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.65) 100%);
 }
 
-/* Cornice di bronzo battuto con chiodi agli angoli (public/images/cornice.svg):
+/* Cornice dorata con borchie agli angoli (public/images/cornice.svg):
    si allarga a qualsiasi dimensione senza deformare gli angoli */
-.frame-bronze {
+.frame-gold {
   border: 7px solid transparent;
   border-image: url("/images/cornice.svg") 10 / 7px stretch;
   box-shadow: 0 3px 8px rgb(0 0 0 / 0.8);
 }
-.frame-bronze-sm {
+.frame-gold-sm {
   border-width: 5px;
   border-image-width: 5px;
 }
-.frame-bronze-lg {
+.frame-gold-lg {
   border-width: 12px;
   border-image-width: 12px;
 }

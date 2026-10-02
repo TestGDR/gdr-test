@@ -477,7 +477,7 @@ function CharacterPicture({
   balloon?: boolean;
   small?: boolean; // cornice sottile (barra in alto del cellulare)
 }) {
-  const frame = `frame-bronze ${small ? "frame-bronze-sm" : ""} block`;
+  const frame = `frame-gold ${small ? "frame-gold-sm" : ""} block`;
   if (!character)
     return (
       <span className={frame}>
@@ -490,7 +490,7 @@ function CharacterPicture({
       className="group relative block shrink-0 rounded focus-visible:outline-none"
       trigger={
         <>
-          {/* Immagine dentro la cornice di bronzo; al passaggio si illumina */}
+          {/* Immagine dentro la cornice dorata; al passaggio si illumina */}
           <span className={`${frame} transition group-hover:brightness-125 group-focus-visible:brightness-125`}>
             <Avatar name={character.name} url={character.avatar_url} size={size} bare />
           </span>
