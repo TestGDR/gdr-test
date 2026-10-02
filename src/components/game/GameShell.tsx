@@ -33,6 +33,7 @@ import {
   RefreshIcon,
   TicketIcon,
   ToolsIcon,
+  UsersIcon,
 } from "./icons";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
@@ -83,6 +84,12 @@ export default function GameShell({
   const [leftOpen, setLeftOpen] = useState(true); // desktop
   const [rightOpen, setRightOpen] = useState(true); // desktop
   const [drawerOpen, setDrawerOpen] = useState(false); // cellulare
+  const [drawerPath, setDrawerPath] = useState(pathname);
+  if (pathname !== drawerPath) {
+    // cambiando pagina il pannello del cellulare si richiude
+    setDrawerPath(pathname);
+    setDrawerOpen(false);
+  }
   const [phrase, setPhrase] = useState(statusText);
   const [availability, setAvailability] = useState(initialAvailability);
   const [onlineOpen, setOnlineOpen] = useState(false);
@@ -133,13 +140,14 @@ export default function GameShell({
   return (
     <AreaContext.Provider value={setArea}>
       <div className="flex h-dvh flex-col overflow-hidden">
-        {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui */}
+        {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
+            Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
         <header className="bar relative z-30 flex h-14 shrink-0 items-center justify-center border-b pr-2 pl-11 md:px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="Apri pannello"
-            className={`${topBtn} absolute left-1 md:hidden`}
+            className={`${topBtn.replace("relative ", "")} absolute left-2 md:hidden`}
           >
             <MenuIcon />
           </button>
@@ -170,7 +178,7 @@ export default function GameShell({
               }
             />
 
-            <h1 className="mx-1 flex items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] md:text-2xl">
+            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] md:flex md:text-2xl">
               <span className="hidden text-blood md:inline">
                 <FlameIcon />
               </span>
@@ -180,16 +188,33 @@ export default function GameShell({
               </span>
             </h1>
 
-            <UtilityButton
-              className={topBtn}
-              trigger={
-                <>
-                  <ToolsIcon />
-                  <TopTip>Utility giocatore</TopTip>
-                </>
-              }
-            />
-            <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
+            <span className="mx-2 md:hidden">
+              <CharacterPicture character={character} displayName={displayName} size="h-10 w-10" />
+            </span>
+
+            <span className="hidden md:contents">
+              <UtilityButton
+                className={topBtn}
+                trigger={
+                  <>
+                    <ToolsIcon />
+                    <TopTip>Utility giocatore</TopTip>
+                  </>
+                }
+              />
+              <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
+            </span>
+
+            {character && (
+              <span className="contents md:hidden">
+                <TopMessageButton label="Missive" count={unread.counts.missiva} onClick={() => openMessages("missiva")}>
+                  <ScrollIcon />
+                </TopMessageButton>
+                <TopMessageButton label="Messaggi OFF" count={unread.counts.off} onClick={() => openMessages("off")}>
+                  <BubbleIcon />
+                </TopMessageButton>
+              </span>
+            )}
           </div>
         </header>
 
@@ -232,6 +257,9 @@ export default function GameShell({
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
               onOpenSheet={setSheetId}
+              mobileTools={
+                <MobileTools canManage={canManage} onlineCount={online.length} onOpenOnline={() => setOnlineOpen(true)} />
+              }
             />
             </div>
           </aside>
@@ -321,6 +349,7 @@ function LeftColumn({
   onOpenOnline,
   onChangeAvailability,
   onOpenSheet,
+  mobileTools,
 }: {
   area: Area;
   userId: string;
@@ -332,6 +361,7 @@ function LeftColumn({
   onOpenOnline: () => void;
   onChangeAvailability: (value: Availability) => void;
   onOpenSheet: (characterId: string) => void;
+  mobileTools: ReactNode;
 }) {
   // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
   const me = online.find((p) => p.userId === userId);
@@ -358,32 +388,13 @@ function LeftColumn({
         {GAME_DATE}
       </div>
 
-      {/* Personaggio + messaggi */}
-      <div className="flex items-center gap-3 rounded-md border border-border bg-black/40 p-3">
+      {/* Cellulare: gestione, utility, ticket e presenti (il personaggio e' nella barra in alto) */}
+      <div className="md:hidden">{mobileTools}</div>
+
+      {/* Personaggio + messaggi (computer) */}
+      <div className="hidden items-center gap-3 rounded-md border border-border bg-black/40 p-3 md:flex">
         {/* L'immagine apre la scheda */}
-        {character ? (
-          <SheetButton
-            characterId={character.id}
-            className="group relative shrink-0 rounded focus-visible:outline-none"
-            trigger={
-              <>
-                <span className="block rounded ring-accent transition group-hover:ring-2 group-focus-visible:ring-2">
-                  <Avatar name={character.name} url={character.avatar_url} size="h-14 w-14" />
-                </span>
-                {character.status !== "attivo" && (
-                  <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[11px] text-orange-300">
-                    ⧗
-                  </span>
-                )}
-                <Balloon>
-                  {character.status === "attivo" ? "Apri la scheda" : "Apri la scheda (PG non ancora attivo)"}
-                </Balloon>
-              </>
-            }
-          />
-        ) : (
-          <Avatar name={displayName} size="h-14 w-14" />
-        )}
+        <CharacterPicture character={character} displayName={displayName} size="h-14 w-14" balloon />
         {character && (
           <div className="flex gap-2">
             <MessageButton
@@ -409,12 +420,12 @@ function LeftColumn({
         <button
           type="button"
           onClick={onOpenOnline}
-          className="w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent"
+          className="hidden w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent md:block"
           title="Apri l'elenco di tutti i presenti"
         >
           <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
         </button>
-        <h3 className="mt-3 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
+        <h3 className="truncate border-b md:mt-3 border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
           {me?.place === "chat" ? me.placeLabel : `In mappa · ${area.title}`}
         </h3>
         <ul className="mt-2 space-y-1.5 text-sm">
@@ -448,6 +459,86 @@ function LeftColumn({
         </ul>
       </div>
     </div>
+  );
+}
+
+// Immagine quadrata del personaggio: apre la scheda
+function CharacterPicture({
+  character,
+  displayName,
+  size,
+  balloon,
+}: {
+  character: MainCharacter | null;
+  displayName: string;
+  size: string;
+  balloon?: boolean;
+}) {
+  if (!character) return <Avatar name={displayName} size={size} />;
+  return (
+    <SheetButton
+      characterId={character.id}
+      className="group relative block shrink-0 rounded focus-visible:outline-none"
+      trigger={
+        <>
+          <span className="block rounded ring-accent transition group-hover:ring-2 group-focus-visible:ring-2">
+            <Avatar name={character.name} url={character.avatar_url} size={size} />
+          </span>
+          {character.status !== "attivo" && (
+            <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[11px] text-orange-300">
+              ⧗
+            </span>
+          )}
+          {balloon && (
+            <Balloon>{character.status === "attivo" ? "Apri la scheda" : "Apri la scheda (PG non ancora attivo)"}</Balloon>
+          )}
+        </>
+      }
+    />
+  );
+}
+
+// Cellulare: icone del pannello a scomparsa
+const drawerBtn =
+  "group relative flex h-12 w-full items-center justify-center rounded-md border border-border bg-black/40 text-muted transition hover:border-accent hover:text-accent";
+
+function MobileTools({ canManage, onlineCount, onOpenOnline }: { canManage: boolean; onlineCount: number; onOpenOnline: () => void }) {
+  return (
+    <div className={`grid gap-2 ${canManage ? "grid-cols-4" : "grid-cols-3"}`}>
+      {canManage && (
+        <Link href="/gestione" className={drawerBtn} aria-label="Gestione">
+          <GearIcon />
+        </Link>
+      )}
+      <UtilityButton
+        className={drawerBtn}
+        trigger={
+          <>
+            <ToolsIcon />
+            <span className="sr-only">Utility giocatore</span>
+          </>
+        }
+      />
+      <ComingSoonButton title="Ticket" icon={<TicketIcon />} className={drawerBtn} />
+      <button type="button" onClick={onOpenOnline} className={drawerBtn} aria-label={`${onlineCount} presenti online: apri l'elenco`}>
+        <UsersIcon />
+        <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[11px] font-bold text-white shadow">
+          {onlineCount}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+// Cellulare: missive e OFF nella barra in alto
+function TopMessageButton({ label, count, onClick, children }: { label: string; count: number; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={count > 0 ? `${label}: ${count} non letti` : label} className={topBtn}>
+      {children}
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
+      )}
+    </button>
   );
 }
 
@@ -558,11 +649,11 @@ function TopTip({ children }: { children: ReactNode }) {
 }
 
 // Sezioni non ancora realizzate: l'icona c'e' gia', il contenuto arrivera'
-function ComingSoonButton({ title, icon }: { title: string; icon: ReactNode }) {
+function ComingSoonButton({ title, icon, className = topBtn }: { title: string; icon: ReactNode; className?: string }) {
   return (
     <ModalButton
       title={title}
-      className={topBtn}
+      className={className}
       label={
         <>
           {icon}
@@ -619,9 +710,9 @@ function RightRail({ canManage }: { canManage: boolean }) {
           <MapIcon />
           <Tip>Mappa</Tip>
         </Link>
-        {/* Pannelli di gestione: solo moderatori e admin */}
+        {/* Pannelli di gestione: solo moderatori e admin (su cellulare stanno nel pannello) */}
         {canManage && (
-          <Link href="/gestione" className={`${railBtn} ${active("/gestione")}`} aria-label="Gestione">
+          <Link href="/gestione" className={`${railBtn} ${active("/gestione")} max-md:hidden`} aria-label="Gestione">
             <GearIcon />
             <Tip>Gestione</Tip>
           </Link>
