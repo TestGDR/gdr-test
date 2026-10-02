@@ -392,12 +392,12 @@ function LeftColumn({
       <div className="md:hidden">{mobileTools}</div>
 
       {/* Personaggio + messaggi (computer) */}
-      <div className="hidden items-center gap-3 bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
+      <div className="hidden items-center bg-black/75 p-3 shadow-[0_8px_22px_rgb(0_0_0/0.75),inset_0_0_18px_rgb(0_0_0/0.6)] md:flex">
         {/* L'immagine apre la scheda */}
         <CharacterPicture character={character} displayName={displayName} size="h-[4.5rem] w-[4.5rem]" balloon medieval />
         {character && (
-          // Missive e OFF davanti a uno stendardo
-          <div className="relative flex flex-1 items-center justify-center gap-3 py-3 pr-3 pl-1">
+          // Missive e OFF davanti a uno stendardo che esce dalla cornice del ritratto
+          <div className="relative -ml-1 flex flex-1 items-center justify-center gap-3 py-3 pr-3 pl-2">
             <BannerArt />
             <MessageButton
               label="Missive (messaggi in gioco)"
@@ -491,7 +491,7 @@ function CharacterPicture({
   return (
     <SheetButton
       characterId={character.id}
-      className="group relative block shrink-0 rounded focus-visible:outline-none"
+      className={`group relative block shrink-0 rounded focus-visible:outline-none ${medieval ? "z-20" : ""}`}
       trigger={
         <>
           {/* Immagine dentro la cornice dorata; al passaggio si illumina */}
@@ -586,7 +586,7 @@ function MessageButton({
   );
 }
 
-// Stendardo di stoffa rosso scuro con asta e coda a rondine, sullo sfondo dei messaggi
+// Stendardo di stoffa rosso scuro con coda a rondine, attaccato alla cornice del ritratto
 function BannerArt() {
   return (
     <svg
@@ -608,20 +608,10 @@ function BannerArt() {
           <stop offset="0" stopColor="#000" stopOpacity="0" />
           <stop offset="1" stopColor="#000" stopOpacity=".45" />
         </linearGradient>
-        <linearGradient id="banner-pole" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#d9b47a" />
-          <stop offset=".5" stopColor="#7a5a34" />
-          <stop offset="1" stopColor="#3a2a16" />
-        </linearGradient>
       </defs>
-      {/* asta con puntale */}
-      <rect x="3" y="4" width="2.6" height="46" rx="1" fill="url(#banner-pole)" />
-      <polygon points="4.3,0 6.6,4.5 2,4.5" fill="url(#banner-pole)" />
       {/* stoffa con coda a rondine */}
-      <path d="M5.6 7 H116 L104 26 L116 45 H5.6 Z" fill="url(#banner-cloth)" />
-      <path d="M5.6 7 H116 L104 26 L116 45 H5.6 Z" fill="url(#banner-shade)" />
-      {/* bordo dorato cucito */}
-      <path d="M8 9.6 H111 L101 26 L111 42.4 H8 Z" fill="none" stroke="#c9a05a" strokeOpacity=".7" strokeWidth=".8" strokeDasharray="2.2 1.4" />
+      <path d="M0 7 H116 L104 26 L116 45 H0 Z" fill="url(#banner-cloth)" />
+      <path d="M0 7 H116 L104 26 L116 45 H0 Z" fill="url(#banner-shade)" />
     </svg>
   );
 }
