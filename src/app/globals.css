@@ -241,6 +241,13 @@ body {
 .book-page-right {
   background-image: url("/images/pagina-destra.webp");
 }
+/* Manuale: carta di un giallo un po' piu' scuro */
+.book-manuale .book-page-left {
+  background-image: url("/images/manuale-sinistra.webp");
+}
+.book-manuale .book-page-right {
+  background-image: url("/images/manuale-destra.webp");
+}
 .book-page-editing {
   background: var(--panel);
 }

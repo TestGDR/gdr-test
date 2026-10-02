@@ -5,9 +5,15 @@
 const path = require("path");
 const sharp = require(path.resolve("node_modules/sharp"));
 
+// Colori della carta: centro, meta', bordi
+const AMBIENTAZIONE = ["#f4e9cd", "#e7d4aa", "#d2b580"];
+const MANUALE = ["#eedb9f", "#dfc17f", "#c7a25e"]; // giallo un po' piu' scuro
+
 const PAGES = [
-  { file: "public/images/pagina-sinistra.webp", W: 640, H: 1400, seed: 4, spine: "right" },
-  { file: "public/images/pagina-destra.webp", W: 1640, H: 1300, seed: 9, spine: "left" },
+  { file: "public/images/pagina-sinistra.webp", W: 640, H: 1400, seed: 4, spine: "right", colors: AMBIENTAZIONE },
+  { file: "public/images/pagina-destra.webp", W: 1640, H: 1300, seed: 9, spine: "left", colors: AMBIENTAZIONE },
+  { file: "public/images/manuale-sinistra.webp", W: 640, H: 1400, seed: 5, spine: "right", colors: MANUALE },
+  { file: "public/images/manuale-destra.webp", W: 1640, H: 1300, seed: 12, spine: "left", colors: MANUALE },
 ];
 const M = 22; // margine trasparente intorno alla carta (per frastaglio e ombra)
 
@@ -28,13 +34,13 @@ function shapeDefs(seed) {
 }
 
 // Carta: colore, macchie, grana, rughe e pieghe agli angoli, bordi bruciati
-async function paper(W, H, seed, spine) {
+async function paper(W, H, seed, spine, colors) {
   const rnd = rng(seed);
   const base = svg(
     W,
     H,
     `<rect width="${W}" height="${H}" fill="url(#b)"/><rect width="${W}" height="${H}" filter="url(#st)" opacity=".3"/><rect width="${W}" height="${H}" filter="url(#gr)"/>`,
-    `<radialGradient id="b" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#f4e9cd"/><stop offset=".6" stop-color="#e7d4aa"/><stop offset="1" stop-color="#d2b580"/></radialGradient>
+    `<radialGradient id="b" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="${colors[0]}"/><stop offset=".6" stop-color="${colors[1]}"/><stop offset="1" stop-color="${colors[2]}"/></radialGradient>
      <filter id="st" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.004" numOctaves="3" seed="${seed + 7}"/><feColorMatrix values="0 0 0 0 0.45 0 0 0 0 0.3 0 0 0 0 0.12 0 0 0 1.6 -0.78"/></filter>
      <filter id="gr" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85 0.4" numOctaves="3" seed="${seed + 3}"/><feColorMatrix values="0 0 0 0 0.4 0 0 0 0 0.28 0 0 0 0 0.12 0 0 0 0.3 0"/></filter>`,
   );
@@ -102,7 +108,7 @@ async function paper(W, H, seed, spine) {
     .toBuffer();
 }
 
-async function page({ file, W, H, seed, spine }) {
+async function page({ file, W, H, seed, spine, colors }) {
   // maschera frastagliata (bianco = carta)
   const mask = await sharp(
     svg(W, H, `<rect width="${W}" height="${H}" fill="#000"/><rect x="${M}" y="${M}" width="${W - 2 * M}" height="${H - 2 * M}" fill="#fff" filter="url(#torn)"/>`, shapeDefs(seed)),
@@ -111,7 +117,7 @@ async function page({ file, W, H, seed, spine }) {
     .png()
     .toBuffer();
 
-  const paperRgb = await sharp(await paper(W, H, seed, spine)).removeAlpha().toBuffer();
+  const paperRgb = await sharp(await paper(W, H, seed, spine, colors)).removeAlpha().toBuffer();
   const maskRaw = await sharp(mask).extractChannel(0).toBuffer();
   const cut = await sharp(paperRgb).joinChannel(maskRaw).png().toBuffer();
 

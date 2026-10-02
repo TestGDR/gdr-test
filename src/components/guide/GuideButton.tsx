@@ -236,7 +236,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
 
   return (
     // Libro aperto: copertina di cuoio, a sinistra l'indice, a destra il contenuto
-    <div className="book flex h-full flex-col p-2 md:flex-row md:p-4">
+    <div className={`book book-${book} flex h-full flex-col p-2 md:flex-row md:p-4`}>
       {/* Pagina sinistra: macrosezioni (si aprono/chiudono) e sezioni */}
       <aside className="book-page book-page-left max-h-60 shrink-0 space-y-3 overflow-y-auto px-8 py-8 md:max-h-none md:w-80">
         {loadError && <p className="text-sm text-red-800">Impossibile caricare i contenuti.</p>}
