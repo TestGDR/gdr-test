@@ -9,9 +9,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { logout } from "@/app/(pubblico)/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
 import ModalButton from "@/components/ui/ModalButton";
@@ -618,14 +620,48 @@ function BannerArt() {
   );
 }
 
-// Fumetto sopra l'elemento al passaggio del mouse (il genitore deve avere "group relative")
+// Fumetto sopra l'elemento al passaggio del mouse (o al focus da tastiera).
+// Si disegna direttamente nella pagina, sopra a tutto: le colonne con lo
+// scorrimento non lo tagliano piu'. Basta metterlo dentro l'elemento.
 function Balloon({ children }: { children: ReactNode }) {
+  const marker = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const anchor = marker.current?.parentElement;
+    if (!anchor) return;
+    const show = () => {
+      const r = anchor.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top });
+    };
+    const hide = () => setPos(null);
+    anchor.addEventListener("mouseenter", show);
+    anchor.addEventListener("mouseleave", hide);
+    anchor.addEventListener("focusin", show);
+    anchor.addEventListener("focusout", hide);
+    window.addEventListener("scroll", hide, true);
+    return () => {
+      anchor.removeEventListener("mouseenter", show);
+      anchor.removeEventListener("mouseleave", hide);
+      anchor.removeEventListener("focusin", show);
+      anchor.removeEventListener("focusout", hide);
+      window.removeEventListener("scroll", hide, true);
+    };
+  }, []);
+
   return (
-    <span
-      role="tooltip"
-      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs font-normal whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-blood/60 after:content-['']"
-    >
-      {children}
+    <span ref={marker} hidden>
+      {pos &&
+        createPortal(
+          <span
+            role="tooltip"
+            style={{ left: pos.x, top: pos.y }}
+            className="pointer-events-none fixed z-[80] -mt-2 -translate-x-1/2 -translate-y-full border border-blood/60 bg-black/95 px-2 py-1 text-xs font-normal whitespace-nowrap text-foreground shadow-lg after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-blood/60 after:content-['']"
+          >
+            {children}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }
