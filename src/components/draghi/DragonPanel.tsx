@@ -9,7 +9,6 @@ import {
   dragonName,
   effectLabel,
   signed,
-  monthlyUpkeep,
   nextStage,
   stageLabel,
   type Dragon,
@@ -151,28 +150,13 @@ function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
 // ---------------------------------------------------------------------
 function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: DragonStage[]; riderName: string }) {
   const mods = useMods(dragon);
-  const cost = stages.find((s) => s.stage === dragon.stage)?.px_to_next ?? null;
-  const next = nextStage(dragon.stage, stages);
   return (
     <div className="space-y-5">
       <div className="mx-auto max-w-xl">
         <DragonBars dragon={dragon} stages={stages} variant="parchment" />
       </div>
       <div className="relative mx-auto flex max-w-xl items-center justify-center">
-        {/* su computer i due cerchi grandi stanno ai lati dell'esagono */}
-        <BigRing label="Mantenimento" value={monthlyUpkeep(dragon, stages)} note="risorse / mese" className="absolute bottom-6 left-0 z-10 hidden sm:flex" />
         <HexFrame dragon={dragon} />
-        <BigRing
-          label="Crescita"
-          value={next && cost !== null ? cost : "—"}
-          note={next ? `PX per ${next.label.toLowerCase()}` : "è adulto"}
-          className="absolute right-0 bottom-6 z-10 hidden sm:flex"
-        />
-      </div>
-      {/* su cellulare sotto l'esagono, affiancati */}
-      <div className="flex justify-around sm:hidden">
-        <BigRing label="Mantenimento" value={monthlyUpkeep(dragon, stages)} note="risorse / mese" />
-        <BigRing label="Crescita" value={next && cost !== null ? cost : "—"} note={next ? `PX per ${next.label.toLowerCase()}` : "è adulto"} />
       </div>
 
       {/* caratteristiche: due per lato, come su una scheda incisa */}
