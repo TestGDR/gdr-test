@@ -25,6 +25,14 @@ export const SheetIcon = () => (
   </svg>
 );
 
+// Il mio drago: testa di drago di profilo
+export const DragonIcon = () => (
+  <svg {...base}>
+    <path d="M3 14c2-1 4-1 6 0l2-4c-2-1-3-3-3-6 2 1 4 2 5 4 1-2 3-3 5-3-1 2-1 3 0 4l2 1-2 1c1 1 2 3 2 5-2-1-4-1-5 0l-2 3c-1 2-3 3-5 3l1-3c-2 0-4-1-6-5Z" />
+    <path d="M15.5 9.5h.01" />
+  </svg>
+);
+
 // Info luogo: una "i" in un cerchio
 export const InfoIcon = () => (
   <svg {...base}>

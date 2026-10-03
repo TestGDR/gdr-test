@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export type ModalSize = "md" | "lg" | "xl" | "tall" | "area";
+export type ModalSize = "md" | "lg" | "xl" | "tall" | "area" | "sheet";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
@@ -13,6 +13,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   tall: "w-[min(600px,calc(100vw-1rem))] h-[min(52rem,calc(100dvh-1rem))]",
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)
   area: "w-[min(46rem,calc(100vw-2rem))] h-[min(700px,calc(100dvh-1rem))]",
+  // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
+  sheet: "w-[min(820px,calc(100vw-1rem))] h-[min(940px,calc(100dvh-1rem))]",
 };
 
 // Finestra modale controllata dal chiamante (open / onClose).
@@ -154,7 +156,7 @@ export default function Modal({
         </div>
         <div
           className={
-            size === "xl" || size === "tall"
+            size === "xl" || size === "tall" || size === "sheet"
               ? "min-h-0 flex-1"
               : "min-h-0 flex-1 overflow-y-auto p-5"
           }

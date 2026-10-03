@@ -27,6 +27,7 @@ import {
   BookIcon,
   CastleIcon,
   ChevronIcon,
+  DragonIcon,
   GearIcon,
   InfoIcon,
   MapIcon,
@@ -44,6 +45,8 @@ import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
 import SalaryCollector from "./SalaryCollector";
+import DragonPanel from "@/components/draghi/DragonPanel";
+import Modal from "@/components/ui/Modal";
 
 // ---------------------------------------------------------------------
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
@@ -96,6 +99,7 @@ export default function GameShell({
   const [phrase, setPhrase] = useState(statusText);
   const [availability, setAvailability] = useState(initialAvailability);
   const [onlineOpen, setOnlineOpen] = useState(false);
+  const [dragonOpen, setDragonOpen] = useState(0); // 0 = chiuso; a ogni apertura cambia e ricarica i dati
   const [sheetId, setSheetId] = useState<string | null>(null); // scheda aperta dalla lista dei presenti
   const [messages, setMessages] = useState<{
     open: boolean;
@@ -254,8 +258,14 @@ export default function GameShell({
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
               onOpenSheet={setSheetId}
+              onOpenDragon={() => setDragonOpen((n) => n + 1)}
               mobileTools={
-                <MobileTools canManage={canManage} onlineCount={online.length} onOpenOnline={() => setOnlineOpen(true)} />
+                <MobileTools
+                  canManage={canManage}
+                  onlineCount={online.length}
+                  onOpenOnline={() => setOnlineOpen(true)}
+                  onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
+                />
               }
             />
             </div>
@@ -297,6 +307,11 @@ export default function GameShell({
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
+      {character && (
+        <Modal open={dragonOpen > 0} onClose={() => setDragonOpen(0)} title="Il mio drago" size="sheet">
+          {dragonOpen > 0 && <DragonPanel key={dragonOpen} characterId={character.id} />}
+        </Modal>
+      )}
       <OnlineModal
         open={onlineOpen}
         onClose={() => setOnlineOpen(false)}
@@ -347,6 +362,7 @@ function LeftColumn({
   onChangeAvailability,
   onOpenSheet,
   mobileTools,
+  onOpenDragon,
 }: {
   area: Area;
   userId: string;
@@ -358,6 +374,7 @@ function LeftColumn({
   onOpenOnline: () => void;
   onChangeAvailability: (value: Availability) => void;
   onOpenSheet: (characterId: string) => void;
+  onOpenDragon: () => void;
   mobileTools: ReactNode;
 }) {
   // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
@@ -443,6 +460,9 @@ function LeftColumn({
               onClick={() => onOpenMessages("off")}
             >
               <BubbleIcon />
+            </MessageButton>
+            <MessageButton label="Il mio drago" count={0} onClick={onOpenDragon}>
+              <DragonIcon />
             </MessageButton>
           </div>
         )}
@@ -549,9 +569,20 @@ function CharacterPicture({
 const drawerBtn =
   "group relative flex h-12 w-full items-center justify-center text-muted transition hover:text-accent";
 
-function MobileTools({ canManage, onlineCount, onOpenOnline }: { canManage: boolean; onlineCount: number; onOpenOnline: () => void }) {
+function MobileTools({
+  canManage,
+  onlineCount,
+  onOpenOnline,
+  onOpenDragon,
+}: {
+  canManage: boolean;
+  onlineCount: number;
+  onOpenOnline: () => void;
+  onOpenDragon: (() => void) | null;
+}) {
+  const count = 3 + (canManage ? 1 : 0) + (onOpenDragon ? 1 : 0);
   return (
-    <div className={`grid gap-2 ${canManage ? "grid-cols-4" : "grid-cols-3"}`}>
+    <div className={`grid gap-2 ${count === 5 ? "grid-cols-5" : count === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
       {canManage && (
         <Link href="/gestione" className={drawerBtn} aria-label="Gestione">
           <GearIcon />
@@ -567,6 +598,11 @@ function MobileTools({ canManage, onlineCount, onOpenOnline }: { canManage: bool
         }
       />
       <ComingSoonButton title="Ticket" icon={<TicketIcon />} className={drawerBtn} />
+      {onOpenDragon && (
+        <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
+          <DragonIcon />
+        </button>
+      )}
       <button type="button" onClick={onOpenOnline} className={drawerBtn} aria-label={`${onlineCount} presenti online: apri l'elenco`}>
         <UsersIcon />
         <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[11px] font-bold text-white shadow">
