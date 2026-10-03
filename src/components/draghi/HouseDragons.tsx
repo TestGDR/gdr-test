@@ -20,11 +20,18 @@ export default function HouseDragons({ houseId }: { houseId: string }) {
     ]).then(async ([d, s]) => {
       const dragons = (d.data ?? []) as Dragon[];
       const ids = dragons.flatMap((x) => (x.rider_id ? [x.rider_id] : []));
-      const { data: riders } = ids.length ? await supabase.from("characters").select("id, name").in("id", ids) : { data: [] };
+      const npcIds = dragons.flatMap((x) => (x.npc_rider_id ? [x.npc_rider_id] : []));
+      const [{ data: riders }, { data: npcRiders }] = await Promise.all([
+        ids.length ? supabase.from("characters").select("id, name").in("id", ids) : Promise.resolve({ data: [] }),
+        npcIds.length ? supabase.from("house_npcs").select("id, name").in("id", npcIds) : Promise.resolve({ data: [] }),
+      ]);
       setData({
         dragons,
         stages: (s.data ?? []) as DragonStage[],
-        riders: Object.fromEntries((riders ?? []).map((r) => [r.id, r.name])),
+        riders: Object.fromEntries([
+          ...(riders ?? []).map((r) => [r.id, r.name]),
+          ...(npcRiders ?? []).map((n) => [n.id, `${n.name} (PNG)`]),
+        ]),
       });
     });
   }, [supabase, houseId]);
@@ -54,7 +61,7 @@ export default function HouseDragons({ houseId }: { houseId: string }) {
                 <span className="block text-xs text-muted">
                   {stageLabel(d.stage, data.stages)} · {colorLabel(d)}
                 </span>
-                <span className="block text-xs text-muted">Cavaliere: {d.rider_id ? data.riders[d.rider_id] : "nessuno"}</span>
+                <span className="block text-xs text-muted">Cavaliere: {data.riders[d.rider_id ?? d.npc_rider_id ?? ""] ?? "nessuno"}</span>
               </span>
             </button>
           </li>
@@ -65,7 +72,7 @@ export default function HouseDragons({ houseId }: { houseId: string }) {
           Uova: <strong className="text-foreground">{eggs.length}</strong> in attesa di schiudersi.
         </p>
       )}
-      {open && <DragonCard dragon={open} stages={data.stages} riderName={open.rider_id ? data.riders[open.rider_id] : null} />}
+      {open && <DragonCard dragon={open} stages={data.stages} riderName={data.riders[open.rider_id ?? open.npc_rider_id ?? ""] ?? null} />}
     </div>
   );
 }

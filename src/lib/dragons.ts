@@ -29,7 +29,8 @@ export type Dragon = {
   skills: Record<string, number>;
   unspent_points: number;
   image_url: string | null;
-  rider_id: string | null;
+  rider_id: string | null; // cavaliere PG
+  npc_rider_id: string | null; // oppure cavaliere PNG
   hatched_at: string | null;
   created_at: string;
 };

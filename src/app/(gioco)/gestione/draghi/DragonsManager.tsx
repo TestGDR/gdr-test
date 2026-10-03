@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export type HouseLite = { id: string; name: string; sigil_url: string | null };
 export type PgLite = { id: string; name: string; house_id: string | null; px: number; status: string };
+export type NpcLite = { id: string; name: string; house_id: string | null; deceased: boolean };
 
 type Props = {
   houses: HouseLite[];
@@ -28,6 +29,7 @@ type Props = {
   stages: DragonStage[];
   traits: TraitRow[];
   pgs: PgLite[];
+  npcs: NpcLite[];
   skills: DragonSkill[];
   temperaments: TemperamentRow[];
   effects: TraitEffect[];
@@ -95,12 +97,14 @@ export default function DragonsManager(props: Props) {
 // ---------------------------------------------------------------------
 // Draghi per casata
 // ---------------------------------------------------------------------
-function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments, effects }: Props) {
+function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temperaments, effects }: Props) {
   const { supabase, run, busy, feedback } = useOp();
   const [selectedId, setSelectedId] = useState<string | null>(dragons[0]?.id ?? null);
   const [newStage, setNewStage] = useState<Record<string, string>>({});
   const selected = dragons.find((d) => d.id === selectedId) ?? null;
-  const pgName = (id: string | null) => pgs.find((p) => p.id === id)?.name ?? null;
+  // nome del cavaliere, PG o PNG
+  const riderName = (d: Dragon) =>
+    d.rider_id ? (pgs.find((p) => p.id === d.rider_id)?.name ?? null) : d.npc_rider_id ? `${npcs.find((n) => n.id === d.npc_rider_id)?.name ?? "?"} (PNG)` : null;
   const groups = [
     ...houses.map((h) => ({ id: h.id, name: `Casata ${h.name}`, house: h as HouseLite | null })),
     { id: "nessuna", name: "Senza casata", house: null },
@@ -137,7 +141,7 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments
                         <span className="block truncate font-serif">{dragonName(d)}</span>
                         <span className="text-xs text-muted">
                           {d.status === "uovo" ? "Uovo" : stageLabel(d.stage, stages)}
-                          {d.rider_id && ` · ${pgName(d.rider_id)}`}
+                          {riderName(d) && ` · ${riderName(d)}`}
                         </span>
                       </span>
                     </button>
@@ -200,7 +204,7 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments
       </aside>
 
       {selected ? (
-        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs, skills, temperaments, effects }} onDeleted={() => setSelectedId(null)} />
+        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs, npcs, skills, temperaments, effects }} onDeleted={() => setSelectedId(null)} />
       ) : (
         <p className="text-muted">Scegli un drago dall&apos;elenco, oppure assegna la dotazione iniziale a una casata.</p>
       )}
@@ -215,6 +219,7 @@ function DragonEditor({
   stages,
   traits,
   pgs,
+  npcs,
   skills,
   onDeleted,
 }: Props & { dragon: Dragon; onDeleted: () => void }) {
@@ -224,6 +229,14 @@ function DragonEditor({
   const egg = d.status === "uovo";
   // un PG puo' cavalcare un solo drago
   const takenRiders = new Set(dragons.filter((x) => x.id !== d.id && x.rider_id).map((x) => x.rider_id));
+  const takenNpcs = new Set(dragons.filter((x) => x.id !== d.id && x.npc_rider_id).map((x) => x.npc_rider_id));
+  const houseName = (id: string | null) => houses.find((h) => h.id === id)?.name ?? "senza casata";
+  // valore del menu: "pg:<id>" oppure "png:<id>"
+  const riderValue = d.rider_id ? `pg:${d.rider_id}` : d.npc_rider_id ? `png:${d.npc_rider_id}` : "";
+  function setRider(value: string) {
+    const [kind, id] = value.split(":");
+    setD((x) => ({ ...x, rider_id: kind === "pg" ? id : null, npc_rider_id: kind === "png" ? id : null }));
+  }
 
   function save() {
     run(
@@ -234,6 +247,7 @@ function DragonEditor({
             name: d.name.trim(),
             house_id: d.house_id,
             rider_id: d.rider_id,
+            npc_rider_id: d.npc_rider_id,
             ...(egg
               ? {}
               : {
@@ -283,16 +297,27 @@ function DragonEditor({
         </Field>
         {!egg && (
           <Field label="Cavaliere">
-            <select value={d.rider_id ?? ""} onChange={(e) => set("rider_id", e.target.value || null)} className="input">
+            <select value={riderValue} onChange={(e) => setRider(e.target.value)} className="input">
               <option value="">Nessuno</option>
-              {pgs
-                .filter((p) => p.status === "attivo" && (!takenRiders.has(p.id) || p.id === d.rider_id))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.house_id !== d.house_id ? " (altra casata)" : ""}
-                  </option>
-                ))}
+              <optgroup label="Personaggi (PG)">
+                {pgs
+                  .filter((p) => p.status === "attivo" && (!takenRiders.has(p.id) || p.id === d.rider_id))
+                  .map((p) => (
+                    <option key={p.id} value={`pg:${p.id}`}>
+                      {p.name}
+                      {p.house_id !== d.house_id ? " (altra casata)" : ""}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="PNG delle casate">
+                {npcs
+                  .filter((n) => !n.deceased && (!takenNpcs.has(n.id) || n.id === d.npc_rider_id))
+                  .map((n) => (
+                    <option key={n.id} value={`png:${n.id}`}>
+                      {n.name} · {houseName(n.house_id)}
+                    </option>
+                  ))}
+              </optgroup>
             </select>
           </Field>
         )}
