@@ -53,7 +53,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     items: [
       { key: "forum.moderare", label: "Moderare il forum", description: "Modificare ed eliminare post altrui", soon: true },
       { key: "forum.sezioni", label: "Gestire le sezioni", description: "Creare ed eliminare sezioni del forum", soon: true },
-      { key: "annunci.globali", label: "Annunci globali", description: "Scrivere, modificare ed eliminare le Notizie ON e OFF" },
+      { key: "notizie.on", label: "Notizie ON", description: "Scrivere, modificare ed eliminare le Notizie ON (dal mondo di gioco)" },
+      { key: "annunci.globali", label: "Annunci globali", description: "Scrivere, modificare ed eliminare le Notizie OFF" },
     ],
   },
 ];

@@ -43,7 +43,8 @@ import {
   UsersIcon,
   WeatherIcon,
 } from "./icons";
-import NewsPanel, { type NewsKind } from "./NewsPanel";
+import NewsPanel from "./NewsPanel";
+import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -78,7 +79,8 @@ type Props = {
   initialAvailability: Availability;
   canEditDocs: boolean; // puo' modificare Manuale e Ambientazione
   canManage: boolean; // vede la rotella della Gestione (moderatori e admin)
-  canWriteNews: boolean; // scrive le Notizie ON e OFF
+  canWriteNewsOn: boolean; // scrive le Notizie ON (admin, master, moderatori)
+  canWriteNewsOff: boolean; // scrive le Notizie OFF
   canModerate: boolean; // toglie le richieste di gioco altrui
   canManageUsers: boolean; // toglie le assenze altrui
   children: ReactNode;
@@ -102,7 +104,8 @@ export default function GameShell({
   initialAvailability,
   canEditDocs,
   canManage,
-  canWriteNews,
+  canWriteNewsOn,
+  canWriteNewsOff,
   canModerate,
   canManageUsers,
   children,
@@ -349,11 +352,10 @@ export default function GameShell({
         </Modal>
       )}
       <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
-        size={panel === "ricerca" || panel === "assenze" ? "panel" : "lg"}
+        size={panel === "ricerca" || panel === "assenze" ? "panel" : panel === "notizie-on" ? "xl" : "lg"}
       >
-        {(panel === "notizie-on" || panel === "notizie-off") && (
-          <NewsPanel key={`${panel}-${panelSession}`} kind={panel.slice(8) as NewsKind} canWrite={canWriteNews} />
-        )}
+        {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
+        {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
         {panel === "ricerca" && (
           <PlayRequestsPanel
             key={panelSession}

@@ -6,10 +6,10 @@ import RichEditor from "@/components/guide/RichEditor";
 import { createClient } from "@/lib/supabase/client";
 
 export type NewsKind = "on" | "off";
-type News = { id: string; title: string; body: string; created_at: string; updated_at: string };
+export type News = { id: string; title: string; body: string; created_at: string; updated_at: string };
 
-const sanitize = (html: string) => DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-const when = (iso: string) =>
+export const sanitize = (html: string) => DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+export const when = (iso: string) =>
   new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
 
 // Notizie ON (dal mondo di gioco) e OFF (comunicazioni dello staff):
@@ -88,7 +88,7 @@ export default function NewsPanel({ kind, canWrite }: { kind: NewsKind; canWrite
   );
 }
 
-function NewsForm({ kind, news, onDone }: { kind: NewsKind; news: News | null; onDone: (saved: boolean) => void }) {
+export function NewsForm({ kind, news, onDone }: { kind: NewsKind; news: News | null; onDone: (saved: boolean) => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState(news?.title ?? "");
   const [body, setBody] = useState(news?.body ?? "");
