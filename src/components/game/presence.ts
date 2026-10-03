@@ -33,6 +33,10 @@ export type PresencePayload = Omit<OnlinePlayer, "live">;
 
 const HEARTBEAT_MS = 60_000; // ogni quanto si lascia il segnale nel database
 const POLL_MS = 20_000; // ogni quanto si rilegge chi ha dato segnale di recente
+// Segnale piu' recente di cosi' = presente a tutti gli effetti, anche se il suo
+// collegamento in tempo reale e' caduto (il segnale arriva ogni minuto)
+const FRESH_MS = 150_000;
+const RETRY_MS = 4_000; // dopo quanto si ricrea il collegamento in tempo reale caduto
 
 // Dati arrivati da altri browser: completati con valori neutri se mancano
 function normalize(userId: string, p: Partial<OnlinePlayer>, live: boolean): OnlinePlayer {
@@ -63,6 +67,8 @@ export function usePresence(me: PresencePayload) {
   const [live, setLive] = useState<OnlinePlayer[]>([]);
   const [recent, setRecent] = useState<OnlinePlayer[]>([]);
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  // Cambia per ricreare da zero il collegamento in tempo reale quando cade
+  const [attempt, setAttempt] = useState(0);
   // Ultimi dati da annunciare: servono anche dopo una riconnessione
   const payload = JSON.stringify(me);
   const latest = useRef(payload);
@@ -75,13 +81,20 @@ export function usePresence(me: PresencePayload) {
     () =>
       supabase.rpc("recent_online").then(({ data }) => {
         if (!data) return;
-        setRecent((data as { user_id: string; info: Partial<OnlinePlayer> }[]).map((r) => normalize(r.user_id, r.info, false)));
+        const now = Date.now();
+        setRecent(
+          (data as { user_id: string; info: Partial<OnlinePlayer>; last_seen: string }[]).map((r) =>
+            normalize(r.user_id, r.info, now - new Date(r.last_seen).getTime() < FRESH_MS),
+          ),
+        );
       }),
     [supabase],
   );
 
   // --- Tempo reale -------------------------------------------------------
   useEffect(() => {
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const ch = supabase.channel("online", { config: { presence: { key: me.userId } } });
     ch.on("presence", { event: "sync" }, () => {
       // Una voce per utente (con piu' schede vale l'ultima); l'id dalla chiave della presenza
@@ -91,6 +104,14 @@ export function usePresence(me: PresencePayload) {
       // sito ha appena spento il suo), cosi' l'uscita si vede subito
       setTimeout(refreshRecent, 1500);
     }).subscribe((status) => {
+      if (disposed) return;
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        // Collegamento caduto e non ripreso: lo ricreo da zero tra poco
+        setChannel(null);
+        clearTimeout(retry);
+        retry = setTimeout(() => setAttempt((a) => a + 1), RETRY_MS);
+        return;
+      }
       if (status !== "SUBSCRIBED") return;
       setChannel(ch);
       // Dopo una caduta Supabase si ricollega da solo ma NON ripete l'annuncio: lo rifacciamo
@@ -98,10 +119,12 @@ export function usePresence(me: PresencePayload) {
     });
 
     return () => {
+      disposed = true;
+      clearTimeout(retry);
       setChannel(null);
       supabase.removeChannel(ch);
     };
-  }, [supabase, me.userId, refreshRecent]);
+  }, [supabase, me.userId, refreshRecent, attempt]);
 
   // --- Segnale nel database ----------------------------------------------
   useEffect(() => {
@@ -116,7 +139,10 @@ export function usePresence(me: PresencePayload) {
     const onBack = () => {
       if (document.visibilityState !== "visible") return;
       beat().then(loadRecent);
-      supabase.getChannels().find((c) => c.topic === "realtime:online")?.track(JSON.parse(latest.current));
+      const ch = supabase.getChannels().find((c) => c.topic === "realtime:online");
+      // Collegamento in tempo reale non attivo (es. dopo ore in secondo piano): lo ricreo
+      if (!ch || ch.state !== "joined") setAttempt((a) => a + 1);
+      else ch.track(JSON.parse(latest.current));
     };
     // Chiudendo il sito (non quando si mette in pausa): segnale spento, si sparisce subito
     const onLeave = () => navigator.sendBeacon("/api/presenza/esci");
