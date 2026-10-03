@@ -64,6 +64,9 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     if (error.code === "email_not_confirmed") {
       return { error: "Devi prima confermare l'email: controlla la tua casella di posta." };
     }
+    if (error.code === "user_banned") {
+      return { error: "Questo account è sospeso: non puoi accedere. Per informazioni contatta lo staff." };
+    }
     return { error: LOGIN_ERROR };
   }
   await recordAccess(data.user.id, "login");

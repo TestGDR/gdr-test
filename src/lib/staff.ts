@@ -1,5 +1,5 @@
 import "server-only";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ALL_PERMISSION_KEYS } from "@/lib/permissions";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -27,12 +27,15 @@ export async function getStaffContext(): Promise<StaffContext & Awaited<ReturnTy
   const [{ data }, { data: playerRole }] = await Promise.all([
     auth.supabase
       .from("profiles")
-      .select("role, staff_role:staff_roles(id, name, description, color, sort_order, permissions, system_key)")
+      .select("role, banned_until, staff_role:staff_roles(id, name, description, color, sort_order, permissions, system_key)")
       .eq("id", auth.user.id)
-      .single<{ role: string; staff_role: StaffRole | null }>(),
+      .single<{ role: string; banned_until: string | null; staff_role: StaffRole | null }>(),
     // I permessi del ruolo Giocatore valgono per tutti
     auth.supabase.from("staff_roles").select("permissions").eq("system_key", "giocatore").maybeSingle(),
   ]);
+
+  // Utente bannato con una sessione ancora aperta: lo si fa uscire subito
+  if (isBanned(data?.banned_until ?? null)) redirect("/api/sospeso");
 
   const isAdmin = data?.role === "admin";
   const role = data?.staff_role ?? null;
@@ -47,4 +50,12 @@ export async function requirePermission(permission: string) {
   const ctx = await getStaffContext();
   if (!ctx.permissions.has(permission)) notFound();
   return ctx;
+}
+
+// Ban in corso: "infinity" (permanente) oppure una data futura
+export function isBanned(bannedUntil: string | null) {
+  if (!bannedUntil) return false;
+  if (bannedUntil === "infinity") return true;
+  const t = new Date(bannedUntil).getTime();
+  return Number.isNaN(t) ? true : t > Date.now();
 }

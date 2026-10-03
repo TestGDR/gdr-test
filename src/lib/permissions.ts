@@ -21,7 +21,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "casate.gestire", label: "Gestione casate", description: "Casate, ruoli e stipendi, alberi genealogici, PNG e membri" },
       { key: "draghi.gestire", label: "Gestione draghi", description: "Draghi e uova delle casate, fasi di crescita e punteggi" },
       { key: "documentazione.scrivere", label: "Manuale e Ambientazione", description: "Scrivere e modificare le pagine della documentazione" },
-      { key: "utenti.gestire", label: "Gestione utenti", description: "Sospensioni ed eliminazioni degli account", soon: true },
+      { key: "utenti.gestire", label: "Gestione utenti", description: "Modificare, bannare ed eliminare gli account" },
     ],
   },
   {
@@ -70,4 +70,5 @@ export const MANAGEMENT_PERMISSIONS = [
   "casate.gestire",
   "mondo.gestire",
   "draghi.gestire",
+  "utenti.gestire",
 ];

@@ -12,6 +12,12 @@ const PANELS = [
     description: "Crea i ruoli staff, scegli cosa possono fare e assegnali agli utenti.",
   },
   {
+    permission: "utenti.gestire",
+    href: "/gestione/utenti",
+    title: "Utenti",
+    description: "Modifica, ban ed eliminazione degli account.",
+  },
+  {
     permission: "gestione.accessi",
     href: "/gestione/accessi",
     title: "Registro accessi",
