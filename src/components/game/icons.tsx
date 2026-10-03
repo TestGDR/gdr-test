@@ -25,11 +25,15 @@ export const SheetIcon = () => (
   </svg>
 );
 
-// Il mio drago: testa di drago di profilo
+// Il mio drago: drago in volo visto dall'alto (ali spiegate, coda arricciata)
 export const DragonIcon = () => (
-  <svg {...base}>
-    <path d="M3 14c2-1 4-1 6 0l2-4c-2-1-3-3-3-6 2 1 4 2 5 4 1-2 3-3 5-3-1 2-1 3 0 4l2 1-2 1c1 1 2 3 2 5-2-1-4-1-5 0l-2 3c-1 2-3 3-5 3l1-3c-2 0-4-1-6-5Z" />
-    <path d="M15.5 9.5h.01" />
+  <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M11 9.2 2 3.5c.9 1.6 1 3.1.4 4.6 1.4-.2 2.6.3 3.3 1.4 1.2-.5 2.4-.2 3.2.9.7-.3 1.4-.2 2.1.4Z" />
+    <path d="M13 9.2 22 3.5c-.9 1.6-1 3.1-.4 4.6-1.4-.2-2.6.3-3.3 1.4-1.2-.5-2.4-.2-3.2.9-.7-.3-1.4-.2-2.1.4Z" />
+    <ellipse cx="12" cy="11.2" rx="1.9" ry="3.8" />
+    <path d="M12 3.2l1.5 2.4L12 7.6l-1.5-2L12 3.2Zm-1.1.7-1-1.8m3.2 1.8 1-1.8" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+    <path d="M12 14.6c-.2 2.6.6 4.2 2.4 5.2 1 .5 1.5-.4 1-1.1" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <path d="m15.2 18.1 1.6.2-.4 1.6Z" />
   </svg>
 );
 
