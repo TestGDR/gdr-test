@@ -6,14 +6,17 @@ import {
   STATS,
   colorHex,
   colorLabel,
+  dragonModifiers,
   dragonName,
+  effectLabel,
+  signed,
   monthlyUpkeep,
   nextStage,
   stageLabel,
   type Dragon,
   type DragonStage,
 } from "@/lib/dragons";
-import { useDragonSkills } from "@/lib/dragon-skills";
+import { useDragonEffects, useDragonSkills } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 import { saveDragonImage } from "./actions";
 
@@ -157,10 +160,26 @@ const withStat = (skills: { key: string; label: string; stat_key: string }[]) =>
 
 function ValuesGrid({ dragon }: { dragon: Dragon }) {
   const skills = useDragonSkills();
+  const effects = useDragonEffects();
+  const mods = dragonModifiers(dragon, effects);
+  const skillLabel = (k: string) => skills.find((s) => s.key === k)?.label ?? k;
+  // "+1" (o "*" se il modificatore vale solo in certe condizioni), con la spiegazione al passaggio
+  function renderMod(kind: string, key: string) {
+    const m = mods[`${kind}:${key}`];
+    if (!m) return null;
+    return (
+      <span
+        title={m.sources.map((e) => `${e.trait}: ${effectLabel(e, skillLabel)}`).join("\n")}
+        className={`w-8 shrink-0 text-right text-xs font-bold ${m.total > 0 ? "text-green-400" : m.total < 0 ? "text-red-400" : "text-muted"}`}
+      >
+        {m.total !== 0 ? signed(m.total) : "*"}
+      </span>
+    );
+  }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} />
-      <ValueList title="Abilità" items={withStat(skills)} values={dragon.skills} />
+      <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} renderControl={(key) => renderMod("caratteristica", key)} />
+      <ValueList title="Abilità" items={withStat(skills)} values={dragon.skills} renderControl={(key) => renderMod("abilita", key)} />
     </div>
   );
 }

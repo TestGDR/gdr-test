@@ -83,3 +83,42 @@ export function nextStage(stage: string | null, stages: DragonStage[]) {
   const cur = stages.find((s) => s.stage === stage);
   return cur ? (stages.find((s) => s.sort_order === cur.sort_order + 1) ?? null) : null;
 }
+
+// ---------------------------------------------------------------------
+// Effetti di pregi e difetti: modificatori su caratteristiche e abilita'
+// (i valori del drago non cambiano: i modificatori si sommano nei tiri)
+// ---------------------------------------------------------------------
+export type TraitEffect = {
+  id: number;
+  side: "pregio" | "difetto";
+  trait: string;
+  target_kind: "caratteristica" | "abilita";
+  target_key: string;
+  modifier: number;
+  condition: string;
+};
+
+export type Modifier = { total: number; sources: TraitEffect[] };
+
+// Modificatori del drago, per "caratteristica:vigore" / "abilita:volare"
+export function dragonModifiers(d: Pick<Dragon, "pregi" | "difetti">, effects: TraitEffect[]) {
+  const out: Record<string, Modifier> = {};
+  for (const e of effects) {
+    const has = e.side === "pregio" ? d.pregi.includes(e.trait) : d.difetti.includes(e.trait);
+    if (!has) continue;
+    const key = `${e.target_kind}:${e.target_key}`;
+    out[key] ??= { total: 0, sources: [] };
+    // con una condizione il modificatore vale solo in certi tiri: non entra nel totale fisso
+    if (!e.condition.trim()) out[key].total += e.modifier;
+    out[key].sources.push(e);
+  }
+  return out;
+}
+
+export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+// "+1 Volare (solo di notte)"
+export function effectLabel(e: TraitEffect, skillLabel: (key: string) => string) {
+  const target = e.target_kind === "caratteristica" ? (STATS.find((s) => s.key === e.target_key)?.label ?? e.target_key) : skillLabel(e.target_key);
+  return `${signed(e.modifier)} ${target}${e.condition.trim() ? ` (${e.condition.trim()})` : ""}`;
+}

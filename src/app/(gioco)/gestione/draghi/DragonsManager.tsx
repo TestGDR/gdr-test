@@ -13,9 +13,10 @@ import {
   stageLabel,
   type Dragon,
   type DragonStage,
+  type TraitEffect,
   type TraitPair,
 } from "@/lib/dragons";
-import { invalidateDragonSkills, type DragonSkill } from "@/lib/dragon-skills";
+import { invalidateDragonEffects, invalidateDragonSkills, type DragonSkill } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 
 export type HouseLite = { id: string; name: string; sigil_url: string | null };
@@ -29,6 +30,7 @@ type Props = {
   pgs: PgLite[];
   skills: DragonSkill[];
   temperaments: TemperamentRow[];
+  effects: TraitEffect[];
 };
 
 const TABS = [
@@ -83,7 +85,7 @@ export default function DragonsManager(props: Props) {
         {tab === "draghi" && <DragonsTab {...props} />}
         {tab === "fasi" && <StagesTab stages={props.stages} />}
         {tab === "abilita" && <SkillsTab skills={props.skills} />}
-        {tab === "tratti" && <TraitsTab traits={props.traits} />}
+        {tab === "tratti" && <TraitsTab traits={props.traits} effects={props.effects} skills={props.skills} />}
         {tab === "caratteri" && <TemperamentsTab temperaments={props.temperaments} />}
       </div>
     </section>
@@ -93,7 +95,7 @@ export default function DragonsManager(props: Props) {
 // ---------------------------------------------------------------------
 // Draghi per casata
 // ---------------------------------------------------------------------
-function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments }: Props) {
+function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments, effects }: Props) {
   const { supabase, run, busy, feedback } = useOp();
   const [selectedId, setSelectedId] = useState<string | null>(dragons[0]?.id ?? null);
   const [newStage, setNewStage] = useState<Record<string, string>>({});
@@ -198,7 +200,7 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments
       </aside>
 
       {selected ? (
-        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs, skills, temperaments }} onDeleted={() => setSelectedId(null)} />
+        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs, skills, temperaments, effects }} onDeleted={() => setSelectedId(null)} />
       ) : (
         <p className="text-muted">Scegli un drago dall&apos;elenco, oppure assegna la dotazione iniziale a una casata.</p>
       )}
@@ -807,34 +809,53 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
 // ---------------------------------------------------------------------
 export type TraitRow = TraitPair & { pregio_text: string; difetto_text: string };
 
-function TraitsTab({ traits }: { traits: TraitRow[] }) {
+// Effetto in modifica: bersaglio "caratteristica:vigore" / "abilita:volare"
+type EffectDraft = { target: string; modifier: number; condition: string };
+
+const toDrafts = (effects: TraitEffect[], side: "pregio" | "difetto", trait: string): EffectDraft[] =>
+  effects
+    .filter((e) => e.side === side && e.trait === trait)
+    .map((e) => ({ target: `${e.target_kind}:${e.target_key}`, modifier: e.modifier, condition: e.condition }));
+
+function TraitsTab({ traits, effects, skills }: { traits: TraitRow[]; effects: TraitEffect[]; skills: DragonSkill[] }) {
   const { supabase, run, busy, feedback } = useOp();
   const empty = { pregio: "", difetto: "", pregio_text: "", difetto_text: "" };
   const [draft, setDraft] = useState<TraitRow>(empty);
+  const [draftFx, setDraftFx] = useState<{ pregio: EffectDraft[]; difetto: EffectDraft[] }>({ pregio: [], difetto: [] });
 
   return (
     <div className="max-w-5xl space-y-4">
       <p className="text-sm text-muted">
         Ogni pregio ha il suo difetto opposto: alla generazione non possono uscire insieme. La frase di ciascun tratto entra nel carattere
-        dei nuovi draghi. Se rinomini un tratto il nome si aggiorna anche sui draghi che ce l&apos;hanno; se elimini una coppia, viene tolta
-        dai draghi.
+        dei nuovi draghi. Ogni tratto può avere più effetti: un modificatore su una caratteristica o un&apos;abilità, con una condizione
+        facoltativa (es. &quot;solo di notte&quot;). I valori del drago non cambiano: i modificatori si sommano nei tiri. Rinominando un tratto
+        il nome si aggiorna anche su draghi ed effetti; eliminando una coppia, viene tolta da tutto.
       </p>
       {feedback}
       <ul className="space-y-3">
         {traits.map((t) => (
-          <TraitPairEditor key={t.pregio} pair={t} busy={busy} run={run} supabase={supabase} />
+          <TraitPairEditor key={t.pregio} pair={t} effects={effects} skills={skills} busy={busy} run={run} supabase={supabase} />
         ))}
       </ul>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await run(() => supabase.from("dragon_trait_pairs").insert({ ...draft, pregio: draft.pregio.trim(), difetto: draft.difetto.trim() }), "Coppia aggiunta."))
+          const pair = { ...draft, pregio: draft.pregio.trim(), difetto: draft.difetto.trim() };
+          const ok = await run(async () => {
+            const res = await supabase.from("dragon_trait_pairs").insert(pair);
+            if (res.error) return res;
+            return saveEffects(supabase, pair.pregio, pair.difetto, draftFx);
+          }, "Coppia aggiunta.");
+          if (ok) {
+            invalidateDragonEffects();
             setDraft(empty);
+            setDraftFx({ pregio: [], difetto: [] });
+          }
         }}
         className="space-y-2 border border-dashed border-accent/50 p-3"
       >
         <p className="text-xs tracking-wider text-muted uppercase">Nuova coppia</p>
-        <TraitFields value={draft} onChange={setDraft} />
+        <TraitFields value={draft} onChange={setDraft} effects={draftFx} onEffects={setDraftFx} skills={skills} />
         <button className="btn px-4 py-1.5 text-sm" disabled={busy || !draft.pregio.trim() || !draft.difetto.trim()}>
           + Aggiungi coppia
         </button>
@@ -843,36 +864,69 @@ function TraitsTab({ traits }: { traits: TraitRow[] }) {
   );
 }
 
+// Sostituisce gli effetti dei due tratti con quelli in modifica
+async function saveEffects(
+  supabase: ReturnType<typeof useOp>["supabase"],
+  pregio: string,
+  difetto: string,
+  fx: { pregio: EffectDraft[]; difetto: EffectDraft[] },
+) {
+  const del = await supabase
+    .from("dragon_trait_effects")
+    .delete()
+    .or(`and(side.eq.pregio,trait.eq."${pregio.replace(/"/g, "")}"),and(side.eq.difetto,trait.eq."${difetto.replace(/"/g, "")}")`);
+  if (del.error) return del;
+  const rows = (["pregio", "difetto"] as const).flatMap((side) =>
+    fx[side]
+      .filter((e) => e.target && e.modifier !== 0)
+      .map((e) => {
+        const [target_kind, target_key] = e.target.split(":");
+        return { side, trait: side === "pregio" ? pregio : difetto, target_kind, target_key, modifier: e.modifier, condition: e.condition.trim() };
+      }),
+  );
+  if (rows.length === 0) return { error: null };
+  return supabase.from("dragon_trait_effects").insert(rows);
+}
+
 function TraitPairEditor({
   pair,
+  effects,
+  skills,
   busy,
   run,
   supabase,
 }: {
   pair: TraitRow;
+  effects: TraitEffect[];
+  skills: DragonSkill[];
   busy: boolean;
   run: ReturnType<typeof useOp>["run"];
   supabase: ReturnType<typeof useOp>["supabase"];
 }) {
+  const initialFx = { pregio: toDrafts(effects, "pregio", pair.pregio), difetto: toDrafts(effects, "difetto", pair.difetto) };
   const [v, setV] = useState(pair);
-  const changed = JSON.stringify(v) !== JSON.stringify(pair);
+  const [fx, setFx] = useState(initialFx);
+  const changed = JSON.stringify(v) !== JSON.stringify(pair) || JSON.stringify(fx) !== JSON.stringify(initialFx);
   return (
     <li className="space-y-2 border border-border/60 p-3">
-      <TraitFields value={v} onChange={setV} />
+      <TraitFields value={v} onChange={setV} effects={fx} onEffects={setFx} skills={skills} />
       <div className="flex gap-2">
         <button
           type="button"
           disabled={busy || !changed || !v.pregio.trim() || !v.difetto.trim()}
-          onClick={() =>
-            run(
-              () =>
-                supabase
-                  .from("dragon_trait_pairs")
-                  .update({ pregio: v.pregio.trim(), difetto: v.difetto.trim(), pregio_text: v.pregio_text, difetto_text: v.difetto_text })
-                  .eq("pregio", pair.pregio),
-              "Coppia salvata.",
-            )
-          }
+          onClick={async () => {
+            const pregio = v.pregio.trim();
+            const difetto = v.difetto.trim();
+            const ok = await run(async () => {
+              const res = await supabase
+                .from("dragon_trait_pairs")
+                .update({ pregio, difetto, pregio_text: v.pregio_text, difetto_text: v.difetto_text })
+                .eq("pregio", pair.pregio);
+              if (res.error) return res;
+              return saveEffects(supabase, pregio, difetto, fx);
+            }, "Coppia salvata.");
+            if (ok) invalidateDragonEffects();
+          }}
           className="btn px-3 py-1 text-xs"
         >
           Salva
@@ -880,10 +934,10 @@ function TraitPairEditor({
         <button
           type="button"
           disabled={busy}
-          onClick={() =>
-            window.confirm(`Eliminare la coppia "${pair.pregio}" / "${pair.difetto}"? Verrà tolta dai draghi che la hanno.`) &&
-            run(() => supabase.from("dragon_trait_pairs").delete().eq("pregio", pair.pregio), "Coppia eliminata.")
-          }
+          onClick={async () => {
+            if (!window.confirm(`Eliminare la coppia "${pair.pregio}" / "${pair.difetto}"? Verrà tolta dai draghi che la hanno, con i suoi effetti.`)) return;
+            if (await run(() => supabase.from("dragon_trait_pairs").delete().eq("pregio", pair.pregio), "Coppia eliminata.")) invalidateDragonEffects();
+          }}
           className="btn-ghost border-red-900 px-2 py-1 text-xs text-red-400 hover:border-red-500"
         >
           Elimina coppia
@@ -893,18 +947,89 @@ function TraitPairEditor({
   );
 }
 
-function TraitFields({ value, onChange }: { value: TraitRow; onChange: (v: TraitRow) => void }) {
+function TraitFields({
+  value,
+  onChange,
+  effects,
+  onEffects,
+  skills,
+}: {
+  value: TraitRow;
+  onChange: (v: TraitRow) => void;
+  effects: { pregio: EffectDraft[]; difetto: EffectDraft[] };
+  onEffects: (fx: { pregio: EffectDraft[]; difetto: EffectDraft[] }) => void;
+  skills: DragonSkill[];
+}) {
   const set = (k: keyof TraitRow, x: string) => onChange({ ...value, [k]: x });
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <div className="space-y-1.5">
         <input value={value.pregio} onChange={(e) => set("pregio", e.target.value)} maxLength={60} placeholder="Pregio" aria-label="Pregio" className="input py-1 text-[#e8cf9c]" />
         <textarea value={value.pregio_text} onChange={(e) => set("pregio_text", e.target.value)} rows={2} placeholder="Come si vede nel carattere del drago" aria-label="Frase del pregio" className="input text-sm" />
+        <EffectsEditor list={effects.pregio} onChange={(l) => onEffects({ ...effects, pregio: l })} skills={skills} />
       </div>
       <div className="space-y-1.5">
         <input value={value.difetto} onChange={(e) => set("difetto", e.target.value)} maxLength={60} placeholder="Difetto opposto" aria-label="Difetto" className="input py-1 text-red-300" />
         <textarea value={value.difetto_text} onChange={(e) => set("difetto_text", e.target.value)} rows={2} placeholder="Come si vede nel carattere del drago" aria-label="Frase del difetto" className="input text-sm" />
+        <EffectsEditor list={effects.difetto} onChange={(l) => onEffects({ ...effects, difetto: l })} skills={skills} />
       </div>
+    </div>
+  );
+}
+
+// Effetti di un tratto: cosa influenza, di quanto e (se serve) quando
+function EffectsEditor({ list, onChange, skills }: { list: EffectDraft[]; onChange: (l: EffectDraft[]) => void; skills: DragonSkill[] }) {
+  const update = (i: number, patch: Partial<EffectDraft>) => onChange(list.map((e, k) => (k === i ? { ...e, ...patch } : e)));
+  return (
+    <div className="space-y-1.5 border-l-2 border-border/70 pl-2">
+      <p className="text-[11px] tracking-wider text-muted uppercase">Effetti nei tiri</p>
+      {list.map((e, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-1.5">
+          <select value={e.target} onChange={(ev) => update(i, { target: ev.target.value })} aria-label="Cosa influenza" className="input w-44! py-1 text-xs">
+            <optgroup label="Caratteristiche">
+              {STATS.map((s) => (
+                <option key={s.key} value={`caratteristica:${s.key}`}>
+                  {s.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Abilità">
+              {skills.map((s) => (
+                <option key={s.key} value={`abilita:${s.key}`}>
+                  {s.label}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+          <input
+            type="number"
+            min={-10}
+            max={10}
+            value={e.modifier}
+            onChange={(ev) => update(i, { modifier: Math.max(-10, Math.min(10, Math.trunc(Number(ev.target.value) || 0))) })}
+            aria-label="Modificatore"
+            className={`input w-16! py-1 text-xs ${e.modifier > 0 ? "text-green-300" : e.modifier < 0 ? "text-red-300" : ""}`}
+          />
+          <input
+            value={e.condition}
+            onChange={(ev) => update(i, { condition: ev.target.value })}
+            maxLength={120}
+            placeholder="Quando (facoltativo)"
+            aria-label="Condizione"
+            className="input min-w-28 flex-1 py-1 text-xs"
+          />
+          <button type="button" onClick={() => onChange(list.filter((_, k) => k !== i))} aria-label="Togli effetto" className="px-1 text-muted hover:text-red-400">
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...list, { target: "caratteristica:vigore", modifier: 1, condition: "" }])}
+        className="text-xs text-accent hover:underline"
+      >
+        + Aggiungi effetto
+      </button>
     </div>
   );
 }

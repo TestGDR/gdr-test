@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { TraitEffect } from "@/lib/dragons";
 import { createClient } from "@/lib/supabase/client";
 
 // Abilita' dei draghi: le decide lo staff (Gestione -> Draghi -> Abilita').
@@ -41,4 +42,30 @@ export function useDragonSkills() {
     };
   }, []);
   return skills;
+}
+
+// Effetti di pregi e difetti (stesso meccanismo: caricati una volta e condivisi)
+let effectsCache: Promise<TraitEffect[]> | null = null;
+
+export function invalidateDragonEffects() {
+  effectsCache = null;
+}
+
+export function useDragonEffects() {
+  const [effects, setEffects] = useState<TraitEffect[]>([]);
+  useEffect(() => {
+    let alive = true;
+    effectsCache ??= Promise.resolve(
+      createClient()
+        .from("dragon_trait_effects")
+        .select("*")
+        .order("id")
+        .then(({ data }) => (data ?? []) as TraitEffect[]),
+    );
+    effectsCache.then((e) => alive && setEffects(e));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return effects;
 }

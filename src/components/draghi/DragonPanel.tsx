@@ -5,14 +5,18 @@ import {
   MAX_VALUE,
   STATS,
   colorHex,
+  dragonModifiers,
   dragonName,
+  effectLabel,
+  signed,
   monthlyUpkeep,
   nextStage,
   stageLabel,
   type Dragon,
   type DragonStage,
+  type Modifier,
 } from "@/lib/dragons";
-import { useDragonSkills } from "@/lib/dragon-skills";
+import { useDragonEffects, useDragonSkills } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 import { saveDragonImage } from "./actions";
 
@@ -141,6 +145,7 @@ function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
 // caratteristiche nei cerchi piccoli, targhette in basso
 // ---------------------------------------------------------------------
 function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: DragonStage[]; riderName: string }) {
+  const mods = useMods(dragon);
   const cost = stages.find((s) => s.stage === dragon.stage)?.px_to_next ?? null;
   const next = nextStage(dragon.stage, stages);
   return (
@@ -159,10 +164,11 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
       {/* caratteristiche: due per lato, come su una scheda incisa */}
       <div className="mx-auto flex max-w-xl items-start justify-between px-2">
         {STATS.map((s, i) => (
-          <div key={s.key} className={`flex flex-col items-center gap-1 ${i === 1 || i === 2 ? "mt-6" : ""}`}>
+          <div key={s.key} className={`relative flex flex-col items-center gap-1 ${i === 1 || i === 2 ? "mt-6" : ""}`}>
             <Ring size="h-14 w-14">
               <span className="font-serif text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
+            <ModBadge mod={mods[`caratteristica:${s.key}`]} />
             <span className="text-[10px] tracking-[0.2em] text-[#6b4a2e] uppercase">{s.label}</span>
           </div>
         ))}
@@ -233,12 +239,14 @@ function DragonGlyph({ colors }: { colors: (string | null)[] }) {
 // ---------------------------------------------------------------------
 function Skills({ dragon }: { dragon: Dragon }) {
   const skills = useDragonSkills();
+  const mods = useMods(dragon);
   return (
     <div className="space-y-5">
       <SectionTitle>Abilità</SectionTitle>
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
         {skills.map((s) => (
-          <div key={s.key} className="flex flex-col items-center gap-2">
+          <div key={s.key} className="relative flex flex-col items-center gap-2">
+            <ModBadge mod={mods[`abilita:${s.key}`]} big />
             <BigRing
               label={s.label}
               value={dragon.skills[s.key] ?? 0}
@@ -250,10 +258,11 @@ function Skills({ dragon }: { dragon: Dragon }) {
       <SectionTitle>Caratteristiche</SectionTitle>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {STATS.map((s) => (
-          <div key={s.key} className="flex flex-col items-center gap-1">
+          <div key={s.key} className="relative flex flex-col items-center gap-1">
             <Ring size="h-14 w-14">
               <span className="font-serif text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
+            <ModBadge mod={mods[`caratteristica:${s.key}`]} />
             <span className="text-[10px] tracking-[0.2em] text-[#6b4a2e] uppercase">{s.label}</span>
           </div>
         ))}
@@ -288,6 +297,25 @@ function Character({ dragon }: { dragon: Dragon }) {
 // Pregi e difetti, con la loro descrizione
 // ---------------------------------------------------------------------
 function Traits({ dragon, traits }: { dragon: Dragon; traits: TraitInfo[] }) {
+  const effects = useDragonEffects();
+  const skills = useDragonSkills();
+  const skillLabel = (k: string) => skills.find((s) => s.key === k)?.label ?? k;
+  const list = (side: "pregio" | "difetto", trait: string) => {
+    const mine = effects.filter((e) => e.side === side && e.trait === trait);
+    if (mine.length === 0) return null;
+    return (
+      <ul className="mt-1 flex flex-wrap gap-1.5">
+        {mine.map((e) => (
+          <li
+            key={e.id}
+            className={`border px-2 py-0.5 text-xs font-semibold ${e.modifier > 0 ? "border-[#2f5a2a]/60 text-[#2f5a2a]" : "border-[#8b2a14]/60 text-[#8b2a14]"}`}
+          >
+            {effectLabel(e, skillLabel)}
+          </li>
+        ))}
+      </ul>
+    );
+  };
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <SectionTitle>Pregi</SectionTitle>
@@ -296,6 +324,7 @@ function Traits({ dragon, traits }: { dragon: Dragon; traits: TraitInfo[] }) {
           <li key={p}>
             <Ribbon>{p}</Ribbon>
             <p className="mt-1.5 text-sm leading-relaxed">{traits.find((t) => t.pregio === p)?.pregio_text}</p>
+            {list("pregio", p)}
           </li>
         ))}
       </ul>
@@ -305,6 +334,7 @@ function Traits({ dragon, traits }: { dragon: Dragon; traits: TraitInfo[] }) {
           <li key={d}>
             <Ribbon tone="red">{d}</Ribbon>
             <p className="mt-1.5 text-sm leading-relaxed">{traits.find((t) => t.difetto === d)?.difetto_text}</p>
+            {list("difetto", d)}
           </li>
         ))}
       </ul>
@@ -478,6 +508,32 @@ function Growth({ dragon, stages, px, onChanged }: { dragon: Dragon; stages: Dra
         </section>
       )}
     </div>
+  );
+}
+
+// Modificatori del drago dai suoi pregi e difetti
+function useMods(dragon: Dragon) {
+  const effects = useDragonEffects();
+  return dragonModifiers(dragon, effects);
+}
+
+// Bollino accanto a un valore: modificatore fisso (+1 / -2), oppure "*" se ce
+// ne sono solo con una condizione. Passandoci sopra si legge da dove vengono.
+function ModBadge({ mod, big }: { mod?: Modifier; big?: boolean }) {
+  const skills = useDragonSkills();
+  if (!mod) return null;
+  const skillLabel = (k: string) => skills.find((s) => s.key === k)?.label ?? k;
+  const title = mod.sources.map((e) => `${e.trait}: ${effectLabel(e, skillLabel)}`).join("\n");
+  const text = mod.total !== 0 ? signed(mod.total) : "*";
+  return (
+    <span
+      title={title}
+      className={`absolute z-10 rounded-full border px-1.5 text-xs font-bold shadow ${big ? "top-5 right-3" : "-top-1 -right-2"} ${
+        mod.total > 0 ? "border-[#2f5a2a] bg-[#dfe8c8] text-[#2f5a2a]" : mod.total < 0 ? "border-[#8b2a14] bg-[#f1d2c4] text-[#8b2a14]" : "border-[#6b4a2e] bg-[#f4e9cd] text-[#6b4a2e]"
+      }`}
+    >
+      {text}
+    </span>
   );
 }
 
