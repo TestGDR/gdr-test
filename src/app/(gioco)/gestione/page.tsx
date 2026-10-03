@@ -24,6 +24,12 @@ const PANELS = [
     description: "Pulizia di chat, missive e OFF vecchi; eliminazione dei personaggi inattivi.",
   },
   {
+    permission: ["chat.log", "messaggi.log"],
+    href: "/gestione/log",
+    title: "Log",
+    description: "Cerca e scarica i log delle chat, delle missive (ON) e dei messaggi OFF.",
+  },
+  {
     permission: "gestione.accessi",
     href: "/gestione/accessi",
     title: "Registro accessi",
@@ -57,7 +63,7 @@ const PANELS = [
 
 export default async function GestionePage() {
   const { isAdmin, role, permissions } = await getStaffContext();
-  const visible = PANELS.filter((p) => permissions.has(p.permission));
+  const visible = PANELS.filter((p) => [p.permission].flat().some((k) => permissions.has(k)));
   // Senza nessun pannello (giocatori, master) la pagina "non esiste"
   if (visible.length === 0) notFound();
 

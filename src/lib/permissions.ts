@@ -42,8 +42,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     items: [
       { key: "chat.narrazione", label: "Narrazione master", description: "Scrivere messaggi di narrazione nelle liste" },
       { key: "chat.moderare", label: "Moderare le liste", description: "Eliminare messaggi scritti da altri" },
-      { key: "chat.log", label: "Log chat", description: "Cercare e scaricare i log delle liste", soon: true },
-      { key: "messaggi.log", label: "Log messaggi", description: "Archivio di missive e messaggi OFF", soon: true },
+      { key: "chat.log", label: "Log chat", description: "Cercare e scaricare i log delle chat di gioco" },
+      { key: "messaggi.log", label: "Log messaggi", description: "Cercare e scaricare missive (ON) e messaggi OFF" },
     ],
   },
   {
@@ -74,4 +74,6 @@ export const MANAGEMENT_PERMISSIONS = [
   "draghi.gestire",
   "utenti.gestire",
   "manutenzione.sito",
+  "chat.log",
+  "messaggi.log",
 ];
