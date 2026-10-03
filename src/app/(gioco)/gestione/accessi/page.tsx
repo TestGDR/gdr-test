@@ -17,10 +17,71 @@ type AccessRow = {
   profile: { username: string | null } | null;
 };
 
+type ActivityRow = {
+  character_id: string;
+  name: string;
+  status: string;
+  activated_at: string | null;
+  last_entry: string | null;
+  last_chat_action: string | null;
+};
+
 const LIMIT = 500;
 
-export default async function AccessiPage() {
+const TABS = [
+  ["accessi", "Accessi"],
+  ["attivita", "Attività dei personaggi"],
+] as const;
+
+const dateTime = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("it-IT", {
+        timeZone: "Europe/Rome",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+export default async function AccessiPage({ searchParams }: PageProps<"/gestione/accessi">) {
   const { supabase } = await requirePermission("gestione.accessi");
+  const view = (await searchParams).vista === "attivita" ? "attivita" : "accessi";
+
+  const header = (
+    <>
+      <GameArea title="Registro accessi" />
+      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
+        ← Gestione
+      </Link>
+      <h1 className="font-serif text-3xl text-accent">Registro accessi</h1>
+      <nav className="flex gap-1 border-b border-border">
+        {TABS.map(([id, label]) => (
+          <Link
+            key={id}
+            href={id === "accessi" ? "/gestione/accessi" : "/gestione/accessi?vista=attivita"}
+            aria-current={view === id ? "page" : undefined}
+            className={`-mb-px border-b-2 px-4 py-2.5 text-xs tracking-[0.12em] uppercase transition ${
+              view === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+    </>
+  );
+
+  if (view === "attivita") {
+    const { data, error } = await supabase.rpc("staff_character_activity");
+    return (
+      <div className="space-y-6">
+        {header}
+        <CharacterActivity rows={(data ?? []) as ActivityRow[]} failed={!!error} />
+      </div>
+    );
+  }
 
   const { data } = await supabase
     .from("access_logs")
@@ -41,11 +102,7 @@ export default async function AccessiPage() {
 
   return (
     <div className="space-y-8">
-      <GameArea title="Registro accessi" />
-      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
-        ← Gestione
-      </Link>
-      <h1 className="font-serif text-3xl text-accent">Registro accessi</h1>
+      {header}
 
       <section className="panel">
         <h2 className="mb-3 font-serif text-xl">IP condivisi da più account</h2>
@@ -107,5 +164,48 @@ function VpnBadge({ row }: { row: AccessRow }) {
       {row.vpn_type ?? "Sì"}
       {row.risk !== null && ` · rischio ${row.risk}`}
     </span>
+  );
+}
+
+// Personaggi: data di creazione (approvazione), ultimo ingresso in land, ultima azione in chat
+function CharacterActivity({ rows, failed }: { rows: ActivityRow[]; failed: boolean }) {
+  if (failed) return <p className="text-red-400">Impossibile caricare le attività dei personaggi.</p>;
+  return (
+    <section className="space-y-3">
+      <p className="text-sm text-muted">
+        <strong className="text-foreground">Ultimo login</strong>: l&apos;ultima volta che il giocatore è entrato in land.{" "}
+        <strong className="text-foreground">Ultima azione</strong>: l&apos;ultima azione scritta in una chat di gioco.{" "}
+        <strong className="text-foreground">Creazione</strong>: il giorno in cui il personaggio è stato approvato e ha potuto giocare.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-panel text-muted">
+            <tr>
+              <th className="p-2">Personaggio</th>
+              <th className="p-2">Creazione</th>
+              <th className="p-2">Ultimo login</th>
+              <th className="p-2">Ultima azione</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.character_id} className="border-t border-border">
+                <td className="p-2 font-serif">{r.name}</td>
+                <td className="whitespace-nowrap p-2">
+                  {r.status === "attivo" ? (
+                    (dateTime(r.activated_at) ?? "—")
+                  ) : (
+                    <span className="text-orange-300">non ancora approvato</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap p-2">{dateTime(r.last_entry) ?? <span className="text-muted">mai</span>}</td>
+                <td className="whitespace-nowrap p-2">{dateTime(r.last_chat_action) ?? <span className="text-muted">nessuna</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <p className="p-4 text-muted">Nessun personaggio.</p>}
+      </div>
+    </section>
   );
 }
