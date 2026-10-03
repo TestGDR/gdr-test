@@ -343,16 +343,16 @@ function DragonEditor({
 
           <Field label="Carattere">
             <div className="space-y-1.5">
-              <textarea value={d.temperament} onChange={(e) => set("temperament", e.target.value)} rows={5} className="input" />
+              <textarea value={d.temperament} onChange={(e) => set("temperament", e.target.value)} rows={8} className="input" />
               <button
                 type="button"
                 onClick={async () => {
-                  const { data } = await supabase.rpc("dragon_random_temperament");
+                  const { data } = await supabase.rpc("dragon_compose_temperament", { p_pregi: d.pregi, p_difetti: d.difetti });
                   if (typeof data === "string") set("temperament", data);
                 }}
                 className="text-xs text-accent hover:underline"
               >
-                ⟳ Nuovo carattere a caso
+                ⟳ Nuovo carattere a caso, con i pregi e difetti scelti qui sopra
               </button>
             </div>
           </Field>

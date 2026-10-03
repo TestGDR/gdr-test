@@ -85,19 +85,26 @@ export default function DragonCard({
   );
 }
 
-// Carattere: "Titolo — descrizione" (il titolo in evidenza)
+// Carattere: "Titolo — descrizione" (il titolo in evidenza), poi un paragrafo
+// con come si vedono pregi e difetto nel comportamento
 function Temperament({ text }: { text: string }) {
-  const [title, ...rest] = text.split(" — ");
+  const [main, ...traits] = text.split(/\n\s*\n/);
+  const [title, ...rest] = main.split(" — ");
   return (
-    <div className="border-l-2 border-accent/60 pl-3 text-sm leading-relaxed">
-      <h4 className="mb-1 font-serif tracking-wider text-accent uppercase">Carattere</h4>
+    <div className="space-y-2 border-l-2 border-accent/60 pl-3 text-sm leading-relaxed">
+      <h4 className="font-serif tracking-wider text-accent uppercase">Carattere</h4>
       {rest.length > 0 ? (
         <p>
           <strong className="font-serif text-[#e8cf9c]">{title}</strong> — <span className="text-foreground/90 italic">{rest.join(" — ")}</span>
         </p>
       ) : (
-        <p className="text-foreground/90 italic">{text}</p>
+        <p className="text-foreground/90 italic">{main}</p>
       )}
+      {traits.map((t, i) => (
+        <p key={i} className="text-foreground/90 italic">
+          {t}
+        </p>
+      ))}
     </div>
   );
 }
