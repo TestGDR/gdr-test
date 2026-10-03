@@ -148,7 +148,7 @@ body {
   @apply rounded-lg border border-border bg-panel p-5;
 }
 
-/* Sfondo del gioco: pietra scura (public/images/pietra.jpg, tessera 948x1821)
+/* Sfondo del gioco: pietra scura (public/images/pietra.jpg, tessera 557x605)
    in trasparenza sul nero, con una vignettatura verso i bordi */
 .stone-bg {
   background-color: var(--background);
@@ -159,7 +159,7 @@ body {
   inset: 0;
   /* tessera senza giunture (bordi difettosi tolti e lati sfumati uno nell'altro),
      alle dimensioni originali e ripetuta: resta nitida */
-  background: url("/images/pietra.jpg") top left / 948px 1821px repeat;
+  background: url("/images/pietra.jpg") top left / 557px 605px repeat;
   opacity: 0.55;
 }
 .stone-bg::after {
