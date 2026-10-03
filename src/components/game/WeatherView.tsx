@@ -110,26 +110,6 @@ export default function WeatherView({ regionId }: { regionId: string | null }) {
             })}
           </div>
 
-          {/* ora per ora */}
-          <div className="overflow-x-auto pb-1">
-            <ol className="flex min-w-max gap-1">
-              {day.hours.map((x, h) => (
-                <li
-                  key={h}
-                  title={`${String(h).padStart(2, "0")}:00 · ${condition(x.cond).label}, ${x.temp}°`}
-                  className={`flex w-11 flex-col items-center border py-1.5 text-xs ${h === hour ? "border-accent bg-blood/20 text-foreground" : "border-border/60 text-muted"}`}
-                >
-                  <span>{String(h).padStart(2, "0")}</span>
-                  <span className="text-lg" aria-hidden>
-                    {conditionIcon(x.cond, h)}
-                  </span>
-                  <span className="text-foreground">{x.temp}°</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          {region?.climate && <p className="text-xs leading-relaxed text-muted italic">{region.climate}</p>}
         </>
       )}
     </div>
