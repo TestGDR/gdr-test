@@ -45,6 +45,7 @@ import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
 import SalaryCollector from "./SalaryCollector";
+import WeatherView from "./WeatherView";
 import DragonPanel from "@/components/draghi/DragonPanel";
 import Modal from "@/components/ui/Modal";
 
@@ -52,12 +53,12 @@ import Modal from "@/components/ui/Modal";
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
 // ogni pagina del gioco la imposta con <GameArea title="..." />
 // ---------------------------------------------------------------------
-type Area = { title: string; image?: string | null; description?: string | null };
+type Area = { title: string; image?: string | null; description?: string | null; weatherRegionId?: string | null };
 const AreaContext = createContext<(area: Area) => void>(() => {});
 
-export function GameArea({ title, image, description }: Area) {
+export function GameArea({ title, image, description, weatherRegionId }: Area) {
   const setArea = useContext(AreaContext);
-  useEffect(() => setArea({ title, image, description }), [setArea, title, image, description]);
+  useEffect(() => setArea({ title, image, description, weatherRegionId }), [setArea, title, image, description, weatherRegionId]);
   return null;
 }
 
@@ -396,6 +397,7 @@ function LeftColumn({
         <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 flex-col gap-1.5">
           <ModalButton
             title="Meteo"
+            size="lg"
             className={areaBtn}
             label={
               <>
@@ -405,11 +407,7 @@ function LeftColumn({
               </>
             }
           >
-            {() => (
-              <p className="py-6 text-center text-muted">
-                Il <strong className="text-accent">meteo</strong> di {area.title} è in preparazione.
-              </p>
-            )}
+            {() => <WeatherView regionId={area.weatherRegionId ?? null} />}
           </ModalButton>
           <ModalButton
             title={area.title}

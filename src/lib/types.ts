@@ -32,6 +32,7 @@ export type GameMap = {
   image_url: string;
   sort_order: number;
   active: boolean; // i giocatori vedono solo le mappe attive
+  weather_region_id: string | null; // regione climatica (meteo)
 };
 
 export type Location = {

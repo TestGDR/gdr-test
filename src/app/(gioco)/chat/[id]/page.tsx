@@ -22,6 +22,9 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   if (!room) notFound();
 
   const back = `/mappa?id=${room.location.map_id}&luogo=${room.location.id}`;
+  // meteo: quello della regione della mappa a cui appartiene la chat
+  const { data: mapInfo } = await supabase.from("maps").select("weather_region_id").eq("id", room.location.map_id).maybeSingle();
+  const weatherRegionId = (mapInfo?.weather_region_id as string | null) ?? null;
   const image = room.image_url ?? room.location.image_url;
   const isPrivate = room.access !== "pubblica";
 
@@ -60,7 +63,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   if (!canEnter) {
     return (
       <div className="mx-auto mt-6 max-w-xl text-center">
-        <GameArea title={room.name} image={image} description={room.description} />
+        <GameArea title={room.name} image={image} description={room.description} weatherRegionId={weatherRegionId} />
         {header}
         <p className="panel text-muted">
           {room.access === "casata"
@@ -81,7 +84,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
 
   return (
     <div className="flex h-full min-h-[24rem] flex-col">
-      <GameArea title={room.name} image={image} description={room.description} />
+      <GameArea title={room.name} image={image} description={room.description} weatherRegionId={weatherRegionId} />
       {header}
       {isPrivate && (
         <RoomAccessBar

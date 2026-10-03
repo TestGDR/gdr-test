@@ -43,7 +43,7 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <GameArea title={map.name} image={map.image_url} description={map.description} />
+      <GameArea title={map.name} image={map.image_url} description={map.description} weatherRegionId={map.weather_region_id} />
       {character?.status !== "attivo" && <InactiveBanner />}
 
       {allMaps.length > 1 && (

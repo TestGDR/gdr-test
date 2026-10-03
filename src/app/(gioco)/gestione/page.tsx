@@ -31,6 +31,12 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
+    href: "/gestione/meteo",
+    title: "Meteo",
+    description: "Regioni climatiche, stagione attuale, semi (modelli di giornata) e meteo di oggi.",
+  },
+  {
+    permission: "mondo.gestire",
     href: "/gestione/mondo",
     title: "Gestione mondo",
     description: "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",
