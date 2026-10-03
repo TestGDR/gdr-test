@@ -27,7 +27,7 @@ const PANELS = [
     permission: "draghi.gestire",
     href: "/gestione/draghi",
     title: "Draghi",
-    description: "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e PX dei personaggi.",
+    description: "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e punteggi.",
   },
   {
     permission: "mondo.gestire",

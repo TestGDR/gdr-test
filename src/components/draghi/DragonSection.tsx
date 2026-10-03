@@ -62,7 +62,6 @@ export default function DragonSection({
   return (
     <section className="space-y-3">
       <h4 className="font-serif text-accent">Drago</h4>
-      {isOwn && <p className="text-xs text-muted">PX disponibili: <strong className="text-foreground">{data.px}</strong></p>}
       {data.dragon ? (
         <DragonCard
           dragon={data.dragon}

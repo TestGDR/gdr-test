@@ -32,7 +32,6 @@ type Props = {
 const TABS = [
   { id: "draghi", label: "Draghi" },
   { id: "fasi", label: "Fasi e costi" },
-  { id: "px", label: "PX dei personaggi" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -78,7 +77,6 @@ export default function DragonsManager(props: Props) {
       <div className="p-4">
         {tab === "draghi" && <DragonsTab {...props} />}
         {tab === "fasi" && <StagesTab stages={props.stages} />}
-        {tab === "px" && <PxTab pgs={props.pgs} houses={props.houses} />}
       </div>
     </section>
   );
@@ -649,65 +647,6 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
         </button>
         {feedback}
       </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
-// PX dei personaggi (per ora assegnati a mano dallo staff)
-// ---------------------------------------------------------------------
-function PxTab({ pgs, houses }: { pgs: PgLite[]; houses: HouseLite[] }) {
-  const { supabase, run, busy, feedback } = useOp();
-  const [query, setQuery] = useState("");
-  const [amount, setAmount] = useState<Record<string, string>>({});
-  const [reason, setReason] = useState("");
-  const q = query.trim().toLowerCase();
-  const list = pgs.filter((p) => p.status === "attivo" && (!q || p.name.toLowerCase().includes(q)));
-
-  return (
-    <div className="max-w-3xl space-y-4">
-      <p className="text-sm text-muted">
-        I PX si spendono per far crescere i draghi. Per ora li assegna lo staff: un numero negativo li toglie. Ogni movimento resta
-        registrato.
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca un personaggio..." className="input w-64" />
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (es. giocata del 3 ottobre)" maxLength={200} className="input min-w-64 flex-1" />
-      </div>
-      {feedback}
-      <ul className="divide-y divide-border/60 border border-border/60">
-        {list.map((p) => (
-          <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
-            <span className="min-w-40 flex-1 font-serif">
-              {p.name} <span className="text-xs text-muted">{houses.find((h) => h.id === p.house_id)?.name ?? ""}</span>
-            </span>
-            <span className="w-20 text-right">
-              <strong>{p.px}</strong> PX
-            </span>
-            <input
-              type="number"
-              value={amount[p.id] ?? ""}
-              onChange={(e) => setAmount((a) => ({ ...a, [p.id]: e.target.value }))}
-              placeholder="+/-"
-              aria-label={`PX da dare a ${p.name}`}
-              className="input w-24 py-1"
-            />
-            <button
-              type="button"
-              disabled={busy || !Number(amount[p.id])}
-              onClick={async () => {
-                const n = Math.trunc(Number(amount[p.id]));
-                if (await run(() => supabase.rpc("staff_grant_px", { p_character: p.id, p_amount: n, p_reason: reason }), `PX aggiornati per ${p.name}.`))
-                  setAmount((a) => ({ ...a, [p.id]: "" }));
-              }}
-              className="btn px-3 py-1 text-xs"
-            >
-              Assegna
-            </button>
-          </li>
-        ))}
-        {list.length === 0 && <li className="px-3 py-3 text-sm text-muted">Nessun personaggio attivo trovato.</li>}
-      </ul>
     </div>
   );
 }
