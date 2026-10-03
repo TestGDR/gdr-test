@@ -258,7 +258,6 @@ export default function GameShell({
               onOpenMessages={openMessages}
               onOpenOnline={() => setOnlineOpen(true)}
               onOpenSheet={setSheetId}
-              onOpenDragon={() => setDragonOpen((n) => n + 1)}
               mobileTools={
                 <MobileTools
                   canManage={canManage}
@@ -288,7 +287,7 @@ export default function GameShell({
                 : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
-            <RightRail canManage={canManage} />
+            <RightRail canManage={canManage} onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null} />
           </nav>
         </div>
       </div>
@@ -362,7 +361,6 @@ function LeftColumn({
   onChangeAvailability,
   onOpenSheet,
   mobileTools,
-  onOpenDragon,
 }: {
   area: Area;
   userId: string;
@@ -374,7 +372,6 @@ function LeftColumn({
   onOpenOnline: () => void;
   onChangeAvailability: (value: Availability) => void;
   onOpenSheet: (characterId: string) => void;
-  onOpenDragon: () => void;
   mobileTools: ReactNode;
 }) {
   // Chi e' nel mio stesso posto (stessa mappa o stessa lista)
@@ -460,9 +457,6 @@ function LeftColumn({
               onClick={() => onOpenMessages("off")}
             >
               <BubbleIcon />
-            </MessageButton>
-            <MessageButton label="Il mio drago" count={0} onClick={onOpenDragon}>
-              <DragonIcon />
             </MessageButton>
           </div>
         )}
@@ -862,7 +856,7 @@ function Tip({ children }: { children: ReactNode }) {
   );
 }
 
-function RightRail({ canManage }: { canManage: boolean }) {
+function RightRail({ canManage, onOpenDragon }: { canManage: boolean; onOpenDragon: (() => void) | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
@@ -887,6 +881,13 @@ function RightRail({ canManage }: { canManage: boolean }) {
           <MapIcon />
           <Tip>Mappa</Tip>
         </Link>
+        {/* Il mio drago (su cellulare sta nel menu dell'hamburger) */}
+        {onOpenDragon && (
+          <button type="button" onClick={onOpenDragon} className={`${railBtn} max-md:hidden`} aria-label="Il mio drago">
+            <DragonIcon />
+            <Tip>Il mio drago</Tip>
+          </button>
+        )}
         {/* Pannelli di gestione: solo moderatori e admin (su cellulare stanno nel pannello) */}
         {canManage && (
           <Link href="/gestione" className={`${railBtn} ${active("/gestione")} max-md:hidden`} aria-label="Gestione">
