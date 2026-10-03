@@ -41,15 +41,6 @@ export const STATS = [
   { key: "percezione", label: "Percezione" },
 ] as const;
 
-export const SKILLS = [
-  { key: "volare", label: "Volare" },
-  { key: "attacco_fisico", label: "Attacco fisico" },
-  { key: "attacco_infuocato", label: "Attacco infuocato" },
-  { key: "schivare", label: "Schivare" },
-  { key: "fermezza", label: "Fermezza" },
-  { key: "sensi", label: "Sensi" },
-] as const;
-
 export const MAX_VALUE = 10; // tetto di caratteristiche e abilita' (lo impone anche il database)
 
 // Colori delle scaglie, con una tinta per i pallini

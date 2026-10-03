@@ -3,7 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   MAX_VALUE,
-  SKILLS,
   STATS,
   colorHex,
   colorLabel,
@@ -14,6 +13,7 @@ import {
   type Dragon,
   type DragonStage,
 } from "@/lib/dragons";
+import { useDragonSkills } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 import { saveDragonImage } from "./actions";
 
@@ -152,10 +152,11 @@ function ColorDots({ dragon }: { dragon: Dragon }) {
 }
 
 function ValuesGrid({ dragon }: { dragon: Dragon }) {
+  const skills = useDragonSkills();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} />
-      <ValueList title="Abilità" items={SKILLS} values={dragon.skills} />
+      <ValueList title="Abilità" items={skills} values={dragon.skills} />
     </div>
   );
 }
@@ -207,6 +208,7 @@ function ValueList({
 // Distribuzione dei punti liberi (dopo una crescita)
 function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: number; onSaved?: () => void }) {
   const supabase = useMemo(() => createClient(), []);
+  const skills = useDragonSkills();
   const [alloc, setAlloc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,7 +259,7 @@ function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: n
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} extra={alloc} renderControl={control} />
-        <ValueList title="Abilità" items={SKILLS} values={dragon.skills} extra={alloc} renderControl={control} />
+        <ValueList title="Abilità" items={skills} values={dragon.skills} extra={alloc} renderControl={control} />
       </div>
       <div className="flex items-center gap-3">
         <button type="button" onClick={save} disabled={busy || used === 0} className="btn px-4 py-1.5 text-sm">

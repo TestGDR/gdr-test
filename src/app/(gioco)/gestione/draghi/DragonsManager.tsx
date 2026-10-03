@@ -7,7 +7,6 @@ import { saveDragonImage } from "@/components/draghi/actions";
 import {
   DRAGON_COLORS,
   MAX_VALUE,
-  SKILLS,
   STATS,
   dragonName,
   monthlyUpkeep,
@@ -16,6 +15,7 @@ import {
   type DragonStage,
   type TraitPair,
 } from "@/lib/dragons";
+import { invalidateDragonSkills, type DragonSkill } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 
 export type HouseLite = { id: string; name: string; sigil_url: string | null };
@@ -25,13 +25,18 @@ type Props = {
   houses: HouseLite[];
   dragons: Dragon[];
   stages: DragonStage[];
-  traits: TraitPair[];
+  traits: TraitRow[];
   pgs: PgLite[];
+  skills: DragonSkill[];
+  temperaments: TemperamentRow[];
 };
 
 const TABS = [
   { id: "draghi", label: "Draghi" },
   { id: "fasi", label: "Fasi e costi" },
+  { id: "abilita", label: "Abilità" },
+  { id: "tratti", label: "Pregi e difetti" },
+  { id: "caratteri", label: "Caratteri" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -77,6 +82,9 @@ export default function DragonsManager(props: Props) {
       <div className="p-4">
         {tab === "draghi" && <DragonsTab {...props} />}
         {tab === "fasi" && <StagesTab stages={props.stages} />}
+        {tab === "abilita" && <SkillsTab skills={props.skills} />}
+        {tab === "tratti" && <TraitsTab traits={props.traits} />}
+        {tab === "caratteri" && <TemperamentsTab temperaments={props.temperaments} />}
       </div>
     </section>
   );
@@ -85,7 +93,7 @@ export default function DragonsManager(props: Props) {
 // ---------------------------------------------------------------------
 // Draghi per casata
 // ---------------------------------------------------------------------
-function DragonsTab({ houses, dragons, stages, traits, pgs }: Props) {
+function DragonsTab({ houses, dragons, stages, traits, pgs, skills, temperaments }: Props) {
   const { supabase, run, busy, feedback } = useOp();
   const [selectedId, setSelectedId] = useState<string | null>(dragons[0]?.id ?? null);
   const [newStage, setNewStage] = useState<Record<string, string>>({});
@@ -190,7 +198,7 @@ function DragonsTab({ houses, dragons, stages, traits, pgs }: Props) {
       </aside>
 
       {selected ? (
-        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs }} onDeleted={() => setSelectedId(null)} />
+        <DragonEditor key={selected.id + selected.stage + selected.status} dragon={selected} {...{ houses, dragons, stages, traits, pgs, skills, temperaments }} onDeleted={() => setSelectedId(null)} />
       ) : (
         <p className="text-muted">Scegli un drago dall&apos;elenco, oppure assegna la dotazione iniziale a una casata.</p>
       )}
@@ -205,6 +213,7 @@ function DragonEditor({
   stages,
   traits,
   pgs,
+  skills,
   onDeleted,
 }: Props & { dragon: Dragon; onDeleted: () => void }) {
   const { supabase, run, busy, feedback } = useOp();
@@ -359,7 +368,7 @@ function DragonEditor({
 
           <div className="grid gap-5 sm:grid-cols-2">
             <NumberGrid title="Caratteristiche" items={STATS} values={d.stats} onChange={(v) => set("stats", v)} />
-            <NumberGrid title="Abilità" items={SKILLS} values={d.skills} onChange={(v) => set("skills", v)} />
+            <NumberGrid title="Abilità" items={skills} values={d.skills} onChange={(v) => set("skills", v)} />
           </div>
           <Field label="Punti ancora da distribuire (dal cavaliere)">
             <input
@@ -657,5 +666,300 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-1 block text-xs tracking-wider text-muted uppercase">{label}</span>
       {children}
     </label>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Abilita': nome e ordine modificabili, si aggiungono e si eliminano
+// ---------------------------------------------------------------------
+function SkillsTab({ skills }: { skills: DragonSkill[] }) {
+  const { supabase, run, busy, feedback } = useOp();
+  const [rows, setRows] = useState(skills);
+  const [label, setLabel] = useState("");
+  const changed = (s: DragonSkill) => skills.find((x) => x.key === s.key)?.label !== s.label;
+
+  // chiave tecnica dal nome: "Attacco di coda" -> "attacco_di_coda"
+  const keyFrom = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[^\w\s]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .slice(0, 40);
+
+  async function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[j]] = [next[j], next[i]];
+    setRows(next);
+    for (const [k, s] of next.entries()) {
+      await supabase.from("dragon_skills").update({ sort_order: k }).eq("key", s.key);
+    }
+    invalidateDragonSkills();
+    run(() => Promise.resolve({ error: null }), "Ordine salvato.");
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <p className="text-sm text-muted">
+        Le abilità dei draghi. Una nuova abilità vale 0 per i draghi già esistenti e riceve punti nelle prossime generazioni e crescite.
+        Eliminandola sparisce dai valori di tutti i draghi.
+      </p>
+      {feedback}
+      <ul className="divide-y divide-border/60 border border-border/60">
+        {rows.map((s, i) => (
+          <li key={s.key} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+            <input
+              value={s.label}
+              onChange={(e) => setRows((r) => r.map((x) => (x.key === s.key ? { ...x, label: e.target.value } : x)))}
+              maxLength={60}
+              aria-label={`Nome dell'abilità ${s.label}`}
+              className="input w-64! py-1"
+            />
+            <span className="text-xs text-muted">{s.key}</span>
+            <span className="ml-auto flex gap-1">
+              <button type="button" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label="Sposta su" className="btn-ghost px-2 py-1 text-xs">
+                ↑
+              </button>
+              <button type="button" disabled={busy || i === rows.length - 1} onClick={() => move(i, 1)} aria-label="Sposta giù" className="btn-ghost px-2 py-1 text-xs">
+                ↓
+              </button>
+              <button
+                type="button"
+                disabled={busy || !changed(s) || !s.label.trim()}
+                onClick={async () => {
+                  if (await run(() => supabase.from("dragon_skills").update({ label: s.label.trim() }).eq("key", s.key), "Abilità rinominata.")) invalidateDragonSkills();
+                }}
+                className="btn px-3 py-1 text-xs"
+              >
+                Salva
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  if (!window.confirm(`Eliminare l'abilità "${s.label}"? Verrà tolta da tutti i draghi.`)) return;
+                  if (await run(() => supabase.from("dragon_skills").delete().eq("key", s.key), "Abilità eliminata.")) {
+                    invalidateDragonSkills();
+                    setRows((r) => r.filter((x) => x.key !== s.key));
+                  }
+                }}
+                className="btn-ghost border-red-900 px-2 py-1 text-xs text-red-400 hover:border-red-500"
+              >
+                Elimina
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const key = keyFrom(label);
+          if (!key) return;
+          const ok = await run(
+            () => supabase.from("dragon_skills").insert({ key, label: label.trim(), sort_order: rows.length }),
+            `Abilità "${label.trim()}" aggiunta.`,
+          );
+          if (ok) {
+            invalidateDragonSkills();
+            setRows((r) => [...r, { key, label: label.trim(), sort_order: r.length }]);
+            setLabel("");
+          }
+        }}
+        className="flex gap-2"
+      >
+        <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} placeholder="Nuova abilità (es. Nuotare)" className="input w-64!" />
+        <button className="btn px-4 text-sm" disabled={busy || !keyFrom(label)}>
+          + Aggiungi
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Pregi e difetti: coppie di opposti, ognuno con la sua frase di carattere
+// ---------------------------------------------------------------------
+export type TraitRow = TraitPair & { pregio_text: string; difetto_text: string };
+
+function TraitsTab({ traits }: { traits: TraitRow[] }) {
+  const { supabase, run, busy, feedback } = useOp();
+  const empty = { pregio: "", difetto: "", pregio_text: "", difetto_text: "" };
+  const [draft, setDraft] = useState<TraitRow>(empty);
+
+  return (
+    <div className="max-w-5xl space-y-4">
+      <p className="text-sm text-muted">
+        Ogni pregio ha il suo difetto opposto: alla generazione non possono uscire insieme. La frase di ciascun tratto entra nel carattere
+        dei nuovi draghi. Se rinomini un tratto il nome si aggiorna anche sui draghi che ce l&apos;hanno; se elimini una coppia, viene tolta
+        dai draghi.
+      </p>
+      {feedback}
+      <ul className="space-y-3">
+        {traits.map((t) => (
+          <TraitPairEditor key={t.pregio} pair={t} busy={busy} run={run} supabase={supabase} />
+        ))}
+      </ul>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await run(() => supabase.from("dragon_trait_pairs").insert({ ...draft, pregio: draft.pregio.trim(), difetto: draft.difetto.trim() }), "Coppia aggiunta."))
+            setDraft(empty);
+        }}
+        className="space-y-2 border border-dashed border-accent/50 p-3"
+      >
+        <p className="text-xs tracking-wider text-muted uppercase">Nuova coppia</p>
+        <TraitFields value={draft} onChange={setDraft} />
+        <button className="btn px-4 py-1.5 text-sm" disabled={busy || !draft.pregio.trim() || !draft.difetto.trim()}>
+          + Aggiungi coppia
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function TraitPairEditor({
+  pair,
+  busy,
+  run,
+  supabase,
+}: {
+  pair: TraitRow;
+  busy: boolean;
+  run: ReturnType<typeof useOp>["run"];
+  supabase: ReturnType<typeof useOp>["supabase"];
+}) {
+  const [v, setV] = useState(pair);
+  const changed = JSON.stringify(v) !== JSON.stringify(pair);
+  return (
+    <li className="space-y-2 border border-border/60 p-3">
+      <TraitFields value={v} onChange={setV} />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy || !changed || !v.pregio.trim() || !v.difetto.trim()}
+          onClick={() =>
+            run(
+              () =>
+                supabase
+                  .from("dragon_trait_pairs")
+                  .update({ pregio: v.pregio.trim(), difetto: v.difetto.trim(), pregio_text: v.pregio_text, difetto_text: v.difetto_text })
+                  .eq("pregio", pair.pregio),
+              "Coppia salvata.",
+            )
+          }
+          className="btn px-3 py-1 text-xs"
+        >
+          Salva
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            window.confirm(`Eliminare la coppia "${pair.pregio}" / "${pair.difetto}"? Verrà tolta dai draghi che la hanno.`) &&
+            run(() => supabase.from("dragon_trait_pairs").delete().eq("pregio", pair.pregio), "Coppia eliminata.")
+          }
+          className="btn-ghost border-red-900 px-2 py-1 text-xs text-red-400 hover:border-red-500"
+        >
+          Elimina coppia
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function TraitFields({ value, onChange }: { value: TraitRow; onChange: (v: TraitRow) => void }) {
+  const set = (k: keyof TraitRow, x: string) => onChange({ ...value, [k]: x });
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <div className="space-y-1.5">
+        <input value={value.pregio} onChange={(e) => set("pregio", e.target.value)} maxLength={60} placeholder="Pregio" aria-label="Pregio" className="input py-1 text-[#e8cf9c]" />
+        <textarea value={value.pregio_text} onChange={(e) => set("pregio_text", e.target.value)} rows={2} placeholder="Come si vede nel carattere del drago" aria-label="Frase del pregio" className="input text-sm" />
+      </div>
+      <div className="space-y-1.5">
+        <input value={value.difetto} onChange={(e) => set("difetto", e.target.value)} maxLength={60} placeholder="Difetto opposto" aria-label="Difetto" className="input py-1 text-red-300" />
+        <textarea value={value.difetto_text} onChange={(e) => set("difetto_text", e.target.value)} rows={2} placeholder="Come si vede nel carattere del drago" aria-label="Frase del difetto" className="input text-sm" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Caratteri di base ("Titolo — descrizione")
+// ---------------------------------------------------------------------
+export type TemperamentRow = { id: number; text: string };
+
+function TemperamentsTab({ temperaments }: { temperaments: TemperamentRow[] }) {
+  const { supabase, run, busy, feedback } = useOp();
+  const [draft, setDraft] = useState("");
+  return (
+    <div className="max-w-4xl space-y-4">
+      <p className="text-sm text-muted">
+        I caratteri da cui pescano i nuovi draghi (uno diverso per drago finché possibile), poi completati dalle frasi dei loro pregi e
+        difetti. Scrivi &quot;Titolo — descrizione&quot;: il titolo comparirà in evidenza. I draghi già nati tengono il loro testo.
+      </p>
+      {feedback}
+      <ul className="space-y-3">
+        {temperaments.map((t) => (
+          <TemperamentEditor key={t.id} row={t} busy={busy} run={run} supabase={supabase} />
+        ))}
+      </ul>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await run(() => supabase.from("dragon_temperaments").insert({ text: draft.trim() }), "Carattere aggiunto.")) setDraft("");
+        }}
+        className="space-y-2 border border-dashed border-accent/50 p-3"
+      >
+        <p className="text-xs tracking-wider text-muted uppercase">Nuovo carattere</p>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} placeholder="Titolo — descrizione del carattere" className="input text-sm" />
+        <button className="btn px-4 py-1.5 text-sm" disabled={busy || !draft.trim()}>
+          + Aggiungi carattere
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function TemperamentEditor({
+  row,
+  busy,
+  run,
+  supabase,
+}: {
+  row: TemperamentRow;
+  busy: boolean;
+  run: ReturnType<typeof useOp>["run"];
+  supabase: ReturnType<typeof useOp>["supabase"];
+}) {
+  const [text, setText] = useState(row.text);
+  return (
+    <li className="space-y-2 border border-border/60 p-3">
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} aria-label="Carattere" className="input text-sm" />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy || text.trim() === row.text || !text.trim()}
+          onClick={() => run(() => supabase.from("dragon_temperaments").update({ text: text.trim() }).eq("id", row.id), "Carattere salvato.")}
+          className="btn px-3 py-1 text-xs"
+        >
+          Salva
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            window.confirm("Eliminare questo carattere? I draghi che l'hanno già lo tengono.") &&
+            run(() => supabase.from("dragon_temperaments").delete().eq("id", row.id), "Carattere eliminato.")
+          }
+          className="btn-ghost border-red-900 px-2 py-1 text-xs text-red-400 hover:border-red-500"
+        >
+          Elimina
+        </button>
+      </div>
+    </li>
   );
 }

@@ -1,18 +1,21 @@
 import Link from "next/link";
 import { GameArea } from "@/components/game/GameShell";
-import type { Dragon, DragonStage, TraitPair } from "@/lib/dragons";
+import type { DragonSkill } from "@/lib/dragon-skills";
+import type { Dragon, DragonStage } from "@/lib/dragons";
 import { requirePermission } from "@/lib/staff";
-import DragonsManager, { type HouseLite, type PgLite } from "./DragonsManager";
+import DragonsManager, { type HouseLite, type PgLite, type TemperamentRow, type TraitRow } from "./DragonsManager";
 
 export default async function DraghiPage() {
   const { supabase } = await requirePermission("draghi.gestire");
 
-  const [houses, dragons, stages, traits, pgs] = await Promise.all([
+  const [houses, dragons, stages, traits, pgs, skills, temperaments] = await Promise.all([
     supabase.from("houses").select("id, name, sigil_url").order("sort_order").order("name"),
     supabase.from("dragons").select("*").order("created_at"),
     supabase.from("dragon_stages").select("*").order("sort_order"),
     supabase.from("dragon_trait_pairs").select("*").order("pregio"),
     supabase.from("characters").select("id, name, house_id, px, status").order("name"),
+    supabase.from("dragon_skills").select("*").order("sort_order").order("label"),
+    supabase.from("dragon_temperaments").select("id, text").order("id"),
   ]);
 
   return (
@@ -26,8 +29,10 @@ export default async function DraghiPage() {
         houses={(houses.data ?? []) as HouseLite[]}
         dragons={(dragons.data ?? []) as Dragon[]}
         stages={(stages.data ?? []) as DragonStage[]}
-        traits={(traits.data ?? []) as TraitPair[]}
+        traits={(traits.data ?? []) as TraitRow[]}
         pgs={(pgs.data ?? []) as PgLite[]}
+        skills={(skills.data ?? []) as DragonSkill[]}
+        temperaments={(temperaments.data ?? []) as TemperamentRow[]}
       />
     </div>
   );

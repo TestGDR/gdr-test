@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   MAX_VALUE,
-  SKILLS,
   STATS,
   colorHex,
   dragonName,
@@ -13,6 +12,7 @@ import {
   type Dragon,
   type DragonStage,
 } from "@/lib/dragons";
+import { useDragonSkills } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 import { saveDragonImage } from "./actions";
 
@@ -232,11 +232,12 @@ function DragonGlyph({ colors }: { colors: (string | null)[] }) {
 // Abilita': sei cerchi grandi
 // ---------------------------------------------------------------------
 function Skills({ dragon }: { dragon: Dragon }) {
+  const skills = useDragonSkills();
   return (
     <div className="space-y-5">
       <SectionTitle>Abilità</SectionTitle>
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
-        {SKILLS.map((s) => (
+        {skills.map((s) => (
           <div key={s.key} className="flex flex-col items-center gap-2">
             <BigRing label={s.label} value={dragon.skills[s.key] ?? 0} note={`su ${MAX_VALUE}`} />
           </div>
@@ -312,6 +313,7 @@ function Traits({ dragon, traits }: { dragon: Dragon; traits: TraitInfo[] }) {
 // ---------------------------------------------------------------------
 function Growth({ dragon, stages, px, onChanged }: { dragon: Dragon; stages: DragonStage[]; px: number; onChanged: () => void }) {
   const supabase = useMemo(() => createClient(), []);
+  const skills = useDragonSkills();
   const [name, setName] = useState(dragon.name);
   const [alloc, setAlloc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
@@ -428,7 +430,7 @@ function Growth({ dragon, stages, px, onChanged }: { dragon: Dragon; stages: Dra
           </p>
           {[
             { title: "Caratteristiche", items: STATS },
-            { title: "Abilità", items: SKILLS },
+            { title: "Abilità", items: skills },
           ].map((group) => (
             <div key={group.title}>
               <h4 className="mb-2 text-center text-[11px] tracking-[0.25em] text-[#6b4a2e] uppercase">{group.title}</h4>
