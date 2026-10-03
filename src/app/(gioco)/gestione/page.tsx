@@ -18,6 +18,12 @@ const PANELS = [
     description: "Modifica, ban ed eliminazione degli account.",
   },
   {
+    permission: "manutenzione.sito",
+    href: "/gestione/manutenzione",
+    title: "Manutenzione",
+    description: "Pulizia di chat, missive e OFF vecchi; eliminazione dei personaggi inattivi.",
+  },
+  {
     permission: "gestione.accessi",
     href: "/gestione/accessi",
     title: "Registro accessi",

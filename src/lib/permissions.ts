@@ -22,6 +22,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "draghi.gestire", label: "Gestione draghi", description: "Draghi e uova delle casate, fasi di crescita e punteggi" },
       { key: "documentazione.scrivere", label: "Manuale e Ambientazione", description: "Scrivere e modificare le pagine della documentazione" },
       { key: "utenti.gestire", label: "Gestione utenti", description: "Modificare, bannare ed eliminare gli account" },
+      { key: "manutenzione.sito", label: "Manutenzione sito", description: "Pulire chat, missive e OFF vecchi ed eliminare gli account inattivi" },
     ],
   },
   {
@@ -71,4 +72,5 @@ export const MANAGEMENT_PERMISSIONS = [
   "mondo.gestire",
   "draghi.gestire",
   "utenti.gestire",
+  "manutenzione.sito",
 ];
