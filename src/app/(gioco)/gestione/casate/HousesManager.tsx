@@ -23,6 +23,7 @@ import RichEditor from "@/components/guide/RichEditor";
 import { buildTree, byOrder, FamilyCanvas } from "@/components/houses/FamilyTree";
 import {
   addMember,
+  assignCharacter,
   deleteFamilyMember,
   deleteHouse,
   deleteHouseRole,
@@ -40,6 +41,14 @@ import {
   type HouseResult,
 } from "./actions";
 
+export type PgAssignment = {
+  id: string;
+  name: string;
+  status: "bozza" | "attivo";
+  house_id: string | null;
+  house_role_id: string | null;
+};
+
 type Data = {
   houses: House[];
   roles: HouseRole[];
@@ -47,6 +56,7 @@ type Data = {
   relations: FamilyRelation[];
   npcs: HouseNpc[];
   members: HouseMember[];
+  allPgs: PgAssignment[];
 };
 
 const NEW = "__nuova";
@@ -74,7 +84,156 @@ function useAction() {
   return { run, pending, feedback, clear: () => setMessage(null) };
 }
 
+// Due viste: le casate una per una, oppure l'elenco di tutti i PG con casata e ruolo
 export default function HousesManager(data: Data) {
+  const [view, setView] = useState<"casate" | "assegna">("casate");
+  return (
+    <div className="space-y-4">
+      <div role="tablist" className="flex gap-1 border-b border-border">
+        {(
+          [
+            ["casate", "Casate"],
+            ["assegna", "Assegna PG a casate e ruoli"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={view === id}
+            onClick={() => setView(id)}
+            className={`-mb-px border-b-2 px-4 py-2.5 text-xs tracking-[0.12em] uppercase transition ${
+              view === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === "casate" ? <HousesView {...data} /> : <AssignPgView houses={data.houses} roles={data.roles} pgs={data.allPgs} />}
+    </div>
+  );
+}
+
+// Elenco di tutti i PG: per ognuno si scelgono casata e ruolo e si salva
+function AssignPgView({ houses, roles, pgs }: { houses: House[]; roles: HouseRole[]; pgs: PgAssignment[] }) {
+  const { run, pending, feedback } = useAction();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("tutti"); // tutti | nessuna | id casata
+  const [edits, setEdits] = useState<Record<string, { house: string; role: string }>>({});
+  const q = query.trim().toLowerCase();
+  const houseName = (id: string | null) => houses.find((h) => h.id === id)?.name ?? "";
+  const list = pgs.filter(
+    (p) =>
+      (!q || p.name.toLowerCase().includes(q) || houseName(p.house_id).toLowerCase().includes(q)) &&
+      (filter === "tutti" || (filter === "nessuna" ? !p.house_id : p.house_id === filter)),
+  );
+  // quanti occupano un ruolo (per mostrare i posti)
+  const taken = (roleId: string) => pgs.filter((p) => p.house_role_id === roleId).length;
+
+  return (
+    <div className="space-y-4 border border-border bg-black/50 p-4">
+      <p className="text-sm text-muted">
+        Scegli casata e ruolo di un personaggio e premi Salva. Cambiando casata il ruolo si azzera: scegline uno della casata nuova.
+        Lo staff può superare i posti previsti da un ruolo (sono indicati accanto al nome).
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca un personaggio o una casata..." className="input w-72!" />
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filtra per casata" className="input w-auto!">
+          <option value="tutti">Tutti i personaggi</option>
+          <option value="nessuna">Senza casata</option>
+          {houses.map((h) => (
+            <option key={h.id} value={h.id}>
+              Casata {h.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {feedback}
+      <ul className="divide-y divide-border/60 border border-border/60">
+        {list.map((p) => {
+          const e = edits[p.id] ?? { house: p.house_id ?? "", role: p.house_role_id ?? "" };
+          const changed = e.house !== (p.house_id ?? "") || e.role !== (p.house_role_id ?? "");
+          const houseRoles = roles.filter((r) => r.house_id === e.house);
+          return (
+            <li key={p.id} className={`flex flex-wrap items-center gap-3 px-3 py-2 text-sm ${changed ? "bg-blood/10" : ""}`}>
+              <span className="min-w-44 flex-1 font-serif">
+                {p.name}
+                {p.house_id && <span className="text-muted"> {houseName(p.house_id)}</span>}
+                {p.status !== "attivo" && <span className="ml-2 text-xs text-orange-300">non attivo</span>}
+              </span>
+              <select
+                value={e.house}
+                onChange={(ev) => setEdits((x) => ({ ...x, [p.id]: { house: ev.target.value, role: "" } }))}
+                aria-label={`Casata di ${p.name}`}
+                className="input w-44! py-1"
+              >
+                <option value="">Nessuna casata</option>
+                {houses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={e.role}
+                onChange={(ev) => setEdits((x) => ({ ...x, [p.id]: { ...e, role: ev.target.value } }))}
+                disabled={!e.house}
+                aria-label={`Ruolo di ${p.name}`}
+                className="input w-56! py-1 disabled:opacity-40"
+              >
+                <option value="">Senza ruolo</option>
+                {houseRoles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                    {r.max_members !== null ? ` (${taken(r.id)}/${r.max_members})` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={pending || !changed}
+                onClick={() =>
+                  run(
+                    () => assignCharacter(p.id, e.house || null, e.role || null),
+                    `${p.name}: ${e.house ? `casata ${houseName(e.house)}${e.role ? `, ${houseRoles.find((r) => r.id === e.role)?.name}` : ", senza ruolo"}` : "senza casata"}.`,
+                    () =>
+                      setEdits((x) => {
+                        const next = { ...x };
+                        delete next[p.id];
+                        return next;
+                      }),
+                  )
+                }
+                className="btn px-3 py-1 text-xs"
+              >
+                Salva
+              </button>
+              {changed && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEdits((x) => {
+                      const next = { ...x };
+                      delete next[p.id];
+                      return next;
+                    })
+                  }
+                  className="text-xs text-muted hover:text-accent"
+                >
+                  Annulla
+                </button>
+              )}
+            </li>
+          );
+        })}
+        {list.length === 0 && <li className="px-3 py-3 text-sm text-muted">Nessun personaggio trovato.</li>}
+      </ul>
+    </div>
+  );
+}
+
+function HousesView(data: Data) {
   const [selectedId, setSelectedId] = useState<string>(data.houses[0]?.id ?? NEW);
   const house = data.houses.find((h) => h.id === selectedId) ?? null;
 

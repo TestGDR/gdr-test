@@ -2,12 +2,12 @@ import Link from "next/link";
 import { GameArea } from "@/components/game/GameShell";
 import type { FamilyMember, FamilyRelation, House, HouseMember, HouseNpc, HouseRole } from "@/lib/houses";
 import { requirePermission } from "@/lib/staff";
-import HousesManager from "./HousesManager";
+import HousesManager, { type PgAssignment } from "./HousesManager";
 
 export default async function CasatePage() {
   const { supabase } = await requirePermission("casate.gestire");
 
-  const [houses, roles, family, relations, npcs, members] = await Promise.all([
+  const [houses, roles, family, relations, npcs, members, allPgs] = await Promise.all([
     supabase.from("houses").select("*").order("sort_order").order("name"),
     supabase.from("house_roles").select("*").order("sort_order").order("name"),
     supabase.from("house_family_members").select("*").order("sort_order").order("name"),
@@ -18,6 +18,7 @@ export default async function CasatePage() {
       .select("id, name, status, house_id, house_role_id")
       .not("house_id", "is", null)
       .order("name"),
+    supabase.from("characters").select("id, name, status, house_id, house_role_id").order("name"),
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function CasatePage() {
         relations={(relations.data ?? []) as FamilyRelation[]}
         npcs={(npcs.data ?? []) as HouseNpc[]}
         members={(members.data ?? []) as HouseMember[]}
+        allPgs={(allPgs.data ?? []) as PgAssignment[]}
       />
     </div>
   );

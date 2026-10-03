@@ -520,6 +520,24 @@ export async function setMemberRole(characterId: string, houseId: string, roleId
   return done();
 }
 
+// Casata e ruolo di un personaggio in un colpo solo (null = nessuna casata).
+// Cambiando casata il ruolo deve appartenere a quella nuova.
+export async function assignCharacter(characterId: string, houseId: string | null, roleId: string | null): Promise<HouseResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  if (!houseId && roleId) return { error: "Un ruolo richiede una casata." };
+  if (houseId && !(await roleBelongsTo(ctx, roleId, houseId))) return { error: "Il ruolo non appartiene a questa casata." };
+
+  const admin = createAdminClient();
+  if (!admin) return { error: "Configurazione del server incompleta." };
+  const { error } = await admin
+    .from("characters")
+    .update({ house_id: houseId, house_role_id: houseId ? roleId : null })
+    .eq("id", characterId);
+  if (error) return { error: "Assegnazione non riuscita." };
+  return done();
+}
+
 export async function removeMember(characterId: string): Promise<HouseResult> {
   const ctx = await authorized();
   if (!ctx) return DENIED;
