@@ -554,7 +554,7 @@ function ImageUpload({ dragonId, hasImage }: { dragonId: string; hasImage: boole
 function StagesTab({ stages }: { stages: DragonStage[] }) {
   const { supabase, run, busy, feedback } = useOp();
   const [rows, setRows] = useState(stages);
-  const update = (stage: string, k: "px_to_next" | "monthly_upkeep", v: number) =>
+  const update = (stage: string, k: "px_to_next" | "monthly_upkeep" | "stat_points" | "skill_points" | "stat_cap", v: number) =>
     setRows((r) => r.map((s) => (s.stage === stage ? { ...s, [k]: v } : s)));
 
   async function saveAll() {
@@ -563,7 +563,13 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
         () =>
           supabase
             .from("dragon_stages")
-            .update({ px_to_next: s.px_to_next, monthly_upkeep: s.monthly_upkeep })
+            .update({
+              px_to_next: s.px_to_next,
+              monthly_upkeep: s.monthly_upkeep,
+              stat_points: s.stat_points,
+              skill_points: s.skill_points,
+              stat_cap: Math.min(10, Math.max(1, s.stat_cap)),
+            })
             .eq("stage", s.stage),
         "Fasi salvate.",
       );
@@ -572,9 +578,10 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-5xl space-y-4">
       <p className="text-sm text-muted">
-        Per passare alla fase successiva il cavaliere spende i PX indicati; a ogni passaggio il drago riceve 5 punti da distribuire tra
+        Alla generazione (schiusa o creazione) un drago riceve i punti della sua fase: le caratteristiche partono da 0 e non superano il
+        tetto, le abilità sono a caso per neonato e cucciolo e omogenee (nessuna a 0) da adolescente in su. Per passare alla fase successiva il cavaliere spende i PX indicati; a ogni passaggio il drago riceve 5 punti da distribuire tra
         caratteristiche e abilità (massimo {MAX_VALUE} per voce). Il mantenimento sono le risorse della casata consumate ogni mese.
       </p>
       <table className="w-full text-sm">
@@ -583,6 +590,9 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
             <th className="py-2">Fase</th>
             <th className="py-2">PX per crescere</th>
             <th className="py-2">Mantenimento / mese</th>
+            <th className="py-2">Punti caratteristiche</th>
+            <th className="py-2">Tetto caratteristica</th>
+            <th className="py-2">Punti abilità</th>
           </tr>
         </thead>
         <tbody>
@@ -616,6 +626,19 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
                   className="input w-28 py-1"
                 />
               </td>
+              {(["stat_points", "stat_cap", "skill_points"] as const).map((k) => (
+                <td key={k} className="py-2">
+                  <input
+                    type="number"
+                    min={k === "stat_cap" ? 1 : 0}
+                    max={k === "stat_cap" ? 10 : 200}
+                    value={s[k]}
+                    onChange={(e) => update(s.stage, k, Math.max(0, Number(e.target.value) || 0))}
+                    aria-label={`${k} di ${s.label}`}
+                    className="input w-24 py-1"
+                  />
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

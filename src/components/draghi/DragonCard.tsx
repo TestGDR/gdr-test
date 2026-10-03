@@ -75,7 +75,7 @@ export default function DragonCard({
       </div>
 
       {rider && dragon.unspent_points > 0 ? (
-        <PointsEditor dragon={dragon} onSaved={onChanged} />
+        <PointsEditor dragon={dragon} statCap={stages.find((s) => s.stage === dragon.stage)?.stat_cap ?? MAX_VALUE} onSaved={onChanged} />
       ) : (
         <ValuesGrid dragon={dragon} />
       )}
@@ -183,7 +183,7 @@ function ValueList({
 }
 
 // Distribuzione dei punti liberi (dopo una crescita)
-function PointsEditor({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void }) {
+function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: number; onSaved?: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [alloc, setAlloc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
@@ -191,6 +191,8 @@ function PointsEditor({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => voi
   const used = Object.values(alloc).reduce((a, b) => a + b, 0);
   const left = dragon.unspent_points - used;
   const all = { ...dragon.stats, ...dragon.skills };
+  // caratteristiche: tetto della fase; abilita': massimo generale
+  const capOf = (key: string) => (key in dragon.stats ? statCap : MAX_VALUE);
 
   const control = (key: string) => (
     <span className="flex shrink-0 gap-1">
@@ -206,7 +208,7 @@ function PointsEditor({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => voi
       <button
         type="button"
         aria-label="Aggiungi un punto"
-        disabled={left <= 0 || (all[key] ?? 0) + (alloc[key] ?? 0) >= MAX_VALUE}
+        disabled={left <= 0 || (all[key] ?? 0) + (alloc[key] ?? 0) >= capOf(key)}
         onClick={() => setAlloc((a) => ({ ...a, [key]: (a[key] ?? 0) + 1 }))}
         className="h-6 w-6 border border-border text-sm hover:border-accent disabled:opacity-30"
       >
@@ -229,6 +231,7 @@ function PointsEditor({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => voi
     <div className="space-y-3 border border-[#c9a05a]/50 bg-[#c9a05a]/5 p-3">
       <p className="text-sm">
         Punti da distribuire: <strong className="text-[#e8cf9c]">{left}</strong> su {dragon.unspent_points}
+        <span className="text-muted"> · in questa fase ogni caratteristica arriva al massimo a {statCap}</span>
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} extra={alloc} renderControl={control} />

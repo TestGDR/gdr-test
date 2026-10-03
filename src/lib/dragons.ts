@@ -6,6 +6,9 @@ export type DragonStage = {
   sort_order: number;
   px_to_next: number | null; // null = ultima fase
   monthly_upkeep: number;
+  stat_points: number; // punti caratteristiche alla generazione
+  skill_points: number; // punti abilita' alla generazione
+  stat_cap: number; // tetto di ogni caratteristica in questa fase
 };
 
 export type TraitPair = { pregio: string; difetto: string };
