@@ -19,11 +19,11 @@ export default async function UtentiPage() {
   const admin = createAdminClient();
   if (!admin) return <p className="text-red-400">Configurazione del server incompleta.</p>;
 
-  // Email e ultimo accesso stanno nel sistema di accesso: si leggono solo dal server
-  const accounts: { id: string; email?: string; created_at: string; last_sign_in_at?: string | null }[] = [];
+  // Data di registrazione e ultimo accesso stanno nel sistema di accesso (l'email resta riservata: non si passa alla pagina)
+  const accounts: { id: string; created_at: string; last_sign_in_at?: string | null }[] = [];
   for (let page = 1; page <= 20; page++) {
     const { data } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    accounts.push(...(data?.users ?? []));
+    accounts.push(...(data?.users ?? []).map((u) => ({ id: u.id, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at })));
     if ((data?.users?.length ?? 0) < 1000) break;
   }
   const [{ data: profiles }, { data: pgs }] = await Promise.all([
@@ -36,7 +36,6 @@ export default async function UtentiPage() {
     const main = (pgs as unknown as Pg[] | null)?.find((c) => c.owner_id === a.id) ?? null;
     return {
       id: a.id,
-      email: a.email ?? "",
       createdAt: a.created_at,
       lastSignIn: a.last_sign_in_at ?? null,
       username: p?.username ?? "",

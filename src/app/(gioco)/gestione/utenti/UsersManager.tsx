@@ -6,7 +6,6 @@ import { banUser, deleteUser, unbanUser, updateUser, type UserResult } from "./a
 
 export type UserRow = {
   id: string;
-  email: string;
   createdAt: string;
   lastSignIn: string | null;
   username: string;
@@ -39,13 +38,13 @@ export default function UsersManager({ rows, myId, iAmAdmin }: { rows: UserRow[]
   const list = rows.filter(
     (r) =>
       (filter === "tutti" || banned(r)) &&
-      (!q || [r.username, r.email, r.character?.name ?? "", r.character?.house ?? ""].some((x) => x.toLowerCase().includes(q))),
+      (!q || [r.username, r.character?.name ?? "", r.character?.house ?? ""].some((x) => x.toLowerCase().includes(q))),
   );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca personaggio, utente o email..." className="input w-72!" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca personaggio, utente o casata..." className="input w-72!" />
         <select value={filter} onChange={(e) => setFilter(e.target.value as "tutti" | "bannati")} aria-label="Filtro" className="input w-auto!">
           <option value="tutti">Tutti ({rows.length})</option>
           <option value="bannati">Solo bannati ({rows.filter(banned).length})</option>
@@ -69,7 +68,7 @@ export default function UsersManager({ rows, myId, iAmAdmin }: { rows: UserRow[]
                     {r.character?.house && <span className="text-foreground/70"> {r.character.house}</span>}
                   </span>
                   <span className="block text-xs text-muted">
-                    {r.username} · {r.email}
+                    {r.username}
                   </span>
                 </span>
                 <span className="w-28 text-xs" style={{ color: r.staffRole?.color ?? undefined }}>
@@ -103,7 +102,6 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [username, setUsername] = useState(row.username);
-  const [email, setEmail] = useState(row.email);
   const [pgName, setPgName] = useState(row.character?.name ?? "");
   const [banHours, setBanHours] = useState<number | null>(24);
   const [reason, setReason] = useState("");
@@ -135,14 +133,10 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
 
       <section className="space-y-2">
         <h4 className="font-serif text-accent">Modifica</h4>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs text-muted uppercase">Nome utente</span>
             <input value={username} onChange={(e) => setUsername(e.target.value)} maxLength={30} className="input py-1" />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted uppercase">Email</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input py-1" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs text-muted uppercase">Nome del personaggio</span>
@@ -153,7 +147,7 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
           type="button"
           disabled={pending}
           onClick={() =>
-            run(() => updateUser(row.id, { username, email, characterId: row.character?.id ?? null, characterName: pgName }), "Utente aggiornato.")
+            run(() => updateUser(row.id, { username, characterId: row.character?.id ?? null, characterName: pgName }), "Utente aggiornato.")
           }
           className="btn px-4 py-1.5 text-sm"
         >

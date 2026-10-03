@@ -25,10 +25,10 @@ function done(): UserResult {
   return {};
 }
 
-// Nome utente, email e nome del personaggio principale
+// Nome utente e nome del personaggio principale (l'email resta riservata all'utente)
 export async function updateUser(
   id: string,
-  values: { username: string; email: string; characterId: string | null; characterName: string },
+  values: { username: string; characterId: string | null; characterName: string },
 ): Promise<UserResult> {
   const g = await guard(id);
   if ("error" in g) return { error: g.error };
@@ -38,14 +38,6 @@ export async function updateUser(
   if (username.length < 3 || username.length > 30) return { error: "Il nome utente deve avere da 3 a 30 caratteri." };
   const { error: e1 } = await admin.from("profiles").update({ username }).eq("id", id);
   if (e1) return { error: e1.code === "23505" ? "Nome utente già in uso." : "Salvataggio del nome utente non riuscito." };
-
-  const email = values.email.trim().toLowerCase();
-  const { data: current } = await admin.auth.admin.getUserById(id);
-  if (email && email !== current.user?.email) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Email non valida." };
-    const { error } = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
-    if (error) return { error: "Email non aggiornata: forse è già usata da un altro account." };
-  }
 
   if (values.characterId) {
     const name = normalizeCharacterName(values.characterName);
