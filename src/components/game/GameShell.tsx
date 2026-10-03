@@ -348,7 +348,9 @@ export default function GameShell({
           {dragonOpen > 0 && <DragonPanel key={dragonOpen} characterId={character.id} />}
         </Modal>
       )}
-      <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""} size="lg">
+      <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
+        size={panel === "ricerca" || panel === "assenze" ? "panel" : "lg"}
+      >
         {(panel === "notizie-on" || panel === "notizie-off") && (
           <NewsPanel key={`${panel}-${panelSession}`} kind={panel.slice(8) as NewsKind} canWrite={canWriteNews} />
         )}

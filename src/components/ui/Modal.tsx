@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export type ModalSize = "md" | "lg" | "xl" | "tall" | "area" | "sheet";
+export type ModalSize = "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
@@ -15,6 +15,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   area: "w-[min(46rem,calc(100vw-2rem))] h-[min(700px,calc(100dvh-1rem))]",
   // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
   sheet: "w-[min(820px,calc(100vw-1rem))] h-[min(940px,calc(100dvh-1rem))]",
+  // ricerca gioco e assenze: alta al massimo 600px, il contenuto scorre dentro
+  panel: "w-[min(46rem,calc(100vw-2rem))] max-h-[min(600px,calc(100dvh-1rem))]",
 };
 
 // Finestra modale controllata dal chiamante (open / onClose).
