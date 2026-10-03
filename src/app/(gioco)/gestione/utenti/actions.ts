@@ -25,27 +25,23 @@ function done(): UserResult {
   return {};
 }
 
-// Nome utente e nome del personaggio principale (l'email resta riservata all'utente)
-export async function updateUser(
-  id: string,
-  values: { username: string; characterId: string | null; characterName: string },
-): Promise<UserResult> {
+// Nome del personaggio: e' anche il nome utente (si entra con quello), quindi
+// cambiano insieme. L'email resta riservata all'utente.
+export async function renameUser(id: string, characterId: string | null, rawName: string): Promise<UserResult> {
   const g = await guard(id);
   if ("error" in g) return { error: g.error };
   const { admin } = g;
 
-  const username = values.username.trim();
-  if (username.length < 3 || username.length > 30) return { error: "Il nome utente deve avere da 3 a 30 caratteri." };
-  const { error: e1 } = await admin.from("profiles").update({ username }).eq("id", id);
-  if (e1) return { error: e1.code === "23505" ? "Nome utente già in uso." : "Salvataggio del nome utente non riuscito." };
+  const name = normalizeCharacterName(rawName);
+  const nameError = validateCharacterName(name);
+  if (nameError) return { error: nameError };
 
-  if (values.characterId) {
-    const name = normalizeCharacterName(values.characterName);
-    const nameError = validateCharacterName(name);
-    if (nameError) return { error: nameError };
-    const { error } = await admin.from("characters").update({ name }).eq("id", values.characterId).eq("owner_id", id);
-    if (error) return { error: error.code === "23505" ? "Esiste già un personaggio con questo nome." : "Nome del personaggio non salvato." };
+  if (characterId) {
+    const { error } = await admin.from("characters").update({ name }).eq("id", characterId).eq("owner_id", id);
+    if (error) return { error: error.code === "23505" ? "Esiste già un personaggio con questo nome." : "Nome non salvato." };
   }
+  const { error } = await admin.from("profiles").update({ username: name }).eq("id", id);
+  if (error) return { error: error.code === "23505" ? "Questo nome è già in uso." : "Nome non salvato." };
   return done();
 }
 

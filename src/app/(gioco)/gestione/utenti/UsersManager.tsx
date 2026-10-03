@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { banUser, deleteUser, unbanUser, updateUser, type UserResult } from "./actions";
+import { banUser, deleteUser, renameUser, unbanUser, type UserResult } from "./actions";
 
 export type UserRow = {
   id: string;
@@ -68,7 +68,7 @@ export default function UsersManager({ rows, myId, iAmAdmin }: { rows: UserRow[]
                     {r.character?.house && <span className="text-foreground/70"> {r.character.house}</span>}
                   </span>
                   <span className="block text-xs text-muted">
-                    {r.username}
+                    {r.character && r.username !== r.character.name ? `account: ${r.username}` : ""}
                   </span>
                 </span>
                 <span className="w-28 text-xs" style={{ color: r.staffRole?.color ?? undefined }}>
@@ -101,8 +101,7 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [username, setUsername] = useState(row.username);
-  const [pgName, setPgName] = useState(row.character?.name ?? "");
+  const [pgName, setPgName] = useState(row.character?.name ?? row.username);
   const [banHours, setBanHours] = useState<number | null>(24);
   const [reason, setReason] = useState("");
 
@@ -132,27 +131,19 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
       </p>
 
       <section className="space-y-2">
-        <h4 className="font-serif text-accent">Modifica</h4>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted uppercase">Nome utente</span>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} maxLength={30} className="input py-1" />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted uppercase">Nome del personaggio</span>
-            <input value={pgName} onChange={(e) => setPgName(e.target.value)} maxLength={40} disabled={!row.character} className="input py-1" />
-          </label>
+        <h4 className="font-serif text-accent">Nome del personaggio</h4>
+        <p className="text-xs text-muted">È anche il nome con cui il giocatore entra nel sito: cambiandolo, dovrà usare quello nuovo.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input value={pgName} onChange={(e) => setPgName(e.target.value)} maxLength={40} aria-label="Nome del personaggio" className="input w-64! py-1" />
+          <button
+            type="button"
+            disabled={pending || !pgName.trim() || pgName.trim() === (row.character?.name ?? row.username)}
+            onClick={() => run(() => renameUser(row.id, row.character?.id ?? null, pgName), "Nome cambiato: il giocatore ora entra con il nome nuovo.")}
+            className="btn px-4 py-1.5 text-sm"
+          >
+            Salva
+          </button>
         </div>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() =>
-            run(() => updateUser(row.id, { username, characterId: row.character?.id ?? null, characterName: pgName }), "Utente aggiornato.")
-          }
-          className="btn px-4 py-1.5 text-sm"
-        >
-          Salva modifiche
-        </button>
       </section>
 
       <section className="space-y-2">
