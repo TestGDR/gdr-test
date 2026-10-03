@@ -33,6 +33,7 @@ type Props = {
   skills: DragonSkill[];
   temperaments: TemperamentRow[];
   effects: TraitEffect[];
+  skillFactor?: number;
 };
 
 const TABS = [
@@ -85,7 +86,7 @@ export default function DragonsManager(props: Props) {
       </div>
       <div className="p-4">
         {tab === "draghi" && <DragonsTab {...props} />}
-        {tab === "fasi" && <StagesTab stages={props.stages} />}
+        {tab === "fasi" && <StagesTab stages={props.stages} skillFactor={props.skillFactor ?? 10} />}
         {tab === "abilita" && <SkillsTab skills={props.skills} />}
         {tab === "tratti" && <TraitsTab traits={props.traits} effects={props.effects} skills={props.skills} />}
         {tab === "caratteri" && <TemperamentsTab temperaments={props.temperaments} />}
@@ -261,6 +262,8 @@ function DragonEditor({
                   stats: d.stats,
                   skills: d.skills,
                   unspent_points: d.unspent_points,
+                  growth_px: d.growth_px,
+                  loyalty: d.loyalty,
                 }),
           })
           .eq("id", d.id),
@@ -397,16 +400,37 @@ function DragonEditor({
             <NumberGrid title="Caratteristiche" items={STATS} values={d.stats} onChange={(v) => set("stats", v)} />
             <NumberGrid title="Abilità" items={skills} values={d.skills} onChange={(v) => set("skills", v)} />
           </div>
-          <Field label="Punti ancora da distribuire (dal cavaliere)">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={d.unspent_points}
-              onChange={(e) => set("unspent_points", Math.max(0, Number(e.target.value) || 0))}
-              className="input w-28"
-            />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Punti ancora da distribuire (dal cavaliere)">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={d.unspent_points}
+                onChange={(e) => set("unspent_points", Math.max(0, Number(e.target.value) || 0))}
+                className="input"
+              />
+            </Field>
+            <Field label="PX investiti nella fase attuale">
+              <input
+                type="number"
+                min={0}
+                value={d.growth_px}
+                onChange={(e) => set("growth_px", Math.max(0, Number(e.target.value) || 0))}
+                className="input"
+              />
+            </Field>
+            <Field label="Fedeltà (0-100, per ora solo indicativa)">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={d.loyalty}
+                onChange={(e) => set("loyalty", Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                className="input"
+              />
+            </Field>
+          </div>
         </>
       )}
 
@@ -585,13 +609,15 @@ function ImageUpload({ dragonId, hasImage }: { dragonId: string; hasImage: boole
 // ---------------------------------------------------------------------
 // Fasi: PX per crescere e mantenimento mensile
 // ---------------------------------------------------------------------
-function StagesTab({ stages }: { stages: DragonStage[] }) {
+function StagesTab({ stages, skillFactor }: { stages: DragonStage[]; skillFactor: number }) {
   const { supabase, run, busy, feedback } = useOp();
   const [rows, setRows] = useState(stages);
+  const [factor, setFactor] = useState(skillFactor);
   const update = (stage: string, k: "px_to_next" | "monthly_upkeep" | "stat_points" | "skill_points" | "stat_cap", v: number) =>
     setRows((r) => r.map((s) => (s.stage === stage ? { ...s, [k]: v } : s)));
 
   async function saveAll() {
+    if (!(await run(() => supabase.from("dragon_settings").update({ skill_px_factor: factor }).eq("id", true), "Impostazioni salvate."))) return;
     for (const s of rows) {
       const ok = await run(
         () =>
@@ -677,6 +703,18 @@ function StagesTab({ stages }: { stages: DragonStage[] }) {
           ))}
         </tbody>
       </table>
+      <label className="flex flex-wrap items-center gap-3 text-sm">
+        <span>Abilità comprate con i PX dal cavaliere: costo per alzare di 1 =</span>
+        <input
+          type="number"
+          min={0}
+          max={1000}
+          value={factor}
+          onChange={(e) => setFactor(Math.max(0, Number(e.target.value) || 0))}
+          className="input w-24! py-1"
+        />
+        <span>PX × il nuovo valore (es. da 3 a 4 costa {factor * 4} PX)</span>
+      </label>
       <div className="flex items-center gap-3">
         <button type="button" onClick={saveAll} disabled={busy} className="btn">
           Salva

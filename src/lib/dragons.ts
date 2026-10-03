@@ -31,6 +31,8 @@ export type Dragon = {
   image_url: string | null;
   rider_id: string | null; // cavaliere PG
   npc_rider_id: string | null; // oppure cavaliere PNG
+  growth_px: number; // PX investiti nella fase attuale (maturazione)
+  loyalty: number; // fedelta' al cavaliere, 0-100 (per ora solo rappresentativa)
   hatched_at: string | null;
   created_at: string;
 };

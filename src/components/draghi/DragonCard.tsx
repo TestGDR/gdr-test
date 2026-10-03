@@ -11,7 +11,6 @@ import {
   effectLabel,
   signed,
   monthlyUpkeep,
-  nextStage,
   stageLabel,
   type Dragon,
   type DragonStage,
@@ -19,6 +18,7 @@ import {
 import { useDragonEffects, useDragonSkills } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 import { saveDragonImage } from "./actions";
+import DragonBars from "./DragonBars";
 
 // Scheda di un drago. Con "rider" (il cavaliere che la guarda) compaiono
 // nome e immagine modificabili, la crescita e la distribuzione dei punti.
@@ -35,8 +35,6 @@ export default function DragonCard({
   rider?: { px: number } | null;
   onChanged?: () => void;
 }) {
-  const next = nextStage(dragon.stage, stages);
-  const cost = stages.find((s) => s.stage === dragon.stage)?.px_to_next ?? null;
 
   return (
     <article className="space-y-4 border border-border bg-black/40 p-4">
@@ -81,8 +79,12 @@ export default function DragonCard({
         <ValuesGrid dragon={dragon} />
       )}
 
+      <DragonBars dragon={dragon} stages={stages} />
       {rider && (
-        <GrowBox dragonId={dragon.id} cost={cost} next={next?.label ?? null} px={rider.px} onSaved={onChanged} />
+        <p className="text-xs text-muted">
+          Per investire PX nella maturazione o migliorare le abilità apri <strong className="text-foreground">Il mio drago</strong> (icona
+          del drago nella barra di destra, o nel menu su cellulare). Hai {rider.px} PX.
+        </p>
       )}
     </article>
   );
@@ -299,47 +301,6 @@ function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: n
   );
 }
 
-function GrowBox({
-  dragonId,
-  cost,
-  next,
-  px,
-  onSaved,
-}: {
-  dragonId: string;
-  cost: number | null;
-  next: string | null;
-  px: number;
-  onSaved?: () => void;
-}) {
-  const supabase = useMemo(() => createClient(), []);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (!next || cost === null) return <p className="text-sm text-muted">Il drago è adulto: ha raggiunto l&apos;ultima fase di crescita.</p>;
-
-  async function grow() {
-    if (!window.confirm(`Spendere ${cost} PX per far crescere il drago a ${next}?`)) return;
-    setBusy(true);
-    setError(null);
-    const { error } = await supabase.rpc("dragon_grow", { p_dragon: dragonId });
-    setBusy(false);
-    if (error) return setError(error.message);
-    onSaved?.();
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3 text-sm">
-      <span>
-        Prossima fase: <strong className="text-foreground">{next}</strong> · costo <strong>{cost} PX</strong> (ne hai {px})
-      </span>
-      <button type="button" onClick={grow} disabled={busy || px < cost} className="btn px-4 py-1.5 text-sm">
-        Fai crescere
-      </button>
-      {error && <span className="text-red-400">{error}</span>}
-    </div>
-  );
-}
 
 function RenameField({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void }) {
   const supabase = useMemo(() => createClient(), []);
