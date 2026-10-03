@@ -151,12 +151,16 @@ function ColorDots({ dragon }: { dragon: Dragon }) {
   );
 }
 
+// "Volare (Des)": abilita' con l'abbreviazione della sua caratteristica
+const withStat = (skills: { key: string; label: string; stat_key: string }[]) =>
+  skills.map((s) => ({ key: s.key, label: `${s.label} (${(STATS.find((st) => st.key === s.stat_key)?.label ?? "").slice(0, 3)})` }));
+
 function ValuesGrid({ dragon }: { dragon: Dragon }) {
   const skills = useDragonSkills();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} />
-      <ValueList title="Abilità" items={skills} values={dragon.skills} />
+      <ValueList title="Abilità" items={withStat(skills)} values={dragon.skills} />
     </div>
   );
 }
@@ -259,7 +263,7 @@ function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: n
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} extra={alloc} renderControl={control} />
-        <ValueList title="Abilità" items={skills} values={dragon.skills} extra={alloc} renderControl={control} />
+        <ValueList title="Abilità" items={withStat(skills)} values={dragon.skills} extra={alloc} renderControl={control} />
       </div>
       <div className="flex items-center gap-3">
         <button type="button" onClick={save} disabled={busy || used === 0} className="btn px-4 py-1.5 text-sm">

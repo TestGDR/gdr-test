@@ -239,7 +239,11 @@ function Skills({ dragon }: { dragon: Dragon }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
         {skills.map((s) => (
           <div key={s.key} className="flex flex-col items-center gap-2">
-            <BigRing label={s.label} value={dragon.skills[s.key] ?? 0} note={`su ${MAX_VALUE}`} />
+            <BigRing
+              label={s.label}
+              value={dragon.skills[s.key] ?? 0}
+              note={`${STATS.find((st) => st.key === s.stat_key)?.label ?? ""} · su ${MAX_VALUE}`}
+            />
           </div>
         ))}
       </div>

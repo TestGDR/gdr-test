@@ -676,7 +676,11 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
   const { supabase, run, busy, feedback } = useOp();
   const [rows, setRows] = useState(skills);
   const [label, setLabel] = useState("");
-  const changed = (s: DragonSkill) => skills.find((x) => x.key === s.key)?.label !== s.label;
+  const [stat, setStat] = useState("vigore");
+  const changed = (s: DragonSkill) => {
+    const old = skills.find((x) => x.key === s.key);
+    return old?.label !== s.label || old?.stat_key !== s.stat_key;
+  };
 
   // chiave tecnica dal nome: "Attacco di coda" -> "attacco_di_coda"
   const keyFrom = (text: string) =>
@@ -704,7 +708,7 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
   return (
     <div className="max-w-2xl space-y-4">
       <p className="text-sm text-muted">
-        Le abilità dei draghi. Una nuova abilità vale 0 per i draghi già esistenti e riceve punti nelle prossime generazioni e crescite.
+        Le abilità dei draghi, ognuna con la sua caratteristica di riferimento. Una nuova abilità vale 0 per i draghi già esistenti e riceve punti nelle prossime generazioni e crescite.
         Eliminandola sparisce dai valori di tutti i draghi.
       </p>
       {feedback}
@@ -718,7 +722,18 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
               aria-label={`Nome dell'abilità ${s.label}`}
               className="input w-64! py-1"
             />
-            <span className="text-xs text-muted">{s.key}</span>
+            <select
+              value={s.stat_key}
+              onChange={(e) => setRows((r) => r.map((x) => (x.key === s.key ? { ...x, stat_key: e.target.value } : x)))}
+              aria-label={`Caratteristica di riferimento di ${s.label}`}
+              className="input w-40! py-1"
+            >
+              {STATS.map((st) => (
+                <option key={st.key} value={st.key}>
+                  {st.label}
+                </option>
+              ))}
+            </select>
             <span className="ml-auto flex gap-1">
               <button type="button" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label="Sposta su" className="btn-ghost px-2 py-1 text-xs">
                 ↑
@@ -730,7 +745,7 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
                 type="button"
                 disabled={busy || !changed(s) || !s.label.trim()}
                 onClick={async () => {
-                  if (await run(() => supabase.from("dragon_skills").update({ label: s.label.trim() }).eq("key", s.key), "Abilità rinominata.")) invalidateDragonSkills();
+                  if (await run(() => supabase.from("dragon_skills").update({ label: s.label.trim(), stat_key: s.stat_key }).eq("key", s.key), "Abilità salvata.")) invalidateDragonSkills();
                 }}
                 className="btn px-3 py-1 text-xs"
               >
@@ -760,18 +775,25 @@ function SkillsTab({ skills }: { skills: DragonSkill[] }) {
           const key = keyFrom(label);
           if (!key) return;
           const ok = await run(
-            () => supabase.from("dragon_skills").insert({ key, label: label.trim(), sort_order: rows.length }),
+            () => supabase.from("dragon_skills").insert({ key, label: label.trim(), sort_order: rows.length, stat_key: stat }),
             `Abilità "${label.trim()}" aggiunta.`,
           );
           if (ok) {
             invalidateDragonSkills();
-            setRows((r) => [...r, { key, label: label.trim(), sort_order: r.length }]);
+            setRows((r) => [...r, { key, label: label.trim(), sort_order: r.length, stat_key: stat }]);
             setLabel("");
           }
         }}
         className="flex gap-2"
       >
         <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} placeholder="Nuova abilità (es. Nuotare)" className="input w-64!" />
+        <select value={stat} onChange={(e) => setStat(e.target.value)} aria-label="Caratteristica di riferimento" className="input w-40!">
+          {STATS.map((st) => (
+            <option key={st.key} value={st.key}>
+              {st.label}
+            </option>
+          ))}
+        </select>
         <button className="btn px-4 text-sm" disabled={busy || !keyFrom(label)}>
           + Aggiungi
         </button>

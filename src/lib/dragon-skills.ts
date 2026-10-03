@@ -5,7 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 
 // Abilita' dei draghi: le decide lo staff (Gestione -> Draghi -> Abilita').
 // Si caricano una volta sola e si condividono tra tutti i componenti.
-export type DragonSkill = { key: string; label: string; sort_order: number };
+export type DragonSkill = {
+  key: string;
+  label: string;
+  sort_order: number;
+  stat_key: string; // caratteristica di riferimento (vigore, destrezza, intelletto, percezione)
+};
 
 let cache: Promise<DragonSkill[]> | null = null;
 
