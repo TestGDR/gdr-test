@@ -62,7 +62,7 @@ export default function OnlineModal(props: Props) {
     <Modal open={open} onClose={onClose} title="Elenco online" size="tall">
       <div className="flex h-full flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
-          <p className="font-serif text-xl tracking-[0.15em] uppercase">
+          <p className="font-serif text-lg tracking-[0.15em] uppercase sm:text-xl">
             <span className="text-accent">{online.length}</span> online
           </p>
           <div className="flex flex-wrap gap-1">
@@ -71,7 +71,7 @@ export default function OnlineModal(props: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full border px-3 py-1 text-xs tracking-wider uppercase transition ${
+                className={`rounded-full border px-2 py-0.5 text-[10px] tracking-wider uppercase transition sm:px-3 sm:py-1 sm:text-xs ${
                   filter === f.id
                     ? "border-accent bg-accent/15 text-accent"
                     : "border-transparent text-muted hover:text-foreground"
@@ -148,17 +148,17 @@ function PlayerRow({
 }) {
   return (
     <li
-      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-2 sm:gap-3 sm:px-3 ${
+      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2 ${
         player.live ? "" : "opacity-50"
       }`}
       title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
     >
-      <Avatar name={player.name} url={player.avatar} size="h-9 w-9 sm:h-11 sm:w-11" />
+      <Avatar name={player.name} url={player.avatar} size="h-8 w-8 sm:h-11 sm:w-11" />
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2">
+        <p className="flex items-center gap-1.5 sm:gap-2">
           {player.sigil && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-5 w-5 shrink-0 object-contain" />
+            <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-4 w-4 shrink-0 object-contain sm:h-5 sm:w-5" />
           )}
           {/* Il nome apre la scheda del personaggio */}
           <button
@@ -166,7 +166,8 @@ function PlayerRow({
             onClick={() => player.characterId && onOpenSheet(player.characterId)}
             disabled={!player.characterId}
             title={player.characterId ? `Apri la scheda di ${player.name}` : undefined}
-            className="truncate text-left font-serif tracking-wide text-accent uppercase hover:underline disabled:no-underline"
+            // su cellulare nome e cognome vanno a capo invece di essere tagliati
+            className="min-w-0 text-left font-serif text-[13px] leading-tight tracking-normal break-words text-accent uppercase hover:underline disabled:no-underline sm:truncate sm:text-base sm:tracking-wide"
           >
             {player.name}
             {player.house && <span className="text-foreground/70"> {player.house}</span>}
@@ -183,10 +184,10 @@ function PlayerRow({
             </button>
           )}
         </p>
-        <p className="truncate text-sm text-foreground/80">{player.phrase || " "}</p>
+        <p className="truncate text-xs text-foreground/80 sm:text-sm">{player.phrase || " "}</p>
       </div>
       {/* Simboli */}
-      <div className="flex shrink-0 items-center gap-2 text-base">
+      <div className="flex shrink-0 items-center gap-1 text-base sm:gap-2 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5">
         {isStaff(player) && (
           <span title={player.staffRole ?? ""} className="text-accent" style={{ color: player.staffColor ?? undefined }}>
             <CrownIcon />
@@ -222,7 +223,7 @@ function PhraseEditor({ phrase, onSave }: { phrase: string; onSave: (p: string) 
 
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 sm:px-4">
-      <label htmlFor="phrase" className="text-xs tracking-wider text-muted uppercase">
+      <label htmlFor="phrase" className="text-[10px] tracking-wider text-muted uppercase sm:text-xs">
         La tua frase
       </label>
       <input
