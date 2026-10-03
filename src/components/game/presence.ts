@@ -26,16 +26,13 @@ export type OnlinePlayer = {
   place: "mappa" | "chat";
   placeKey: string; // "mappa" oppure "chat:<id lista>": chi ha la stessa chiave e' nello stesso posto
   placeLabel: string; // nome del posto (mappa, luogo o lista)
-  live: boolean; // connesso adesso; false = connessione persa da poco (segnale < 5 minuti)
+  live: boolean; // sempre true: si e' presenti fino a un'ora dall'ultima azione
 };
 
 export type PresencePayload = Omit<OnlinePlayer, "live">;
 
 const HEARTBEAT_MS = 60_000; // ogni quanto si lascia il segnale nel database
 const POLL_MS = 20_000; // ogni quanto si rilegge chi ha dato segnale di recente
-// Segnale piu' recente di cosi' = presente a tutti gli effetti, anche se il suo
-// collegamento in tempo reale e' caduto (il segnale arriva ogni minuto)
-const FRESH_MS = 150_000;
 const RETRY_MS = 4_000; // dopo quanto si ricrea il collegamento in tempo reale caduto
 
 // Dati arrivati da altri browser: completati con valori neutri se mancano
@@ -59,9 +56,10 @@ function normalize(userId: string, p: Partial<OnlinePlayer>, live: boolean): Onl
   };
 }
 
-// Online = connesso adesso (tempo reale: entrate e uscite istantanee)
-//        + chi ha lasciato un segnale negli ultimi 5 minuti (un calo di
-//          connessione non fa sparire nessuno; chi chiude il sito avvisa e sparisce subito)
+// Online = connesso adesso (tempo reale: entrate e cambi di posto istantanei)
+//        + chi ha fatto un'azione nel sito nell'ultima ora (cambiare pagina, aggiornare,
+//          scrivere in chat, missive e OFF): una scheda in secondo piano o un telefono in
+//          standby non fanno sparire nessuno. Si sparisce subito solo con Esci.
 export function usePresence(me: PresencePayload) {
   const supabase = useMemo(() => createClient(), []);
   const [live, setLive] = useState<OnlinePlayer[]>([]);
@@ -81,12 +79,8 @@ export function usePresence(me: PresencePayload) {
     () =>
       supabase.rpc("recent_online").then(({ data }) => {
         if (!data) return;
-        const now = Date.now();
-        setRecent(
-          (data as { user_id: string; info: Partial<OnlinePlayer>; last_seen: string }[]).map((r) =>
-            normalize(r.user_id, r.info, now - new Date(r.last_seen).getTime() < FRESH_MS),
-          ),
-        );
+        // il database restituisce chi ha fatto un'azione nell'ultima ora: tutti presenti
+        setRecent((data as { user_id: string; info: Partial<OnlinePlayer> }[]).map((r) => normalize(r.user_id, r.info, true)));
       }),
     [supabase],
   );
@@ -128,11 +122,11 @@ export function usePresence(me: PresencePayload) {
 
   // --- Segnale nel database ----------------------------------------------
   useEffect(() => {
-    const beat = () => supabase.rpc("touch_online", { p_info: JSON.parse(latest.current) });
+    const beat = (action = false) => supabase.rpc("touch_online", { p_info: JSON.parse(latest.current), p_action: action });
     const loadRecent = refreshRecent;
 
-    beat().then(loadRecent);
-    const beatTimer = setInterval(beat, HEARTBEAT_MS);
+    beat(true).then(loadRecent); // aprire o aggiornare la pagina e' un'azione
+    const beatTimer = setInterval(() => beat(), HEARTBEAT_MS);
     const pollTimer = setInterval(loadRecent, POLL_MS);
 
     // Tornando sulla scheda o quando torna la rete: subito segnale, annuncio e lista aggiornata
@@ -144,26 +138,25 @@ export function usePresence(me: PresencePayload) {
       if (!ch || ch.state !== "joined") setAttempt((a) => a + 1);
       else ch.track(JSON.parse(latest.current));
     };
-    // Chiudendo il sito (non quando si mette in pausa): segnale spento, si sparisce subito
-    const onLeave = () => navigator.sendBeacon("/api/presenza/esci");
 
     document.addEventListener("visibilitychange", onBack);
     window.addEventListener("online", onBack);
-    window.addEventListener("pagehide", onLeave);
     return () => {
       clearInterval(beatTimer);
       clearInterval(pollTimer);
       document.removeEventListener("visibilitychange", onBack);
       window.removeEventListener("online", onBack);
-      window.removeEventListener("pagehide", onLeave);
     };
   }, [supabase, refreshRecent]);
 
-  // Ogni volta che cambio posto, nome, frase... aggiorno subito cio' che vedono gli altri
+  // Ogni volta che cambio posto, frase, disponibilita'... aggiorno subito cio' che vedono
+  // gli altri. Cambiare pagina o frase e' un'azione: tiene presenti per un'altra ora.
   useEffect(() => {
     channel?.track(JSON.parse(payload));
-    supabase.rpc("touch_online", { p_info: JSON.parse(payload) });
-  }, [supabase, channel, payload]);
+  }, [channel, payload]);
+  useEffect(() => {
+    supabase.rpc("touch_online", { p_info: JSON.parse(payload), p_action: true });
+  }, [supabase, payload]);
 
   return useMemo(() => {
     const liveIds = new Set(live.map((p) => p.userId));

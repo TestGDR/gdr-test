@@ -190,6 +190,8 @@ export async function updatePassword(_prev: AuthState, formData: FormData): Prom
 
 export async function logout() {
   const supabase = await createClient();
+  // si sparisce subito dall'elenco dei presenti
+  await supabase.rpc("leave_online");
   await supabase.auth.signOut();
   (await cookies()).delete(ACCESS_COOKIE);
   redirect("/");
