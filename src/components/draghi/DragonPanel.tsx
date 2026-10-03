@@ -70,7 +70,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
 
   return (
     <div className="flex h-full bg-[#e2d0a8] bg-[url('/images/scheda-drago.webp')] bg-cover bg-center">
-      <div className={`min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 ${INK}`}>
+      <div className={`min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-8 sm:py-5 ${INK}`}>
         {!data ? (
           <p className="py-20 text-center italic">Caricamento...</p>
         ) : !data.dragon ? (
@@ -127,14 +127,14 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
 function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
   return (
     <header className="mb-4 flex items-center gap-3">
-      <Ring size="h-12 w-12" title={dragon.sex === "maschio" ? "Maschio" : "Femmina"}>
+      <Ring size="h-10 w-10 sm:h-12 sm:w-12" title={dragon.sex === "maschio" ? "Maschio" : "Femmina"}>
         <span className="font-serif text-xl">{dragon.sex === "maschio" ? "♂" : "♀"}</span>
       </Ring>
       <div className="min-w-0 flex-1 text-center">
         <p className="text-[11px] tracking-[0.3em] text-[#6b4a2e] uppercase">{stageLabel(dragon.stage, stages)}</p>
-        <h2 className="truncate font-serif text-2xl tracking-wide text-[#3b2a1a] sm:text-3xl">{dragonName(dragon)}</h2>
+        <h2 className="truncate font-serif text-xl tracking-wide text-[#3b2a1a] sm:text-3xl">{dragonName(dragon)}</h2>
       </div>
-      <Ring size="h-12 w-12" title={[dragon.color1, dragon.color2].filter(Boolean).join(" e ")}>
+      <Ring size="h-10 w-10 sm:h-12 sm:w-12" title={[dragon.color1, dragon.color2].filter(Boolean).join(" e ")}>
         <span className="flex gap-0.5">
           {[dragon.color1, dragon.color2].filter(Boolean).map((c) => (
             <span key={c} className="h-4 w-4 rounded-full border border-black/50" style={{ background: colorHex(c) }} />
@@ -159,25 +159,31 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
         <DragonBars dragon={dragon} stages={stages} variant="parchment" />
       </div>
       <div className="relative mx-auto flex max-w-xl items-center justify-center">
-        <BigRing label="Mantenimento" value={monthlyUpkeep(dragon, stages)} note="risorse / mese" className="absolute bottom-6 left-0 z-10" />
+        {/* su computer i due cerchi grandi stanno ai lati dell'esagono */}
+        <BigRing label="Mantenimento" value={monthlyUpkeep(dragon, stages)} note="risorse / mese" className="absolute bottom-6 left-0 z-10 hidden sm:flex" />
         <HexFrame dragon={dragon} />
         <BigRing
           label="Crescita"
           value={next && cost !== null ? cost : "—"}
           note={next ? `PX per ${next.label.toLowerCase()}` : "è adulto"}
-          className="absolute right-0 bottom-6 z-10"
+          className="absolute right-0 bottom-6 z-10 hidden sm:flex"
         />
+      </div>
+      {/* su cellulare sotto l'esagono, affiancati */}
+      <div className="flex justify-around sm:hidden">
+        <BigRing label="Mantenimento" value={monthlyUpkeep(dragon, stages)} note="risorse / mese" />
+        <BigRing label="Crescita" value={next && cost !== null ? cost : "—"} note={next ? `PX per ${next.label.toLowerCase()}` : "è adulto"} />
       </div>
 
       {/* caratteristiche: due per lato, come su una scheda incisa */}
-      <div className="mx-auto flex max-w-xl items-start justify-between px-2">
+      <div className="mx-auto grid max-w-xl grid-cols-4 items-start gap-1 sm:flex sm:justify-between sm:px-2">
         {STATS.map((s, i) => (
-          <div key={s.key} className={`relative flex flex-col items-center gap-1 ${i === 1 || i === 2 ? "mt-6" : ""}`}>
-            <Ring size="h-14 w-14">
-              <span className="font-serif text-xl">{dragon.stats[s.key] ?? 0}</span>
+          <div key={s.key} className={`relative flex flex-col items-center gap-1 ${i === 1 || i === 2 ? "sm:mt-6" : ""}`}>
+            <Ring size="h-11 w-11 sm:h-14 sm:w-14">
+              <span className="font-serif text-lg sm:text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
             <ModBadge mod={mods[`caratteristica:${s.key}`]} />
-            <span className="text-[10px] tracking-[0.2em] text-[#6b4a2e] uppercase">{s.label}</span>
+            <span className="text-[8px] tracking-[0.08em] text-[#6b4a2e] uppercase sm:text-[10px] sm:tracking-[0.2em]">{s.label}</span>
           </div>
         ))}
       </div>
@@ -200,7 +206,7 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
 function HexFrame({ dragon }: { dragon: Dragon }) {
   const hex = "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
   return (
-    <div className="relative h-[19rem] w-[16.5rem] sm:h-[22rem] sm:w-[19rem]">
+    <div className="relative h-[15rem] w-[13rem] sm:h-[22rem] sm:w-[19rem]">
       <svg viewBox="0 0 100 115" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
         <polygon points="50,1 99,29 99,86 50,114 1,86 1,29" fill="none" stroke={LINE} strokeWidth="1.1" />
         <polygon points="50,4.5 96,31 96,84 50,110.5 4,84 4,31" fill="none" stroke={LINE} strokeWidth="2.6" strokeDasharray="0.6 1.4" strokeOpacity=".7" />
@@ -641,7 +647,7 @@ function Ring({ size, children, title, highlight }: { size: string; children: Re
 function BigRing({ label, value, note, className = "" }: { label: string; value: ReactNode; note?: string; className?: string }) {
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      <span className="mb-1 font-serif text-[11px] tracking-[0.2em] text-[#6b4a2e] uppercase">{label}</span>
+      <span className="mb-1 flex min-h-[2.6em] items-end justify-center text-center font-serif text-[11px] leading-tight tracking-[0.12em] text-[#6b4a2e] uppercase sm:tracking-[0.2em]">{label}</span>
       <Ring size="h-20 w-20">
         <span className="font-serif text-3xl">{value}</span>
       </Ring>

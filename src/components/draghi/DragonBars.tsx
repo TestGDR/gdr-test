@@ -56,9 +56,9 @@ function Bar({
   const track = variant === "parchment" ? "border-[#6b4a2e] bg-[#2a1d12]" : "border-[#8a6a3e]/70 bg-black/70";
   return (
     <div title={hint}>
-      <div className={`mb-1 flex items-baseline justify-between gap-3 font-serif text-sm ${text}`}>
-        <span>{label}</span>
-        <span className="tabular-nums">{right}</span>
+      <div className={`mb-1 flex items-baseline justify-between gap-2 font-serif text-xs sm:text-sm ${text}`}>
+        <span className="min-w-0 truncate">{label}</span>
+        <span className="shrink-0 whitespace-nowrap tabular-nums">{right}</span>
       </div>
       <div className={`h-3 overflow-hidden border ${track} shadow-[inset_0_1px_3px_rgb(0_0_0/0.8)]`}>
         <div className={`h-full ${fill} shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-[width] duration-500`} style={{ width: `${value * 100}%` }} />
