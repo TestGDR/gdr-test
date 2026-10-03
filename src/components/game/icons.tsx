@@ -136,3 +136,39 @@ export const GearIcon = () => (
     <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
   </svg>
 );
+
+// Notizie ON: pergamena arrotolata (cronache dal mondo di gioco)
+export const ScrollIcon = () => (
+  <svg {...base}>
+    <path d="M7 4h11a2 2 0 0 1 2 2v1h-4" />
+    <path d="M16 7v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1h10v1a2 2 0 0 0 2 2" />
+    <path d="M7 4a2 2 0 0 0-2 2v11M9 9h4M9 12.5h4" />
+  </svg>
+);
+
+// Notizie OFF: corno da annuncio (comunicazioni dello staff)
+export const HornIcon = () => (
+  <svg {...base}>
+    <path d="M3 10v4h3l8 5V5L6 10H3Z" />
+    <path d="M17.5 9a4 4 0 0 1 0 6M20 6.5a7.5 7.5 0 0 1 0 11" />
+  </svg>
+);
+
+// Ricerca gioco: spade incrociate
+export const SwordsIcon = () => (
+  <svg {...base}>
+    <path d="M14.5 17.5 3 6V3h3l11.5 11.5" />
+    <path d="m13 19 6-6M16 16l4 4M19 21l2-2" />
+    <path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
+    <path d="m11 19-6-6M8 16l-4 4M5 21l-2-2" />
+  </svg>
+);
+
+// Assenze: clessidra
+export const HourglassIcon = () => (
+  <svg {...base}>
+    <path d="M6 3h12M6 21h12" />
+    <path d="M7 3v3a5 5 0 0 0 5 5 5 5 0 0 0 5-5V3M7 21v-3a5 5 0 0 1 5-5 5 5 0 0 1 5 5v3" />
+    <path d="M9.5 19h5" />
+  </svg>
+);

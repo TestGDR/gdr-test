@@ -41,6 +41,9 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       initialAvailability={isAvailability(savedAvailability) ? savedAvailability : "disponibile"}
       canEditDocs={permissions.has("documentazione.scrivere")}
       canManage={MANAGEMENT_PERMISSIONS.some((p) => permissions.has(p))}
+      canWriteNews={permissions.has("annunci.globali")}
+      canModerate={permissions.has("chat.moderare")}
+      canManageUsers={permissions.has("utenti.gestire")}
     >
       {children}
     </GameShell>

@@ -325,3 +325,15 @@ body {
   line-height: 0.85;
   color: #8b2a14;
 }
+
+/* Icona che lampeggia finche' non si apre il pannello (es. nuove richieste di gioco) */
+@keyframes blink-call {
+  0%, 100% { color: var(--color-muted); filter: none; }
+  50% { color: #f0c75e; filter: drop-shadow(0 0 6px rgb(240 199 94 / 0.9)); }
+}
+.blink-call {
+  animation: blink-call 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .blink-call { animation: none; color: #f0c75e; }
+}

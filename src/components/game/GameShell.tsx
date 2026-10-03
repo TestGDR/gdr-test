@@ -29,16 +29,23 @@ import {
   ChevronIcon,
   DragonIcon,
   GearIcon,
+  HornIcon,
+  HourglassIcon,
   InfoIcon,
   MapIcon,
   MenuIcon,
   PowerIcon,
   RefreshIcon,
+  ScrollIcon,
+  SwordsIcon,
   TicketIcon,
   ToolsIcon,
   UsersIcon,
   WeatherIcon,
 } from "./icons";
+import NewsPanel, { type NewsKind } from "./NewsPanel";
+import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
+import AbsencesPanel from "./AbsencesPanel";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
@@ -71,7 +78,19 @@ type Props = {
   initialAvailability: Availability;
   canEditDocs: boolean; // puo' modificare Manuale e Ambientazione
   canManage: boolean; // vede la rotella della Gestione (moderatori e admin)
+  canWriteNews: boolean; // scrive le Notizie ON e OFF
+  canModerate: boolean; // toglie le richieste di gioco altrui
+  canManageUsers: boolean; // toglie le assenze altrui
   children: ReactNode;
+};
+
+// Pannelli aperti dalla barra di destra (o dal menu del cellulare)
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze";
+const PANEL_TITLE: Record<Panel, string> = {
+  "notizie-on": "Notizie ON",
+  "notizie-off": "Notizie OFF",
+  ricerca: "Ricerca gioco",
+  assenze: "Assenze",
 };
 
 export default function GameShell({
@@ -83,6 +102,9 @@ export default function GameShell({
   initialAvailability,
   canEditDocs,
   canManage,
+  canWriteNews,
+  canModerate,
+  canManageUsers,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -129,6 +151,13 @@ export default function GameShell({
   });
 
   const unread = useUnread(character?.id ?? null);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
+  const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
+  const openPanel = (p: Panel) => {
+    setPanel(p);
+    setPanelSession((n) => n + 1);
+  };
 
   function openMessages(kind: MessageKind, to: Contact | null = null) {
     setMessages((m) => ({ open: true, kind, to, session: m.session + 1 }));
@@ -154,8 +183,8 @@ export default function GameShell({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            aria-label="Apri pannello"
-            className={`${menuBtn} absolute left-2 md:hidden`}
+            aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : "Apri pannello"}
+            className={`${menuBtn} absolute left-2 md:hidden ${playRequests.count > 0 ? "blink-call" : ""}`}
           >
             <MenuIcon />
           </button>
@@ -265,6 +294,8 @@ export default function GameShell({
                   onlineCount={online.length}
                   onOpenOnline={() => setOnlineOpen(true)}
                   onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
+                  onOpenPanel={openPanel}
+                  newRequests={playRequests.count}
                 />
               }
             />
@@ -288,7 +319,12 @@ export default function GameShell({
                 : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
             }`}
           >
-            <RightRail canManage={canManage} onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null} />
+            <RightRail
+              canManage={canManage}
+              onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
+              onOpenPanel={openPanel}
+              newRequests={playRequests.count}
+            />
           </nav>
         </div>
       </div>
@@ -312,6 +348,24 @@ export default function GameShell({
           {dragonOpen > 0 && <DragonPanel key={dragonOpen} characterId={character.id} />}
         </Modal>
       )}
+      <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""} size="lg">
+        {(panel === "notizie-on" || panel === "notizie-off") && (
+          <NewsPanel key={`${panel}-${panelSession}`} kind={panel.slice(8) as NewsKind} canWrite={canWriteNews} />
+        )}
+        {panel === "ricerca" && (
+          <PlayRequestsPanel
+            key={panelSession}
+            userId={userId}
+            character={character}
+            canModerate={canModerate}
+            onMessageOff={(to) => openMessages("off", to)}
+            onSeen={playRequests.markSeen}
+          />
+        )}
+        {panel === "assenze" && (
+          <AbsencesPanel key={panelSession} userId={userId} character={character} canManage={canManageUsers} />
+        )}
+      </Modal>
       <OnlineModal
         open={onlineOpen}
         onClose={() => setOnlineOpen(false)}
@@ -572,17 +626,20 @@ function MobileTools({
   onlineCount,
   onOpenOnline,
   onOpenDragon,
+  onOpenPanel,
+  newRequests,
 }: {
   canManage: boolean;
   onlineCount: number;
   onOpenOnline: () => void;
   onOpenDragon: (() => void) | null;
+  onOpenPanel: (p: Panel) => void;
+  newRequests: number;
 }) {
-  const count = 3 + (canManage ? 1 : 0) + (onOpenDragon ? 1 : 0);
   return (
-    <div className={`grid gap-2 ${count === 5 ? "grid-cols-5" : count === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+    <div className="grid grid-cols-5 gap-2">
       {canManage && (
-        <Link href="/gestione" className={drawerBtn} aria-label="Gestione">
+        <Link href="/gestione" className={`${drawerBtn} ${goldGear}`} aria-label="Gestione">
           <GearIcon />
         </Link>
       )}
@@ -607,6 +664,9 @@ function MobileTools({
           {onlineCount}
         </span>
       </button>
+      {PANEL_ICONS.map((p) => (
+        <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
+      ))}
     </div>
   );
 }
@@ -860,7 +920,62 @@ function Tip({ children }: { children: ReactNode }) {
   );
 }
 
-function RightRail({ canManage, onOpenDragon }: { canManage: boolean; onOpenDragon: (() => void) | null }) {
+// Notizie, ricerca gioco e assenze: per tutti i giocatori
+const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
+  { id: "notizie-on", icon: <ScrollIcon /> },
+  { id: "notizie-off", icon: <HornIcon /> },
+  { id: "ricerca", icon: <SwordsIcon /> },
+  { id: "assenze", icon: <HourglassIcon /> },
+];
+const panelLabel = (p: Panel, newRequests: number) =>
+  p === "ricerca" && newRequests > 0
+    ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
+    : PANEL_TITLE[p];
+
+function PanelButton({
+  panel,
+  icon,
+  newRequests,
+  onOpen,
+  className,
+  tip,
+}: {
+  panel: Panel;
+  icon: ReactNode;
+  newRequests: number;
+  onOpen: (p: Panel) => void;
+  className: string;
+  tip?: boolean;
+}) {
+  const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
+  return (
+    <button type="button" onClick={() => onOpen(panel)} className={`${className} ${calling ? "blink-call" : ""}`} aria-label={panelLabel(panel, newRequests)}>
+      {icon}
+      {calling && (
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">
+          {newRequests}
+        </span>
+      )}
+      {tip && <Tip>{panelLabel(panel, newRequests)}</Tip>}
+    </button>
+  );
+}
+
+// Rotella della Gestione: dorata
+const goldGear =
+  "text-[#d4a72c] drop-shadow-[0_0_4px_rgb(212_167_44/0.45)] hover:text-[#f0c75e] hover:drop-shadow-[0_0_6px_rgb(240_199_94/0.7)]";
+
+function RightRail({
+  canManage,
+  onOpenDragon,
+  onOpenPanel,
+  newRequests,
+}: {
+  canManage: boolean;
+  onOpenDragon: (() => void) | null;
+  onOpenPanel: (p: Panel) => void;
+  newRequests: number;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
@@ -894,11 +1009,23 @@ function RightRail({ canManage, onOpenDragon }: { canManage: boolean; onOpenDrag
         )}
         {/* Pannelli di gestione: solo moderatori e admin (su cellulare stanno nel pannello) */}
         {canManage && (
-          <Link href="/gestione" className={`${railBtn} ${active("/gestione")} max-md:hidden`} aria-label="Gestione">
+          <Link href="/gestione" className={`${railBtn} ${goldGear} max-md:hidden`} aria-label="Gestione">
             <GearIcon />
             <Tip>Gestione</Tip>
           </Link>
         )}
+        {/* Notizie, ricerca gioco e assenze (su cellulare stanno nel menu dell'hamburger) */}
+        {PANEL_ICONS.map((p) => (
+          <PanelButton
+            key={p.id}
+            panel={p.id}
+            icon={p.icon}
+            newRequests={newRequests}
+            onOpen={onOpenPanel}
+            className={`${railBtn} max-md:hidden`}
+            tip
+          />
+        ))}
       </div>
       <form action={logout} className="md:mt-auto">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">
