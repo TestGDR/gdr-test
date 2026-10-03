@@ -19,6 +19,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "gestione.accessi", label: "Registro accessi", description: "IP, controllo VPN e IP condivisi tra account" },
       { key: "mondo.gestire", label: "Gestione mondo", description: "Mappe, luoghi e liste di gioco" },
       { key: "casate.gestire", label: "Gestione casate", description: "Casate, ruoli e stipendi, alberi genealogici, PNG e membri" },
+      { key: "draghi.gestire", label: "Gestione draghi", description: "Draghi e uova delle casate, fasi di crescita e PX dei personaggi" },
       { key: "documentazione.scrivere", label: "Manuale e Ambientazione", description: "Scrivere e modificare le pagine della documentazione" },
       { key: "utenti.gestire", label: "Gestione utenti", description: "Sospensioni ed eliminazioni degli account", soon: true },
     ],
@@ -68,4 +69,5 @@ export const MANAGEMENT_PERMISSIONS = [
   "gestione.accessi",
   "casate.gestire",
   "mondo.gestire",
+  "draghi.gestire",
 ];

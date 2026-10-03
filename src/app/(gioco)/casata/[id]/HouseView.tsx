@@ -2,6 +2,7 @@
 
 import DOMPurify from "dompurify";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
+import HouseDragons from "@/components/draghi/HouseDragons";
 import { buildTree, FamilyCanvas } from "@/components/houses/FamilyTree";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import { GAME_YEAR } from "@/lib/game-config";
@@ -163,6 +164,10 @@ export default function HouseView({ house, roles, npcs, members, family, relatio
             })}
           </ul>
         )}
+      </Section>
+
+      <Section title="Draghi">
+        <HouseDragons houseId={house.id} />
       </Section>
 
       <Section title="Albero genealogico">

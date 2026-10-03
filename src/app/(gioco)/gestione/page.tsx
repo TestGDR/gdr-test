@@ -24,6 +24,12 @@ const PANELS = [
     description: "Stemmi, ruoli e stipendi, alberi genealogici, PNG e PG di ogni casata.",
   },
   {
+    permission: "draghi.gestire",
+    href: "/gestione/draghi",
+    title: "Draghi",
+    description: "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e PX dei personaggi.",
+  },
+  {
     permission: "mondo.gestire",
     href: "/gestione/mondo",
     title: "Gestione mondo",

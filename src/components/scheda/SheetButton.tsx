@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { saveSheetExtras } from "@/app/scheda/actions";
+import DragonSection from "@/components/draghi/DragonSection";
 import Modal from "@/components/ui/Modal";
 import ModalButton from "@/components/ui/ModalButton";
 import { ATTRIBUTES, REGIONS, SEXES, SOCIAL_CLASSES, labelOf } from "@/lib/character-creation";
@@ -207,6 +208,12 @@ function CharacterSheet({
             <h4 className="mb-1 font-serif text-accent">Storia</h4>
             <p className="text-sm leading-relaxed whitespace-pre-line">{character.description}</p>
           </section>
+          <DragonSection
+            characterId={character.id}
+            characterName={character.name}
+            houseId={character.house_id ?? null}
+            isOwn={isOwn}
+          />
         </div>
       )}
     </div>
