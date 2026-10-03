@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import Modal from "@/components/ui/Modal";
 import type { Availability } from "@/lib/availability";
@@ -45,16 +46,13 @@ export default function OnlineModal(props: Props) {
   );
 
   // Gruppi: in cima chi cerca gioco, poi chi e' fuori dalle chat, poi una sezione per lista
-  const groups = new Map<string, { label: string; players: OnlinePlayer[] }>();
+  // In mappa: solo "Mappa". In chat: solo il nome della chat, cliccabile per entrarci
+  const groups = new Map<string, { label: string; chatId: string | null; players: OnlinePlayer[] }>();
   for (const p of visible) {
     const key = p.availability === "cerca" ? "cerca" : p.place === "chat" ? p.placeKey : "fuori";
-    const label =
-      key === "cerca"
-        ? "In cerca di gioco adesso"
-        : p.place === "chat"
-          ? `In chat · ${p.placeLabel}`
-          : "Online fuori chat";
-    if (!groups.has(key)) groups.set(key, { label, players: [] });
+    const label = key === "cerca" ? "In cerca di gioco adesso" : p.place === "chat" ? p.placeLabel : "Mappa";
+    const chatId = key !== "cerca" && p.place === "chat" ? p.placeKey.replace(/^chat:/, "") : null;
+    if (!groups.has(key)) groups.set(key, { label, chatId, players: [] });
     groups.get(key)!.players.push(p);
   }
   const order = (key: string) => (key === "cerca" ? 0 : key === "fuori" ? 1 : 2);
@@ -98,10 +96,21 @@ export default function OnlineModal(props: Props) {
                     : "border-blood/50 bg-gradient-to-r from-blood/10 via-blood/30 to-blood/10"
                 }`}
               >
-                {group.label}
-                <span className="rounded-full border border-accent/60 px-1.5 text-[10px] text-accent">
-                  {group.players.length}
-                </span>
+                {group.chatId ? (
+                  <Link
+                    href={`/chat/${group.chatId}`}
+                    onClick={onClose}
+                    title={`Entra in ${group.label}`}
+                    className="text-accent underline-offset-4 hover:underline"
+                  >
+                    {group.label}
+                  </Link>
+                ) : (
+                  <>
+                    {group.label}
+                    <span className="rounded-full border border-accent/60 px-1.5 text-[10px] text-accent">{group.players.length}</span>
+                  </>
+                )}
               </h3>
               <ul className="space-y-1.5">
                 {group.players.map((p) => (

@@ -474,7 +474,13 @@ function LeftColumn({
           <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
         </button>
         <h3 className="mt-3 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
-          {me?.place === "chat" ? me.placeLabel : `In mappa · ${area.title}`}
+          {me?.place === "chat" ? (
+            <Link href={`/chat/${me.placeKey.replace(/^chat:/, "")}`} className="hover:underline" title={`Vai in ${me.placeLabel}`}>
+              {me.placeLabel}
+            </Link>
+          ) : (
+            "Mappa"
+          )}
         </h3>
         <ul className="mt-2 space-y-1.5 text-sm">
           {here.map((p) => (
