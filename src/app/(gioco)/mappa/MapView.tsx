@@ -23,6 +23,17 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
   const [openId, setOpenId] = useState<string | null>(locations.some((l) => l.id === initialLocationId) ? initialLocationId : null);
   const open = locations.find((l) => l.id === openId);
 
+  // Chiudendo la finestra tolgo "luogo" dall'indirizzo (arriva tornando da una chat):
+  // cosi' aggiornando la pagina non si riapre da sola
+  function close() {
+    setOpenId(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("luogo")) {
+      url.searchParams.delete("luogo");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[610px]">{/* mappa 600px + cornice 2 x 5px */}
       <div className="frame-ornate relative overflow-hidden">
@@ -50,7 +61,7 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
         {map.description && <p className="mt-1 text-sm leading-relaxed text-muted">{map.description}</p>}
       </div>
 
-      <Modal open={!!open} onClose={() => setOpenId(null)} title={open?.name ?? ""} size="area">
+      <Modal open={!!open} onClose={close} title={open?.name ?? ""} size="area">
         {open && (
           <RoomList
             location={open}
