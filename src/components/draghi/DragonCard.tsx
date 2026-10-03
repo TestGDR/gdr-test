@@ -57,9 +57,7 @@ export default function DragonCard({
         </div>
       </header>
 
-      {dragon.temperament && (
-        <p className="border-l-2 border-accent/60 pl-3 text-sm leading-relaxed text-foreground/90 italic">{dragon.temperament}</p>
-      )}
+      {dragon.temperament && <Temperament text={dragon.temperament} />}
 
       <div className="flex flex-wrap gap-1.5">
         {dragon.pregi.map((p) => (
@@ -84,6 +82,23 @@ export default function DragonCard({
         <GrowBox dragonId={dragon.id} cost={cost} next={next?.label ?? null} px={rider.px} onSaved={onChanged} />
       )}
     </article>
+  );
+}
+
+// Carattere: "Titolo — descrizione" (il titolo in evidenza)
+function Temperament({ text }: { text: string }) {
+  const [title, ...rest] = text.split(" — ");
+  return (
+    <div className="border-l-2 border-accent/60 pl-3 text-sm leading-relaxed">
+      <h4 className="mb-1 font-serif tracking-wider text-accent uppercase">Carattere</h4>
+      {rest.length > 0 ? (
+        <p>
+          <strong className="font-serif text-[#e8cf9c]">{title}</strong> — <span className="text-foreground/90 italic">{rest.join(" — ")}</span>
+        </p>
+      ) : (
+        <p className="text-foreground/90 italic">{text}</p>
+      )}
+    </div>
   );
 }
 

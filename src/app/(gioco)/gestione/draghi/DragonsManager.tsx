@@ -343,7 +343,7 @@ function DragonEditor({
 
           <Field label="Carattere">
             <div className="space-y-1.5">
-              <textarea value={d.temperament} onChange={(e) => set("temperament", e.target.value)} rows={2} className="input" />
+              <textarea value={d.temperament} onChange={(e) => set("temperament", e.target.value)} rows={5} className="input" />
               <button
                 type="button"
                 onClick={async () => {
