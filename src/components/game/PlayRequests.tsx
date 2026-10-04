@@ -162,6 +162,12 @@ export default function PlayRequestsPanel({
           </button>
         )}
       </div>
+      {character?.status !== "attivo" && (
+        <p className="border border-orange-300/40 bg-orange-300/10 px-3 py-2 text-sm text-orange-200">
+          Potrai inserire una ricerca gioco quando il tuo personaggio sarà attivo: completa la creazione del PG (clicca sulla sua immagine e
+          poi su CREA PG). Intanto puoi vedere le ricerche degli altri e rispondere con un OFF.
+        </p>
+      )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
       {list === null && <p className="text-sm text-muted">Caricamento...</p>}
