@@ -12,7 +12,7 @@ export type TravelSettings = {
   default_location_id: string | null;
 };
 export type MapRow = { id: string; name: string; active: boolean };
-export type PlaceRow = { id: string; name: string; map_id: string; in_game: boolean; has_ravens: boolean };
+export type PlaceRow = { id: string; name: string; map_id: string; in_game: boolean; has_ravens: boolean; kind: string };
 export type PgRow = { id: string; name: string; location_id: string | null };
 
 type Times = {
@@ -60,7 +60,8 @@ export default function TravelManager({
   places: PlaceRow[];
   pgs: PgRow[];
 }) {
-  const gamePlaces = places.filter((p) => p.in_game);
+  // solo i luoghi veri: le macroaree di viaggio non sono tappe ne' destinazioni
+  const gamePlaces = places.filter((p) => p.in_game && p.kind === "luogo");
   return (
     <div className="space-y-6">
       <PaceForm settings={settings} />

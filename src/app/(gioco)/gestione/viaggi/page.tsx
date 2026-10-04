@@ -12,7 +12,7 @@ export default async function ViaggiPage() {
       .select("pace_slow_factor, pace_fast_factor, raven_intercept_pct, rider_intercept_pct, default_location_id")
       .maybeSingle(),
     supabase.from("maps").select("id, name, active").order("sort_order").order("name"),
-    supabase.from("locations").select("id, name, map_id, in_game, has_ravens").order("name"),
+    supabase.from("locations").select("id, name, map_id, in_game, has_ravens, kind").order("name"),
     supabase.from("characters").select("id, name, location_id").order("name"),
   ]);
 

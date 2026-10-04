@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +52,7 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
   const [pace, setPace] = useState<Pace>("normale");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [canFly, setCanFly] = useState(false);
+  const [rooms, setRooms] = useState<{ room_id: string; room_name: string; location_name: string }[]>([]); // chat di viaggio
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -79,6 +81,14 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
     supabase.rpc("travel_options", { p_character: me.id }).then(({ data }) => setOptions((data ?? []) as Option[]));
     supabase.rpc("can_fly", { p_character: me.id }).then(({ data }) => setCanFly(!!data));
   }, [supabase, me.id, load]);
+
+  // in viaggio: le chat in cui si puo' giocare
+  useEffect(() => {
+    if (!travel) return;
+    supabase
+      .rpc("travel_rooms", { p_character: me.id })
+      .then(({ data }) => setRooms((data ?? []) as { room_id: string; room_name: string; location_name: string }[]));
+  }, [supabase, me.id, travel]);
 
   // il tempo che manca si aggiorna da solo; all'arrivo si ricarica
   useEffect(() => {
@@ -160,6 +170,24 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
         <p className="text-center text-xs text-muted">
           Finché sei in viaggio ti trovi ancora a {name(here)}: corvi, staffette e paggi ti cercano lì. All&apos;arrivo riceverai un messaggio di SISTEMA.
         </p>
+        <div className="space-y-1 border border-border bg-black/40 p-3">
+          <p className="text-xs tracking-[0.12em] text-muted uppercase">Dove puoi giocare durante il viaggio</p>
+          {rooms.length === 0 ? (
+            <p className="text-sm text-muted">Nessuna chat di viaggio su questo percorso.</p>
+          ) : (
+            <ul className="space-y-0.5 text-sm">
+              {rooms.map((r) => (
+                <li key={r.room_id}>
+                  <Link href={`/chat/${r.room_id}`} className="text-accent hover:underline">
+                    {r.room_name}
+                  </Link>{" "}
+                  <span className="text-xs text-muted">· {r.location_name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[11px] text-muted">Finché viaggi non puoi giocare nelle chat delle città e dei castelli.</p>
+        </div>
         <div className="text-center">
           <button type="button" onClick={cancel} className="btn-ghost border-red-900 px-4 py-1.5 text-sm text-red-400 hover:border-red-500">
             Annulla il viaggio

@@ -447,6 +447,17 @@ function LocationForm({
       <Field label="Descrizione">
         <textarea name="description" defaultValue={location?.description} rows={4} maxLength={4000} className="input" />
       </Field>
+      <Field label="Tipo">
+        <select name="kind" defaultValue={location?.kind ?? "luogo"} className="input">
+          <option value="luogo">Luogo (città, castello, borgo...)</option>
+          <option value="viaggio_terra">Viaggio per terra: chat per chi viaggia a piedi, a cavallo o in drago</option>
+          <option value="viaggio_mare">Viaggio per mare: chat per chi viaggia per mare</option>
+        </select>
+      </Field>
+      <p className="-mt-1 text-xs text-muted">
+        Chi è in viaggio gioca solo nelle chat di viaggio della mappa di partenza o di arrivo, e non nei luoghi; chi non è in viaggio non
+        entra nelle chat di viaggio. Le macroaree di viaggio non sono destinazioni.
+      </p>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="has_ravens" defaultChecked={location?.has_ravens ?? false} className="h-4 w-4 accent-[#8b2a14]" />
         Castello o città: partono e arrivano i corvi

@@ -61,12 +61,20 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   );
 
   if (!canEnter) {
+    // viaggi: in viaggio si gioca solo nelle chat di viaggio, e viceversa
+    const { data: travelBlock } = await supabase.rpc("room_travel_block", { r: id });
     return (
       <div className="mx-auto mt-6 max-w-xl text-center">
         <GameArea title={room.name} image={image} description={room.description} weatherRegionId={weatherRegionId} />
         {header}
         <p className="panel text-muted">
-          {room.access === "casata"
+          {travelBlock === "in_viaggio"
+            ? "Sei in viaggio: finché non arrivi puoi giocare solo nelle chat di viaggio. Le trovi nel pannello Viaggio (la bussola)."
+            : travelBlock === "non_in_viaggio"
+              ? "Questa è una chat di viaggio: ci entra solo chi è in viaggio. Per partire usa il pannello Viaggio (la bussola)."
+              : travelBlock === "viaggio_diverso"
+                ? "Questa chat di viaggio non è sul tuo percorso (o è per chi viaggia con un altro mezzo): le tue sono nel pannello Viaggio."
+                : room.access === "casata"
             ? `Questa è una chat privata della casata ${house?.name ?? ""}: entrano solo i suoi membri e chi viene invitato.`
             : rental
               ? "Questa stanza è affittata da un altro personaggio: entra solo chi viene invitato."

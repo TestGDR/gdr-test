@@ -137,6 +137,7 @@ export async function saveLocation(form: FormData): Promise<WorldResult> {
     description: text(form, "description", 4000),
     has_ravens: form.get("has_ravens") === "on",
     in_game: form.get("in_game") === "on",
+    kind: ["viaggio_terra", "viaggio_mare"].includes(String(form.get("kind"))) ? String(form.get("kind")) : "luogo",
   };
   if (!id) Object.assign(row, { x: 50, y: 50 }); // le nuove compaiono al centro: poi si trascinano
 
