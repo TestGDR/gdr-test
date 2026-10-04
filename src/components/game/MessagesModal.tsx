@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
+import OffMessages from "./OffMessages";
 
 export type MessageKind = "missiva" | "off";
 export type Contact = { id: string; name: string; avatar?: string | null };
@@ -35,14 +36,18 @@ type Props = {
   initialTo: Contact | null;
   session: number; // cambia a ogni apertura: riparte da zero con i dati aggiornati
   onRead: () => void;
+  canBroadcast: boolean; // puo' scrivere i messaggi OFF a tutti
 };
 
-export default function MessagesModal({ kind, open, onClose, me, initialTo, session, onRead }: Props) {
+export default function MessagesModal({ kind, open, onClose, me, initialTo, session, onRead, canBroadcast }: Props) {
   return (
     <Modal open={open} onClose={onClose} title={KIND_LABEL[kind]} size="xl">
-      {open && (
-        <Messages key={session} kind={kind} me={me} initialTo={initialTo} onRead={onRead} />
-      )}
+      {open &&
+        (kind === "off" ? (
+          <OffMessages key={session} me={me} initialTo={initialTo} canBroadcast={canBroadcast} onRead={onRead} />
+        ) : (
+          <Messages key={session} kind={kind} me={me} initialTo={initialTo} onRead={onRead} />
+        ))}
     </Modal>
   );
 }

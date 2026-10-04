@@ -22,6 +22,7 @@ import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
+import { playMessageChime } from "@/lib/notify-sound";
 import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
@@ -342,6 +343,7 @@ export default function GameShell({
           initialTo={messages.to}
           session={messages.session}
           onRead={unread.refresh}
+          canBroadcast={canWriteNewsOff}
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
@@ -678,7 +680,7 @@ function MobileTools({
 // Cellulare: missive e OFF nella barra in alto
 function TopMessageButton({ label, count, onClick, children }: { label: string; count: number; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} aria-label={count > 0 ? `${label}: ${count} non letti` : label} className={topBtn}>
+    <button type="button" onClick={onClick} aria-label={count > 0 ? `${label}: ${count} non letti` : label} className={`${topBtn} ${count > 0 ? "message-glow" : ""}`}>
       {children}
       {count > 0 && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
@@ -704,7 +706,7 @@ function MessageButton({
       type="button"
       onClick={onClick}
       aria-label={count > 0 ? `${label}: ${count} non letti` : label}
-      className="group relative z-10 flex h-9 w-9 items-center justify-center text-[#e2c99a] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+      className={`group relative z-10 flex h-9 w-9 items-center justify-center text-[#e2c99a] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none ${count > 0 ? "message-glow" : ""}`}
     >
       {children}
       {count > 0 && (
@@ -817,8 +819,12 @@ function useUnread(characterId: string | null) {
         .eq("kind", kind)
         .is("read_at", null)
         .then(({ count }) => count ?? 0);
-    const [missiva, off] = await Promise.all([count("missiva"), count("off")]);
-    return { missiva, off };
+    const [missiva, off, offShared] = await Promise.all([
+      count("missiva"),
+      count("off"),
+      supabase.rpc("off_unread", { p_character: characterId }).then(({ data }) => (data as number | null) ?? 0),
+    ]);
+    return { missiva, off: off + offShared };
   }, [supabase, characterId]);
 
   const refresh = useCallback(() => {
@@ -835,11 +841,33 @@ function useUnread(characterId: string | null) {
         { event: "INSERT", schema: "public", table: "private_messages", filter: `recipient_id=eq.${characterId}` },
         () => refresh(),
       )
+      // letto da un altro dispositivo o da un'altra scheda
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "private_messages", filter: `recipient_id=eq.${characterId}` },
+        () => refresh(),
+      )
+      // gruppi e messaggi a tutti
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_group_messages" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "off_group_members" }, () => refresh())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_broadcasts" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "off_broadcast_reads", filter: `character_id=eq.${characterId}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [supabase, characterId, fetchCounts, refresh]);
+
+  // Avviso sonoro: subito quando arriva un messaggio, poi ogni 15 secondi finche' resta qualcosa da leggere
+  const total = counts.missiva + counts.off;
+  const previous = useRef(0);
+  useEffect(() => {
+    if (total > previous.current) playMessageChime();
+    previous.current = total;
+    if (total === 0) return;
+    const timer = setInterval(playMessageChime, 15_000);
+    return () => clearInterval(timer);
+  }, [total]);
 
   return { counts, refresh };
 }

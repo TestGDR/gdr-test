@@ -337,3 +337,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .blink-call { animation: none; color: #f0c75e; }
 }
+
+/* Icona dei messaggi con qualcosa da leggere: si illumina */
+@keyframes message-glow {
+  0%, 100% { color: #e2c99a; filter: drop-shadow(0 0 2px rgb(240 199 94 / 0.4)); }
+  50% { color: #fff3c4; filter: drop-shadow(0 0 8px rgb(240 199 94 / 1)); }
+}
+.message-glow {
+  animation: message-glow 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-glow { animation: none; color: #fff3c4; filter: drop-shadow(0 0 6px rgb(240 199 94 / 0.9)); }
+}
