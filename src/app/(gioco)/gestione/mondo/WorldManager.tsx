@@ -37,9 +37,6 @@ type MissiveSettings = {
   rider_full_hours: number;
   raven_intercept_pct: number;
   rider_intercept_pct: number;
-  walk_full_hours: number;
-  horse_full_hours: number;
-  dragon_full_hours: number;
 };
 
 const NEW = "__nuova";
@@ -47,7 +44,7 @@ const TABS = [
   { id: "mappe", label: "Mappe" },
   { id: "macroaree", label: "Macroaree" },
   { id: "chat", label: "Chat" },
-  { id: "missive", label: "Missive e viaggi" },
+  { id: "missive", label: "Missive" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -547,22 +544,7 @@ function MissiveTab({
           L&apos;intercettazione vale solo se il mittente o il destinatario si trovano in una mappa non segnata come &quot;territorio sicuro&quot;.
           I cartigli intercettati non arrivano mai: li trovi nei Log, scheda Missive.
         </p>
-        <h3 className="pt-2 font-serif text-xl text-accent">Viaggi</h3>
-        <p className="text-sm text-muted">
-          Ore reali per attraversare tutta la mappa con ogni mezzo; il tempo di un viaggio è in proporzione alla distanza. Con calma si
-          impiega una volta e mezza il tempo, di fretta tre quarti. Si vola solo con un drago di cui si è cavalieri, almeno adolescente.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="A piedi: ore">
-            <input name="walk_full_hours" type="number" min={0} max={1000} step={0.25} defaultValue={settings.walk_full_hours} className="input" />
-          </Field>
-          <Field label="A cavallo: ore">
-            <input name="horse_full_hours" type="number" min={0} max={1000} step={0.25} defaultValue={settings.horse_full_hours} className="input" />
-          </Field>
-          <Field label="In drago: ore">
-            <input name="dragon_full_hours" type="number" min={0} max={1000} step={0.25} defaultValue={settings.dragon_full_hours} className="input" />
-          </Field>
-        </div>
+        <p className="text-sm text-muted">I tempi dei viaggi dei personaggi si impostano in Gestione → Viaggi.</p>
         <Field label="Luogo di partenza (per i PG che non hanno ancora scritto un'azione in una chat di gioco)">
           <select name="default_location_id" defaultValue={settings.default_location_id ?? ""} className="input">
             <option value="">— nessuno —</option>

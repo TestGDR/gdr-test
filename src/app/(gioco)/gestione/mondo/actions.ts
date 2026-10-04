@@ -184,9 +184,6 @@ export async function saveMissiveSettings(form: FormData): Promise<WorldResult> 
     rider_full_hours: hours("rider_full_hours", 6),
     raven_intercept_pct: int(form, "raven_intercept_pct", 0, 100, 10),
     rider_intercept_pct: int(form, "rider_intercept_pct", 0, 100, 20),
-    walk_full_hours: hours("walk_full_hours", 48, 1000),
-    horse_full_hours: hours("horse_full_hours", 16, 1000),
-    dragon_full_hours: hours("dragon_full_hours", 2, 1000),
   };
   const { error } = await ctx.supabase.from("missive_settings").update(row).eq("id", true);
   return error ? { error: "Impostazioni non salvate." } : done();

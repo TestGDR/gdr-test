@@ -55,6 +55,12 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
+    href: "/gestione/viaggi",
+    title: "Viaggi",
+    description: "Velocità a piedi, a cavallo e in drago, andature e tempi di percorrenza tra i luoghi.",
+  },
+  {
+    permission: "mondo.gestire",
     href: "/gestione/mondo",
     title: "Gestione mondo",
     description: "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",
