@@ -1,5 +1,5 @@
 -- =====================================================================
--- 0046 - Ticket (Help Desk)
+-- 0046 - Ticket
 -- Eseguire in Supabase: SQL Editor -> New query -> incolla -> Run
 --
 -- Un ticket e' una conversazione privata tra uno o piu' PG e lo staff.
@@ -219,7 +219,7 @@ begin
   -- risposta dello staff: avviso di SISTEMA a ogni PG del ticket
   if not v_participant then
     for v_pg in select character_id from public.ticket_participants where ticket_id = p_ticket loop
-      perform public.send_system_message(v_pg, 'Lo staff ha risposto al tuo ticket «' || v_ticket.title || '». Lo trovi nell''Help Desk (icona dei ticket).');
+      perform public.send_system_message(v_pg, 'Lo staff ha risposto al tuo ticket «' || v_ticket.title || '». Lo trovi tra i ticket (icona dei ticket).');
     end loop;
     -- chi risponde ha letto
     insert into public.ticket_staff_reads (ticket_id, user_id, last_read_at) values (p_ticket, auth.uid(), now())

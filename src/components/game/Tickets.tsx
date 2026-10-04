@@ -8,7 +8,7 @@ import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
 
 // ---------------------------------------------------------------------
-// Help Desk: ticket tra i giocatori e lo staff.
+// Ticket: conversazioni tra i giocatori e lo staff.
 // Home (come funziona), Nuovo ticket, Archivio (sospesi e chiusi).
 // A destra l'elenco dei ticket, con i filtri. Lo staff ("ticket.gestire")
 // vede tutti i ticket, risponde e ne cambia lo stato.
@@ -60,7 +60,7 @@ function ago(iso: string) {
 
 type View = { page: "home" } | { page: "nuovo" } | { page: "archivio" } | { page: "ticket"; id: string; from: "aperti" | "archivio" };
 
-export default function HelpDesk({ me, isStaff, onSeen }: { me: MainCharacter | null; isStaff: boolean; onSeen: () => void }) {
+export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | null; isStaff: boolean; onSeen: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<View>({ page: "home" });
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
@@ -91,7 +91,7 @@ export default function HelpDesk({ me, isStaff, onSeen }: { me: MainCharacter | 
       .order("sort_order")
       .then(({ data }) => setSections((data ?? []) as Section[]));
     const ch = supabase
-      .channel(`helpdesk:${me?.id ?? "staff"}`)
+      .channel(`ticket-finestra:${me?.id ?? "staff"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => refresh())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages" }, () => refresh())
       .subscribe();
@@ -206,33 +206,26 @@ function NavButton({ active, onClick, icon, children }: { active: boolean; onCli
 function Home({ isStaff }: { isStaff: boolean }) {
   return (
     <article className="mx-auto max-w-2xl space-y-4 text-sm leading-relaxed">
-      <h2 className="text-center font-serif text-2xl tracking-[0.12em] text-accent uppercase">Utilizzo dell&apos;Help Desk</h2>
+      <h2 className="text-center font-serif text-2xl tracking-[0.12em] text-accent uppercase">Ticket</h2>
       <p>
-        L&apos;Help Desk e i ticket servono a giocatori e staff per comunicare senza dimenticanze né messaggi persi, e a tenere uno storico
-        ordinato delle richieste, così ogni informazione utile si ritrova quando serve.
+        I ticket servono ai giocatori e allo staff per comunicare e mantenere tutta una cronologia sempre consultabile, sia per le
+        questioni ON sia per quelle OFF.
+      </p>
+      <h3 className="border-b border-accent/40 pb-1 font-serif text-lg text-accent">Come usare i ticket</h3>
+      <p>
+        <span className="text-accent">»</span> Cliccando su <strong>Nuovo ticket</strong> si apre la pagina in cui scrivere un nuovo
+        messaggio.
       </p>
       <p>
-        Per domande semplici o informazioni rapide puoi sempre scrivere un messaggio OFF a un membro dello staff collegato. Per richieste
-        più complesse, e per tutto ciò che riguarda i personaggi e il gioco e ha bisogno di una conferma dello staff, usa sempre i ticket.
-      </p>
-      <h3 className="border-b border-accent/40 pb-1 font-serif text-lg text-accent">Come funzionano i ticket</h3>
-      <p>
-        <span className="text-accent">»</span> Clicca su <strong>Nuovo ticket</strong> nel menu in alto, scrivi un titolo che riassuma
-        la richiesta in poche parole e scegli la sezione giusta: a destra compariranno le sue istruzioni. Puoi includere anche altri PG
-        coinvolti. Appena inviato, il ticket è <em>in attesa</em>; diventa <em>preso in carico</em> quando un membro dello staff se ne
-        occupa.
+        <span className="text-accent">»</span> Completa tutti i campi e scegli una sezione: scegliere la sezione giusta aiuta lo staff a
+        smaltire più velocemente il ticket.
       </p>
       <p>
-        <span className="text-accent">»</span> Quando lo staff risponde, l&apos;icona dei ticket lampeggia e ricevi un messaggio di
-        SISTEMA nei messaggi OFF.
+        <span className="text-accent">»</span> In <strong>Archivio</strong> troverai tutti i ticket che sono stati chiusi, così da avere
+        uno storico consultabile su qualsiasi questione.
       </p>
       <p>
-        <span className="text-accent">»</span> In <strong>Archivio</strong> trovi i ticket chiusi e quelli <em>sospesi</em> (per
-        un&apos;assenza del giocatore o quando la richiesta va messa in pausa).
-      </p>
-      <p>
-        <span className="text-accent">»</span> Abbi pazienza dopo aver inviato un ticket: lo staff cercherà di rispondere il prima
-        possibile. Non sollecitare, a meno che non ci sia un&apos;urgenza di gioco.
+        <span className="text-accent">»</span> In questa pagina di <strong>Home</strong> trovi invece, a destra, tutti i ticket aperti.
       </p>
       {isStaff && (
         <p className="border border-[#d4a72c]/50 bg-[#d4a72c]/10 p-3 text-[#f0c75e]">

@@ -49,7 +49,7 @@ import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import { useNewsUnseen } from "./news-unseen";
-import HelpDesk from "./HelpDesk";
+import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
@@ -68,7 +68,7 @@ type Area = { title: string; image?: string | null; description?: string | null;
 const AreaContext = createContext<(area: Area) => void>(() => {});
 // Notizie ON / OFF nuove, non ancora viste: l'icona cambia colore
 const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
-// Ticket: quanti da leggere e come aprire l'Help Desk
+// Ticket: quanti da leggere e come aprire la finestra dei ticket
 const TicketContext = createContext<{ count: number; open: () => void }>({ count: 0, open: () => {} });
 
 export function GameArea({ title, image, description, weatherRegionId }: Area) {
@@ -90,7 +90,7 @@ type Props = {
   canWriteNewsOff: boolean; // scrive le Notizie OFF
   canModerate: boolean; // toglie le richieste di gioco altrui
   canManageUsers: boolean; // toglie le assenze altrui
-  canManageTickets: boolean; // staff dell'Help Desk: vede e gestisce tutti i ticket
+  canManageTickets: boolean; // staff dei ticket: vede e gestisce tutti i ticket
   children: ReactNode;
 };
 
@@ -166,8 +166,8 @@ export default function GameShell({
   const [panel, setPanel] = useState<Panel | null>(null);
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
   const tickets = useTicketUnread(userId);
-  const [helpDeskOpen, setHelpDeskOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
-  const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setHelpDeskOpen((n) => n + 1) }), [tickets.count]);
+  const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
+  const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
   const openPanel = (p: Panel) => {
@@ -364,8 +364,8 @@ export default function GameShell({
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
-      <Modal open={helpDeskOpen > 0} onClose={() => setHelpDeskOpen(0)} title="Help Desk" size="xl">
-        {helpDeskOpen > 0 && <HelpDesk key={helpDeskOpen} me={character} isStaff={canManageTickets} onSeen={tickets.refresh} />}
+      <Modal open={ticketsOpen > 0} onClose={() => setTicketsOpen(0)} title="Ticket" size="xl">
+        {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} onSeen={tickets.refresh} />}
       </Modal>
       {character && (
         <Modal open={dragonOpen > 0} onClose={() => setDragonOpen(0)} title="Il mio drago" size="sheet">
@@ -944,7 +944,7 @@ function TopTip({ children }: { children: ReactNode }) {
   );
 }
 
-// Ticket: apre l'Help Desk; lampeggia finche' ci sono risposte (o, per lo staff, richieste) da leggere
+// Ticket: apre la finestra dei ticket; lampeggia finche' ci sono risposte (o, per lo staff, richieste) da leggere
 function TicketButton({ className, tip }: { className: string; tip?: boolean }) {
   const { count, open } = useContext(TicketContext);
   const label = count > 0 ? `Ticket: ${count} da leggere` : "Ticket";
