@@ -48,6 +48,7 @@ import NewsPanel from "./NewsPanel";
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
+import { useNewsUnseen } from "./news-unseen";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
@@ -64,6 +65,8 @@ import Modal from "@/components/ui/Modal";
 // ---------------------------------------------------------------------
 type Area = { title: string; image?: string | null; description?: string | null; weatherRegionId?: string | null };
 const AreaContext = createContext<(area: Area) => void>(() => {});
+// Notizie ON / OFF nuove, non ancora viste: l'icona cambia colore
+const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
 
 export function GameArea({ title, image, description, weatherRegionId }: Area) {
   const setArea = useContext(AreaContext);
@@ -157,10 +160,13 @@ export default function GameShell({
   const unread = useUnread(character?.id ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
+  const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
   const openPanel = (p: Panel) => {
     setPanel(p);
     setPanelSession((n) => n + 1);
+    if (p === "notizie-on") news.markSeen("on");
+    if (p === "notizie-off") news.markSeen("off");
   };
 
   function openMessages(kind: MessageKind, to: Contact | null = null) {
@@ -180,6 +186,7 @@ export default function GameShell({
 
   return (
     <AreaContext.Provider value={setArea}>
+      <NewsUnseenContext.Provider value={news.unseen}>
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
@@ -187,8 +194,8 @@ export default function GameShell({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : "Apri pannello"}
-            className={`${menuBtn} absolute left-2 md:hidden ${playRequests.count > 0 ? "blink-call" : ""}`}
+            aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : news.unseen.on || news.unseen.off ? "Apri pannello: notizie nuove" : "Apri pannello"}
+            className={`${menuBtn} absolute left-2 md:hidden ${playRequests.count > 0 ? "blink-call" : news.unseen.on || news.unseen.off ? "news-new" : ""}`}
           >
             <MenuIcon />
           </button>
@@ -382,6 +389,7 @@ export default function GameShell({
         onChangeAvailability={changeAvailability}
         onMessageOff={(to) => openMessages("off", to)}
       />
+      </NewsUnseenContext.Provider>
     </AreaContext.Provider>
   );
 }
@@ -966,10 +974,12 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "ricerca", icon: <SwordsIcon /> },
   { id: "assenze", icon: <HourglassIcon /> },
 ];
-const panelLabel = (p: Panel, newRequests: number) =>
+const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
   p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
-    : PANEL_TITLE[p];
+    : newNews
+      ? `${PANEL_TITLE[p]}: notizie nuove`
+      : PANEL_TITLE[p];
 
 function PanelButton({
   panel,
@@ -987,15 +997,22 @@ function PanelButton({
   tip?: boolean;
 }) {
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
+  const unseen = useContext(NewsUnseenContext);
+  const newNews = (panel === "notizie-on" && unseen.on) || (panel === "notizie-off" && unseen.off); // dorata finche' non si apre
   return (
-    <button type="button" onClick={() => onOpen(panel)} className={`${className} ${calling ? "blink-call" : ""}`} aria-label={panelLabel(panel, newRequests)}>
+    <button
+      type="button"
+      onClick={() => onOpen(panel)}
+      className={`${className} ${calling ? "blink-call" : newNews ? "news-new" : ""}`}
+      aria-label={panelLabel(panel, newRequests, newNews)}
+    >
       {icon}
       {calling && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">
           {newRequests}
         </span>
       )}
-      {tip && <Tip>{panelLabel(panel, newRequests)}</Tip>}
+      {tip && <Tip>{panelLabel(panel, newRequests, newNews)}</Tip>}
     </button>
   );
 }

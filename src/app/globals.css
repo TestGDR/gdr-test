@@ -349,3 +349,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .message-glow { animation: none; color: #fff3c4; filter: drop-shadow(0 0 6px rgb(240 199 94 / 0.9)); }
 }
+
+/* Notizie nuove: l'icona diventa dorata (fissa, senza lampeggiare) finche' non si apre */
+.news-new {
+  color: #f0c75e;
+  filter: drop-shadow(0 0 5px rgb(240 199 94 / 0.75));
+}
