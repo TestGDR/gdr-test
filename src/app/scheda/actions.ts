@@ -76,22 +76,25 @@ export async function finalizeCharacter(characterId: string): Promise<CreationRe
   return {};
 }
 
-// Prestavolto e immagine del proprio personaggio (modificabili in ogni momento)
+// Prestavolto, immagine e immagine lunga del proprio personaggio (modificabili in ogni momento)
 export async function saveSheetExtras(
   characterId: string,
   faceClaim: string,
   avatarUrl: string,
+  coverUrl: string,
 ): Promise<CreationResult> {
   const { supabase, user } = await requireUser();
   const claim = faceClaim.trim().replace(/\s+/g, " ").slice(0, 80);
   const avatar = avatarUrl.trim();
-  if (avatar && !avatar.toLowerCase().startsWith("https://")) {
-    return { error: "L'immagine deve essere un indirizzo che inizia con https://" };
+  const cover = coverUrl.trim();
+  if ((avatar && !avatar.toLowerCase().startsWith("https://")) || (cover && !cover.toLowerCase().startsWith("https://"))) {
+    return { error: "Le immagini devono essere indirizzi che iniziano con https://" };
   }
+  if (cover.length > 1000) return { error: "Indirizzo dell'immagine lunga troppo lungo." };
 
   const { error } = await supabase
     .from("characters")
-    .update({ face_claim: claim || null, avatar_url: avatar || null })
+    .update({ face_claim: claim || null, avatar_url: avatar || null, cover_url: cover || null })
     .eq("id", characterId)
     .eq("owner_id", user.id);
   if (error) {

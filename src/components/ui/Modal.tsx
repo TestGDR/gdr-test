@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
-export type ModalSize = "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel";
+export type ModalSize =
+  "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel" | "pg";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
@@ -14,9 +21,13 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)
   area: "w-[min(46rem,calc(100vw-2rem))] h-[min(43.75rem,calc(100dvh-1rem))]",
   // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
-  sheet: "w-[min(51.25rem,calc(100vw-1rem))] h-[min(58.75rem,calc(100dvh-1rem))]",
+  sheet:
+    "w-[min(51.25rem,calc(100vw-1rem))] h-[min(58.75rem,calc(100dvh-1rem))]",
   // ricerca gioco e assenze: alta al massimo 600px, il contenuto scorre dentro
-  panel: "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
+  panel:
+    "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
+  // scheda del personaggio: linguette (13rem) + pagina 750 x 600, il contenuto gestisce lo scorrimento
+  pg: "w-[min(59.875rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem)]",
 };
 
 // Finestra modale controllata dal chiamante (open / onClose).
@@ -48,9 +59,12 @@ export default function Modal({
     if (!open) setTray(null);
   }
   const minimized = open && tray !== null;
-  const drag = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(
-    null,
-  );
+  const drag = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!dialog) return;
@@ -66,7 +80,12 @@ export default function Modal({
   function onDragStart(e: PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest("button")) return; // la X non avvia il trascinamento
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { startX: e.clientX, startY: e.clientY, baseX: offset.x, baseY: offset.y };
+    drag.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: offset.x,
+      baseY: offset.y,
+    };
   }
 
   function onDragMove(e: PointerEvent<HTMLDivElement>) {
@@ -134,7 +153,9 @@ export default function Modal({
           onPointerCancel={() => (drag.current = null)}
           className="bar flex shrink-0 cursor-grab touch-none items-center justify-between border-b px-4 py-3 select-none active:cursor-grabbing"
         >
-          <h2 className="text-xs font-bold tracking-[0.2em] text-muted uppercase">{title}</h2>
+          <h2 className="text-xs font-bold tracking-[0.2em] text-muted uppercase">
+            {title}
+          </h2>
           <div className="flex items-center gap-3 text-muted">
             <GrabIcon />
             <button
@@ -158,7 +179,10 @@ export default function Modal({
         </div>
         <div
           className={
-            size === "xl" || size === "tall" || size === "sheet"
+            size === "xl" ||
+            size === "tall" ||
+            size === "sheet" ||
+            size === "pg"
               ? "min-h-0 flex-1"
               : "min-h-0 flex-1 overflow-y-auto p-5"
           }

@@ -6,6 +6,7 @@ export type Character = {
   name: string;
   description: string;
   avatar_url: string | null;
+  cover_url?: string | null; // immagine lunga della prima pagina della scheda
   face_claim?: string | null; // prestavolto
   created_at: string;
   status: "bozza" | "attivo";
