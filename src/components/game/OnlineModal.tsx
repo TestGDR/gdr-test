@@ -155,12 +155,15 @@ function PlayerRow({
     >
       <AvailabilityDot value={player.availability} onChange={isMe ? onChangeAvailability : undefined} />
       <Avatar name={player.name} url={player.avatar} size="h-8 w-8 sm:h-11 sm:w-11" />
+      {/* Stemma della casata: alto quanto nome e frase insieme */}
+      {player.sigil ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10" />
+      ) : (
+        <span className="w-8 shrink-0 sm:w-10" aria-hidden /> // senza casata: i nomi restano allineati
+      )}
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 sm:gap-2">
-          {player.sigil && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-4 w-4 shrink-0 object-contain sm:h-5 sm:w-5" />
-          )}
           {/* Nome e cognome (la casata) insieme: tutto il nome apre la scheda */}
           <button
             type="button"
