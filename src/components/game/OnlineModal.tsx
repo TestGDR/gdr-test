@@ -60,9 +60,9 @@ export default function OnlineModal(props: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="Elenco online" size="tall">
-      <div className="flex h-full flex-col font-plain">
+      <div className="flex h-full flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
-          <p className="text-lg font-semibold tracking-[0.1em] uppercase sm:text-xl">
+          <p className="font-serif text-lg tracking-[0.15em] uppercase sm:text-xl">
             <span className="text-accent">{online.length}</span> online
           </p>
           <div className="flex flex-wrap gap-1">
