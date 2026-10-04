@@ -23,7 +23,7 @@ type Fief = {
   size: "piccolo" | "medio" | "grande";
   location_id: string | null;
   description: string;
-  structures: { id: string; structure_type_id: string; built_by: string; built_at: string }[];
+  structures: { id: string; structure_type_id: string; built_by: string; built_at: string; is_background: boolean }[];
 };
 
 export const CAPACITY = { piccolo: 5, medio: 7, grande: 10 } as const;
@@ -454,7 +454,7 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
     () =>
       supabase
         .from("fiefs")
-        .select("*, structures:fief_structures(id, structure_type_id, built_by, built_at)")
+        .select("*, structures:fief_structures(id, structure_type_id, built_by, built_at, is_background)")
         .order("name")
         .then(({ data }) => setFiefs((data ?? []) as Fief[])),
     [supabase],
@@ -667,6 +667,16 @@ function FiefStructures({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const cap = CAPACITY[fief.size];
   const name = (id: string) => structures.find((s) => s.id === id)?.name ?? "?";
+  // Struttura di BG: assegnata dallo staff, senza costo
+  async function assignBg() {
+    const { error } = await supabase.rpc("assign_background_structure", { p_fief: fief.id, p_structure_type: pick });
+    setMsg(error ? { ok: false, text: error.message.replace("piu''", "più") } : { ok: true, text: "Struttura di BG assegnata." });
+    if (!error) {
+      setPick("");
+      onChanged();
+    }
+  }
+
   async function build() {
     const { error } = await supabase.rpc("build_structure", { p_fief: fief.id, p_structure_type: pick });
     setMsg(error ? { ok: false, text: error.message.replace("Risorse insufficienti", "Risorse della casata insufficienti").replace("piu''", "più") } : { ok: true, text: "Struttura costruita." });
@@ -682,14 +692,18 @@ function FiefStructures({
         {fief.structures.map((s) => (
           <li key={s.id} className="flex flex-wrap items-center gap-2">
             <span className="font-serif">{name(s.structure_type_id)}</span>
+            {s.is_background && <span className="border border-border px-1 text-[0.625rem] text-muted uppercase">BG</span>}
             <span className="text-xs text-muted">
-              costruita da {s.built_by || "?"} il {new Date(s.built_at).toLocaleDateString("it-IT")}
+              {s.is_background ? "di BG, assegnata" : `costruita da ${s.built_by || "?"}`} il {new Date(s.built_at).toLocaleDateString("it-IT")}
             </span>
             <button
               type="button"
               onClick={async () => {
-                if (!window.confirm(`Demolire "${name(s.structure_type_id)}"? Le risorse spese non tornano.`)) return;
-                await supabase.from("fief_structures").delete().eq("id", s.id);
+                const note = s.is_background ? "È di BG: non restituisce risorse." : "La casata recupera metà del costo pagato.";
+                if (!window.confirm(`Demolire "${name(s.structure_type_id)}"? ${note}`)) return;
+                const { data, error } = await supabase.rpc("demolish_structure", { p_structure: s.id });
+                const back = Object.entries((data ?? {}) as Record<string, number>).map(([id, n]) => `${n} ${resName(resources, id)}`);
+                setMsg(error ? { ok: false, text: "Demolizione non riuscita." } : { ok: true, text: back.length ? `Demolita: recuperati ${back.join(", ")}.` : "Demolita." });
                 onChanged();
               }}
               className="ml-auto text-xs text-red-400 hover:text-red-300"
@@ -712,6 +726,9 @@ function FiefStructures({
           </select>
           <button type="button" disabled={!pick} onClick={build} className="btn px-3 py-1 text-xs">
             Costruisci (paga la casata)
+          </button>
+          <button type="button" disabled={!pick} onClick={assignBg} className="btn-ghost px-3 py-1 text-xs" title="Struttura di background: nessun costo">
+            Assegna di BG (gratis)
           </button>
         </div>
       ) : (

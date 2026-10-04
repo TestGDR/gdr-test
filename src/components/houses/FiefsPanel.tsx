@@ -31,7 +31,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
     const [fiefs, fiefTypes, structureTypes, resources, treasury] = await Promise.all([
       supabase
         .from("fiefs")
-        .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id)")
+        .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
         .eq("house_id", house.id)
         .order("name"),
       supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),

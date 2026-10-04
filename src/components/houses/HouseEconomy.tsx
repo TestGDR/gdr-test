@@ -21,7 +21,7 @@ export type EcoFief = {
   fief_type_id: string | null;
   description: string;
   location: { name: string } | null;
-  structures: { id: string; structure_type_id: string }[];
+  structures: { id: string; structure_type_id: string; is_background: boolean }[];
 };
 
 const CAPACITY = { piccolo: 5, medio: 7, grande: 10 } as const;
@@ -85,6 +85,22 @@ export default function HouseEconomy({
     }
   }
 
+  // Demolire: la casata recupera meta' di quanto aveva speso (le strutture di BG non restituiscono nulla)
+  async function demolish(fief: EcoFief, s: EcoFief["structures"][number]) {
+    const type = structureTypes.find((t) => t.id === s.structure_type_id);
+    const note = s.is_background ? "È una struttura di BG: non restituisce risorse." : "La casata recupera metà di quanto aveva speso.";
+    if (!window.confirm(`Demolire ${type?.name ?? "la struttura"} a ${fief.name}? ${note}`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("demolish_structure", { p_structure: s.id, p_character: builderId });
+    setBusy(false);
+    const back = Object.entries((data ?? {}) as Record<string, number>).map(([id, n]) => `${n} ${res(id)}`);
+    setMsg(error ? { ok: false, text: "Demolizione non riuscita." } : { ok: true, text: back.length ? `Demolita: recuperati ${back.join(", ")}.` : "Demolita." });
+    if (!error) {
+      if (onChanged) onChanged();
+      else router.refresh();
+    }
+  }
+
   if (fiefs.length === 0 && !isMember) return null;
 
   return (
@@ -131,11 +147,26 @@ export default function HouseEconomy({
               </div>
               {f.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{f.description}</p>}
               {type && <p className="mt-1 text-xs text-muted">Rende ogni mese: {text(type.incomes)}</p>}
-              <p className="mt-2 text-sm">
-                {f.structures.length
-                  ? [...counts].map(([id, n]) => `${structureTypes.find((t) => t.id === id)?.name ?? "?"}${n > 1 ? ` ×${n}` : ""}`).join(", ")
-                  : "Nessuna struttura."}
-              </p>
+              {f.structures.length === 0 ? (
+                <p className="mt-2 text-sm text-muted">Nessuna struttura.</p>
+              ) : builderId ? (
+                // chi costruisce vede le strutture una per una e puo' demolirle
+                <ul className="mt-2 space-y-1 text-sm">
+                  {f.structures.map((s) => (
+                    <li key={s.id} className="flex items-center gap-2">
+                      <span>{structureTypes.find((t) => t.id === s.structure_type_id)?.name ?? "?"}</span>
+                      {s.is_background && <span className="border border-border px-1 text-[0.625rem] text-muted uppercase">BG</span>}
+                      <button type="button" disabled={busy} onClick={() => demolish(f, s)} className="ml-auto text-xs text-red-400 hover:text-red-300">
+                        Demolisci
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm">
+                  {[...counts].map(([id, n]) => `${structureTypes.find((t) => t.id === id)?.name ?? "?"}${n > 1 ? ` ×${n}` : ""}`).join(", ")}
+                </p>
+              )}
               {builderId && f.structures.length < cap && structureTypes.length > 0 && (
                 <select
                   value=""
