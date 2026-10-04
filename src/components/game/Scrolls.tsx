@@ -28,9 +28,20 @@ function duration(min: number) {
   return `${h} or${h === 1 ? "a" : "e"}${m ? ` e ${m} minuti` : ""}`;
 }
 
-type Tab = "ricevuti" | "inviati" | "scrivi";
+type Tab = "ricevuti" | "inviati" | "scrivi" | "castello";
+type Raven = { id: number; sender_name: string; recipient_name: string; signed: boolean; from_name: string | null; to_name: string | null; created_at: string; deliver_at: string; body: string };
 
-export default function Scrolls({ me, initialTo, onRead }: { me: MainCharacter; initialTo: Contact | null; onRead: () => void }) {
+export default function Scrolls({
+  me,
+  initialTo,
+  isAdmin,
+  onRead,
+}: {
+  me: MainCharacter;
+  initialTo: Contact | null;
+  isAdmin: boolean; // vede l'Archivio messaggi castello
+  onRead: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<Tab>(initialTo ? "scrivi" : "ricevuti");
   const [to, setTo] = useState<Contact | null>(initialTo);
@@ -105,6 +116,11 @@ export default function Scrolls({ me, initialTo, onRead }: { me: MainCharacter; 
         <TabButton active={tab === "scrivi"} onClick={() => (setTab("scrivi"), setOpened(null))}>
           ✒ Scrivi un cartiglio
         </TabButton>
+        {isAdmin && (
+          <TabButton active={tab === "castello"} onClick={() => (setTab("castello"), setOpened(null))}>
+            Archivio messaggi castello
+          </TabButton>
+        )}
         <span className="ml-auto text-xs text-[#c9b48a] italic">{place ? `Ti trovi a ${place}` : ""}</span>
       </nav>
 
@@ -126,6 +142,8 @@ export default function Scrolls({ me, initialTo, onRead }: { me: MainCharacter; 
           />
         ) : tab === "ricevuti" ? (
           <InboxGrid inbox={inbox} onOpen={open} />
+        ) : tab === "castello" && isAdmin ? (
+          <CastleArchive />
         ) : tab === "inviati" ? (
           <SentList sent={sent} onDiscard={(id) => discard(id, "inviati")} />
         ) : me.status !== "attivo" ? (
@@ -202,7 +220,7 @@ function OpenedScroll({ s, onBack, onReply, onDiscard }: { s: Opened; onBack: ()
         Consegnato da {BY[s.method]} il {when(s.delivered_at)}
       </p>
       <article className="unrolled-scroll px-10 py-12 sm:px-14">
-        <p className="font-serif text-[15px] leading-relaxed whitespace-pre-wrap text-[#2e2014] italic">{s.body}</p>
+        <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-[#2e2014] italic">{s.body}</p>
         <p className="mt-8 text-right font-serif text-[#5a1408]">
           {s.signed ? <>— {s.sender_name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}
         </p>
@@ -220,6 +238,56 @@ function OpenedScroll({ s, onBack, onReply, onDiscard }: { s: Opened; onBack: ()
           Getta il cartiglio
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Archivio messaggi castello (solo admin): i cartigli giunti con i corvi,
+// letti dai castellani all'arrivo
+function CastleArchive() {
+  const supabase = useMemo(() => createClient(), []);
+  const [list, setList] = useState<Raven[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState<number | null>(null);
+  useEffect(() => {
+    supabase.rpc("castle_archive").then(({ data }) => setList((data ?? []) as Raven[]));
+  }, [supabase]);
+  const q = query.trim().toLowerCase();
+  const shown = (list ?? []).filter(
+    (r) => !q || [r.sender_name, r.recipient_name, r.from_name, r.to_name, r.body].some((t) => t?.toLowerCase().includes(q)),
+  );
+  return (
+    <div className="mx-auto max-w-3xl space-y-3">
+      <p className="text-center text-sm text-[#c9b48a] italic">
+        Ogni corvo che arriva a un castello viene letto dai castellani: qui trovi tutti i cartigli giunti in volo. Li vedono solo gli admin.
+      </p>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca per nome, luogo o testo" className="input py-1.5" />
+      {list === null && <p className="text-center text-[#c9b48a]">Caricamento...</p>}
+      {list !== null && shown.length === 0 && <p className="py-6 text-center text-[#c9b48a] italic">Nessun corvo nell&apos;archivio.</p>}
+      <ul className="space-y-2">
+        {shown.map((r) => (
+          <li key={r.id} className="border border-[#5a3d22] bg-[#24160d]">
+            <button type="button" onClick={() => setOpenId(openId === r.id ? null : r.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+              <span className="text-[#c9a45c]">
+                <MethodIcon method="corvo" size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-serif text-[#f0dcae]">
+                  {r.sender_name}
+                  {!r.signed && <span className="text-xs text-[#a08a64] italic"> (non firmato)</span>} → {r.recipient_name}
+                </span>
+                <span className="block text-[11px] text-[#a08a64]">
+                  Da {r.from_name ?? "?"} a {r.to_name ?? "?"} · giunto il {when(r.deliver_at)}
+                </span>
+              </span>
+            </button>
+            {openId === r.id && (
+              <p className="border-t border-[#5a3d22] px-4 py-3 text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{r.body}</p>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -253,7 +321,7 @@ function SentList({ sent, onDiscard }: { sent: Sent[] | null; onDiscard: (id: nu
             </button>
             {openId === s.id && (
               <div className="space-y-2 border-t border-[#5a3d22] px-4 py-3">
-                <p className="font-serif text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{s.body}</p>
+                <p className="text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{s.body}</p>
                 <div className="text-right">
                   <button type="button" onClick={() => onDiscard(s.id)} className="text-xs text-red-400 hover:text-red-300">
                     Getta la copia
@@ -370,7 +438,7 @@ function WriteScroll({ me, initialTo, onSent }: { me: MainCharacter; initialTo: 
           rows={9}
           placeholder="Scrivi il tuo messaggio..."
           aria-label="Testo del cartiglio"
-          className="w-full resize-none border-0 bg-transparent font-serif text-[15px] leading-relaxed text-[#2e2014] italic placeholder:text-[#8a7656] focus:outline-none"
+          className="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-[#2e2014] italic placeholder:text-[#8a7656] focus:outline-none"
         />
         <p className="mt-2 text-right font-serif text-[#5a1408]">{signed ? <>— {me.name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}</p>
       </div>

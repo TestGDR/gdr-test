@@ -19,16 +19,17 @@ type Props = {
   session: number; // cambia a ogni apertura: riparte da zero con i dati aggiornati
   onRead: () => void;
   canBroadcast: boolean; // puo' scrivere i messaggi OFF a tutti
+  isAdmin: boolean; // nelle missive vede l'Archivio messaggi castello
 };
 
-export default function MessagesModal({ kind, open, onClose, me, initialTo, session, onRead, canBroadcast }: Props) {
+export default function MessagesModal({ kind, open, onClose, me, initialTo, session, onRead, canBroadcast, isAdmin }: Props) {
   return (
     <Modal open={open} onClose={onClose} title={KIND_LABEL[kind]} size="xl">
       {open &&
         (kind === "off" ? (
           <OffMessages key={session} me={me} initialTo={initialTo} canBroadcast={canBroadcast} onRead={onRead} />
         ) : (
-          <Scrolls key={session} me={me} initialTo={initialTo} onRead={onRead} />
+          <Scrolls key={session} me={me} initialTo={initialTo} isAdmin={isAdmin} onRead={onRead} />
         ))}
     </Modal>
   );

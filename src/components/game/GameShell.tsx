@@ -362,6 +362,7 @@ export default function GameShell({
           session={messages.session}
           onRead={unread.refresh}
           canBroadcast={canWriteNewsOff}
+          isAdmin={isAdmin}
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
