@@ -2,13 +2,26 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { saveTravelSettings } from "./actions";
+import { saveMissiveSettings, saveTravelSettings, setCharacterPosition } from "./actions";
 
-export type TravelSettings = { pace_slow_factor: number; pace_fast_factor: number };
+export type TravelSettings = {
+  pace_slow_factor: number;
+  pace_fast_factor: number;
+  raven_intercept_pct: number;
+  rider_intercept_pct: number;
+  default_location_id: string | null;
+};
 export type MapRow = { id: string; name: string; active: boolean };
-export type PlaceRow = { id: string; name: string; map_id: string; in_game: boolean };
+export type PlaceRow = { id: string; name: string; map_id: string; in_game: boolean; has_ravens: boolean };
+export type PgRow = { id: string; name: string; location_id: string | null };
 
-type Times = { walk_minutes: number | null; horse_minutes: number | null; ship_minutes: number | null; dragon_minutes: number | null };
+type Times = {
+  walk_minutes: number | null;
+  horse_minutes: number | null;
+  ship_minutes: number | null;
+  dragon_minutes: number | null;
+  raven_minutes: number | null;
+};
 type RouteRow = Times & { location_a: string; location_b: string };
 
 const MODES = [
@@ -16,6 +29,7 @@ const MODES = [
   { key: "horse_minutes", label: "A cavallo" },
   { key: "ship_minutes", label: "Per mare" },
   { key: "dragon_minutes", label: "In drago" },
+  { key: "raven_minutes", label: "Corvo" },
 ] as const;
 type ModeKey = (typeof MODES)[number]["key"];
 
@@ -31,11 +45,24 @@ function toMinutes(v: string) {
 }
 const toHours = (m: number | null) => (m == null ? "" : String(Math.round((m / 60) * 100) / 100));
 
-export default function TravelManager({ settings, maps, places }: { settings: TravelSettings; maps: MapRow[]; places: PlaceRow[] }) {
+export default function TravelManager({
+  settings,
+  maps,
+  places,
+  pgs,
+}: {
+  settings: TravelSettings;
+  maps: MapRow[];
+  places: PlaceRow[];
+  pgs: PgRow[];
+}) {
+  const gamePlaces = places.filter((p) => p.in_game);
   return (
     <div className="space-y-6">
       <PaceForm settings={settings} />
-      <Routes maps={maps} places={places.filter((p) => p.in_game)} />
+      <Routes maps={maps} places={gamePlaces} />
+      <MissiveSection settings={settings} maps={maps} places={gamePlaces} />
+      <Positions maps={maps} places={gamePlaces} pgs={pgs} />
     </div>
   );
 }
@@ -73,20 +100,22 @@ function TimeInputs({ values, onChange }: { values: Record<ModeKey, string>; onC
   );
 }
 
-const emptyTimes = (): Record<ModeKey, string> => ({ walk_minutes: "", horse_minutes: "", ship_minutes: "", dragon_minutes: "" });
+const emptyTimes = (): Record<ModeKey, string> => ({ walk_minutes: "", horse_minutes: "", ship_minutes: "", dragon_minutes: "", raven_minutes: "" });
 const timesOf = (r: Times): Record<ModeKey, string> => ({
   walk_minutes: toHours(r.walk_minutes),
   horse_minutes: toHours(r.horse_minutes),
   ship_minutes: toHours(r.ship_minutes),
   dragon_minutes: toHours(r.dragon_minutes),
+  raven_minutes: toHours(r.raven_minutes),
 });
 const minutesOf = (v: Record<ModeKey, string>) => ({
   walk_minutes: toMinutes(v.walk_minutes),
   horse_minutes: toMinutes(v.horse_minutes),
   ship_minutes: toMinutes(v.ship_minutes),
   dragon_minutes: toMinutes(v.dragon_minutes),
+  raven_minutes: toMinutes(v.raven_minutes),
 });
-const noneSet = (t: Times) => !t.walk_minutes && !t.horse_minutes && !t.ship_minutes && !t.dragon_minutes;
+const noneSet = (t: Times) => !t.walk_minutes && !t.horse_minutes && !t.ship_minutes && !t.dragon_minutes && !t.raven_minutes;
 const showTimes = (t: Times) =>
   MODES.map((m) => (
     <span key={m.key} className="block text-xs">
@@ -244,6 +273,10 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
           diverse (per esempio Terre della Tempesta / Approdo ↔ Dorne / Stepstones), nei due sensi, con un tempo per ogni mezzo ad andatura
           normale. Lascia vuoto un mezzo se con quello non si può fare (es. a piedi attraverso il mare). Il viaggio segue da solo la strada
           più breve, anche con più tappe, sempre con lo stesso mezzo: se tra due macroaree non c&apos;è una catena di percorsi, non ci si arriva.
+          <br />
+          <strong className="text-foreground">Missive:</strong> la staffetta segue i percorsi, per ogni tratta il più veloce tra a cavallo e
+          per mare, di fretta. Il <strong className="text-foreground">corvo</strong> ha il suo tempo di volo: scrivilo solo sulle tratte tra
+          castelli o città (anche più tappe: il maestro lo inoltra).
         </>
       }
     >
@@ -297,6 +330,116 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
           </li>
         ))}
       </ul>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Missive: intercettazioni e luogo di partenza
+function MissiveSection({ settings, maps, places }: { settings: TravelSettings; maps: MapRow[]; places: PlaceRow[] }) {
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const field = "block space-y-1 text-xs tracking-wide text-muted uppercase";
+  const mapName = (id: string) => maps.find((m) => m.id === id)?.name ?? "?";
+  return (
+    <Box
+      title="Missive"
+      text={
+        <>
+          Stesso luogo: un paggio, subito. Tra due castelli o città con una rotta dei corvi: un corvo. Altrimenti una staffetta lungo i
+          percorsi. Senza strada il cartiglio non parte. Fuori dai territori sicuri corvi e staffette possono essere intercettati: non
+          arrivano mai e li trovi nei Log. Le caselle &quot;territorio sicuro&quot; (mappe) e &quot;castello o città&quot; (macroaree) sono in
+          Gestione mondo.
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const form = new FormData(e.currentTarget);
+          start(async () => {
+            const r = await saveMissiveSettings(form);
+            setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: "Impostazioni salvate." });
+          });
+        }}
+        className="space-y-3"
+      >
+        <div className="flex flex-wrap gap-3">
+          <label className={field}>
+            <span>Corvo: intercettazione (%)</span>
+            <input name="raven_intercept_pct" type="number" min={0} max={100} defaultValue={settings.raven_intercept_pct} className="input w-28!" />
+          </label>
+          <label className={field}>
+            <span>Staffetta: intercettazione (%)</span>
+            <input name="rider_intercept_pct" type="number" min={0} max={100} defaultValue={settings.rider_intercept_pct} className="input w-28!" />
+          </label>
+          <label className={field}>
+            <span>Luogo di partenza dei nuovi PG</span>
+            <select name="default_location_id" defaultValue={settings.default_location_id ?? ""} className="input w-72!">
+              <option value="">— nessuno —</option>
+              {places.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({mapName(p.map_id)})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="btn" disabled={pending}>
+            Salva
+          </button>
+          {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
+        </div>
+      </form>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Posizione dei PG: si corregge a mano
+function Positions({ maps, places, pgs }: { maps: MapRow[]; places: PlaceRow[]; pgs: PgRow[] }) {
+  const [query, setQuery] = useState("");
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const mapName = (id: string) => maps.find((m) => m.id === id)?.name ?? "?";
+  const q = query.trim().toLowerCase();
+  const shown = q ? pgs.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 30) : [];
+  return (
+    <Box
+      title="Posizione dei personaggi"
+      text="Ogni PG si trova nel luogo dell'ultima chat di gioco in cui ha scritto un'azione, o dove è arrivato con un viaggio. Qui puoi correggerla: cerca il personaggio e scegli il luogo."
+    >
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome del personaggio" className="input max-w-sm py-1.5" />
+      {shown.length > 0 && (
+        <ul className="divide-y divide-border/60 border border-border/60">
+          {shown.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+              <span className="flex-1 font-serif">{p.name}</span>
+              <select
+                defaultValue={p.location_id ?? ""}
+                disabled={pending}
+                onChange={(e) =>
+                  start(async () => {
+                    const r = await setCharacterPosition(p.id, e.target.value || null);
+                    setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: `Posizione di ${p.name} aggiornata.` });
+                  })
+                }
+                aria-label={`Posizione di ${p.name}`}
+                className="input w-72! py-1"
+              >
+                <option value="">— luogo di partenza —</option>
+                {places.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} ({mapName(l.map_id)})
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
+      {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
     </Box>
   );
 }

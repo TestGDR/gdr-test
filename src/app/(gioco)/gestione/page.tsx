@@ -57,7 +57,7 @@ const PANELS = [
     permission: "mondo.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",
-    description: "Percorsi tra le macroaree (anche di mappe diverse) e andature dei viaggi dei personaggi.",
+    description: "Percorsi tra le macroaree (anche di mappe diverse), andature, rotte dei corvi, missive e posizione dei personaggi.",
   },
   {
     permission: "mondo.gestire",

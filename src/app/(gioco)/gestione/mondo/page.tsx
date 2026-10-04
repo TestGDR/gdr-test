@@ -8,14 +8,12 @@ export default async function MondoPage() {
   const { supabase } = await requirePermission("mondo.gestire");
 
   // Con il permesso si vedono anche le mappe spente (regole del database)
-  const [maps, locations, rooms, groups, houses, settings, pgs] = await Promise.all([
+  const [maps, locations, rooms, groups, houses] = await Promise.all([
     supabase.from("maps").select("*").order("sort_order").order("name"),
     supabase.from("locations").select("*").order("name"),
     supabase.from("rooms").select("*").order("sort_order").order("name"),
     supabase.from("room_groups").select("*").order("sort_order").order("name"),
     supabase.from("houses").select("id, name").order("name"),
-    supabase.from("missive_settings").select("*").maybeSingle(),
-    supabase.from("characters").select("id, name, location_id").order("name"),
   ]);
 
   return (
@@ -31,8 +29,6 @@ export default async function MondoPage() {
         rooms={(rooms.data ?? []) as Room[]}
         groups={(groups.data ?? []) as RoomGroup[]}
         houses={houses.data ?? []}
-        missive={settings.data ?? null}
-        pgs={pgs.data ?? []}
       />
     </div>
   );

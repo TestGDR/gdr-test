@@ -17,7 +17,7 @@ type Method = "paggio" | "corvo" | "staffetta";
 type Inbox = { id: number; method: Method; delivered_at: string; opened: boolean; signed: boolean | null; sender_name: string | null; sender_id: string | null; body: string | null };
 type Sent = { id: number; recipient_name: string; method: Method; created_at: string; deliver_at: string; signed: boolean; body: string };
 type Opened = { id: number; method: Method; delivered_at: string; signed: boolean; sender_name: string | null; sender_id: string | null; body: string };
-type Preview = { method: Method; minutes: number; risky: boolean; from_name: string | null };
+type Preview = { method: Method | null; minutes: number | null; risky: boolean; from_name: string | null }; // method null: nessuna strada
 
 const BY: Record<Method, string> = { paggio: "un paggio", corvo: "un corvo", staffetta: "una staffetta" };
 const when = (iso: string) =>
@@ -407,7 +407,7 @@ function WriteScroll({
       p_from_location: origin || null,
     });
     setBusy(false);
-    if (error) return setError("Il cartiglio non è partito.");
+    if (error) return setError(error.message.includes("strada") ? "Nessuna strada per raggiungere il destinatario." : "Il cartiglio non è partito.");
     onSent();
   }
 
@@ -457,22 +457,22 @@ function WriteScroll({
 
       {to && preview && (
         <p className="flex items-start gap-2 border border-[#5a3d22] bg-[#24160d] px-3 py-2 text-sm text-[#e8d8b4]">
-          <span className="mt-0.5 text-[#c9a45c]">
-            <MethodIcon method={preview.method} size={18} />
-          </span>
+          <span className="mt-0.5 text-[#c9a45c]">{preview.method && <MethodIcon method={preview.method} size={18} />}</span>
           <span>
-            {preview.method === "paggio" ? (
+            {preview.method === null ? (
+              <span className="text-orange-300">Nessuna strada per raggiungere il destinatario: il cartiglio non può partire da qui.</span>
+            ) : preview.method === "paggio" ? (
               <>Vi trovate nello stesso luogo: un paggio lo consegnerà subito a mano.</>
             ) : preview.method === "corvo" ? (
               <>
-                Partirà un corvo{preview.from_name ? ` da ${preview.from_name}` : ""}: arriverà in circa {duration(preview.minutes)}.
+                Partirà un corvo{preview.from_name ? ` da ${preview.from_name}` : ""}: arriverà in circa {duration(preview.minutes ?? 0)}.
               </>
             ) : (
               <>
-                I corvi volano solo tra castelli e città: servirà una staffetta, che arriverà in circa {duration(preview.minutes)}.
+                Servirà una staffetta, a cavallo e per mare, di gran carriera: arriverà in circa {duration(preview.minutes ?? 0)}.
               </>
             )}
-            {preview.risky && preview.method !== "paggio" && (
+            {preview.risky && preview.method && preview.method !== "paggio" && (
               <span className="mt-1 block text-xs text-orange-300">
                 Le strade fuori dalle terre sicure sono pericolose: il cartiglio potrebbe essere intercettato e non arrivare mai.
               </span>
@@ -500,7 +500,7 @@ function WriteScroll({
       </label>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="text-center">
-        <button type="button" disabled={busy || !to || !body.trim()} onClick={send} className="btn px-8">
+        <button type="button" disabled={busy || !to || !body.trim() || preview?.method === null} onClick={send} className="btn px-8">
           Sigilla e invia
         </button>
       </div>

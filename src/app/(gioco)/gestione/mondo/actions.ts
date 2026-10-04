@@ -168,35 +168,6 @@ export async function deleteLocation(id: string): Promise<WorldResult> {
 }
 
 // ---------------------------------------------------------------------
-// Missive: tempi, probabilita' di intercettazione, luogo di partenza;
-// posizione dei PG corretta dallo staff
-// ---------------------------------------------------------------------
-export async function saveMissiveSettings(form: FormData): Promise<WorldResult> {
-  const ctx = await authorized();
-  if (!ctx) return DENIED;
-  const hours = (key: string, fallback: number, max = 240) => {
-    const n = Number(String(form.get(key) ?? "").replace(",", "."));
-    return Number.isFinite(n) ? Math.min(max, Math.max(0, Math.round(n * 100) / 100)) : fallback;
-  };
-  const row = {
-    default_location_id: text(form, "default_location_id", 36) || null,
-    raven_full_hours: hours("raven_full_hours", 2),
-    rider_full_hours: hours("rider_full_hours", 6),
-    raven_intercept_pct: int(form, "raven_intercept_pct", 0, 100, 10),
-    rider_intercept_pct: int(form, "rider_intercept_pct", 0, 100, 20),
-  };
-  const { error } = await ctx.supabase.from("missive_settings").update(row).eq("id", true);
-  return error ? { error: "Impostazioni non salvate." } : done();
-}
-
-export async function setCharacterPosition(characterId: string, locationId: string | null): Promise<WorldResult> {
-  const ctx = await authorized();
-  if (!ctx) return DENIED;
-  const { error } = await ctx.supabase.rpc("staff_set_position", { p_character: characterId, p_location: locationId });
-  return error ? { error: "Posizione non salvata." } : done();
-}
-
-// ---------------------------------------------------------------------
 // Chat di gioco
 // ---------------------------------------------------------------------
 export async function saveRoom(form: FormData): Promise<WorldResult> {
