@@ -860,6 +860,7 @@ function useUnread(characterId: string | null) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_group_messages" }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "off_group_members" }, () => refresh())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_broadcasts" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "system_messages", filter: `character_id=eq.${characterId}` }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "off_broadcast_reads", filter: `character_id=eq.${characterId}` }, () => refresh())
       .subscribe();
     return () => {

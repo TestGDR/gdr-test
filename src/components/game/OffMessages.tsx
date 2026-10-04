@@ -26,13 +26,14 @@ type Member = { character_id: string; last_read_at: string; character: Person };
 type Group = { id: string; name: string; created_by: string | null; members: Member[] };
 type GroupMsg = { id: number; group_id: string; sender_id: string; body: string; created_at: string; sender: Person };
 type Broadcast = { id: number; sender_id: string | null; body: string; created_at: string; sender: Person };
+type SystemMsg = { id: number; body: string; created_at: string; read_at: string | null };
 
 // Riga dell'elenco delle conversazioni
 type Conversation = {
   key: string; // "dm:<personaggio>", "group:<id>", "global"
   name: string;
   avatar?: string | null;
-  kind: "dm" | "group" | "global";
+  kind: "dm" | "group" | "global" | "system";
   lastBody?: string;
   lastAt?: string;
   unread: number;
@@ -76,6 +77,7 @@ export default function OffMessages({
   const [groupMsgs, setGroupMsgs] = useState<GroupMsg[]>([]);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [broadcastRead, setBroadcastRead] = useState<string | null>(null);
+  const [systemMsgs, setSystemMsgs] = useState<SystemMsg[]>([]); // dal SISTEMA, sola lettura
   const [extra, setExtra] = useState<Contact[]>(initialTo ? [initialTo] : []);
   const [active, setActive] = useState<string | null>(initialTo ? `dm:${initialTo.id}` : null);
   const [panel, setPanel] = useState<"none" | "new-group" | "members">("none");
@@ -128,7 +130,14 @@ export default function OffMessages({
       setBroadcasts(list);
       setBroadcastRead(read);
     });
-  }, [loadDms, refreshGroups, loadBroadcasts]);
+    supabase
+      .from("system_messages")
+      .select("id, body, created_at, read_at")
+      .eq("character_id", me.id)
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .then(({ data }) => setSystemMsgs(((data ?? []) as SystemMsg[]).reverse()));
+  }, [supabase, me.id, loadDms, refreshGroups, loadBroadcasts]);
 
   // ----- tempo reale -----
   useEffect(() => {
@@ -154,6 +163,10 @@ export default function OffMessages({
       .on("postgres_changes", { event: "*", schema: "public", table: "off_broadcasts" }, () =>
         loadBroadcasts().then(({ list }) => setBroadcasts(list)),
       )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "system_messages", filter: `character_id=eq.${me.id}` }, (p) => {
+        const row = p.new as SystemMsg;
+        setSystemMsgs((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -163,6 +176,17 @@ export default function OffMessages({
   // ----- conversazioni -----
   const conversations = useMemo(() => {
     const out: Conversation[] = [];
+    if (systemMsgs.length > 0) {
+      const last = systemMsgs.at(-1);
+      out.push({
+        key: "system",
+        name: "SISTEMA",
+        kind: "system",
+        lastBody: last?.body,
+        lastAt: last?.created_at,
+        unread: systemMsgs.filter((m) => !m.read_at).length,
+      });
+    }
     if (broadcasts.length > 0 || canBroadcast) {
       const last = broadcasts.at(-1);
       out.push({
@@ -200,11 +224,10 @@ export default function OffMessages({
       people.set(otherId, entry);
     }
     out.push(...people.values());
-    // le piu' recenti in alto; i messaggi a tutti restano primi
-    return out.sort((a, b) =>
-      a.kind === "global" ? -1 : b.kind === "global" ? 1 : (b.lastAt ?? "9").localeCompare(a.lastAt ?? "9"),
-    );
-  }, [broadcasts, broadcastRead, groups, groupMsgs, dms, extra, me.id, canBroadcast]);
+    // le piu' recenti in alto; SISTEMA e messaggi a tutti restano primi
+    const pinned = (c: Conversation) => (c.kind === "system" ? 0 : c.kind === "global" ? 1 : 2);
+    return out.sort((a, b) => pinned(a) - pinned(b) || (b.lastAt ?? "9").localeCompare(a.lastAt ?? "9"));
+  }, [systemMsgs, broadcasts, broadcastRead, groups, groupMsgs, dms, extra, me.id, canBroadcast]);
 
   const current = conversations.find((c) => c.key === active) ?? null;
   const activeGroup = current?.kind === "group" ? groups.find((g) => `group:${g.id}` === active) ?? null : null;
@@ -258,6 +281,17 @@ export default function OffMessages({
           setBroadcastRead(last);
           onRead();
         });
+    } else if (current.kind === "system") {
+      const now = new Date().toISOString();
+      supabase
+        .from("system_messages")
+        .update({ read_at: now })
+        .eq("character_id", me.id)
+        .is("read_at", null)
+        .then(() => {
+          setSystemMsgs((prev) => prev.map((m) => (m.read_at ? m : { ...m, read_at: now })));
+          onRead();
+        });
     }
   }, [supabase, current, unreadHere, dmId, activeGroup, groupMsgs, broadcasts, me.id, onRead]);
 
@@ -273,8 +307,10 @@ export default function OffMessages({
       return groupMsgs
         .filter((m) => `group:${m.group_id}` === current.key)
         .map((m) => ({ id: `g${m.id}`, mine: m.sender_id === me.id, author: m.sender?.name ?? "?", body: m.body, at: m.created_at }));
+    if (current.kind === "system")
+      return systemMsgs.map((m) => ({ id: `s${m.id}`, mine: false, author: "SISTEMA", body: m.body, at: m.created_at }));
     return broadcasts.map((b) => ({ id: `b${b.id}`, mine: b.sender_id === me.id, author: b.sender?.name ?? "Staff", body: b.body, at: b.created_at }));
-  }, [current, dms, dmId, groupMsgs, broadcasts, me.id]);
+  }, [current, dms, dmId, groupMsgs, broadcasts, systemMsgs, me.id]);
 
   async function send(body: string) {
     if (!current) return "Nessuna conversazione.";
@@ -362,7 +398,7 @@ export default function OffMessages({
   }
 
   const isOwner = activeGroup?.created_by === me.id;
-  const canWriteHere = current?.kind !== "global" || canBroadcast;
+  const canWriteHere = current?.kind === "system" ? false : current?.kind !== "global" || canBroadcast;
 
   return (
     <div className="flex h-full">
@@ -387,7 +423,7 @@ export default function OffMessages({
                 <ConversationIcon c={c} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">
-                    <span className={`flex-1 truncate font-serif ${c.kind === "global" ? "text-[#f0c75e]" : "text-accent"}`}>{c.name}</span>
+                    <span className={`flex-1 truncate font-serif ${c.kind === "global" || c.kind === "system" ? "text-[#f0c75e]" : "text-accent"}`}>{c.name}</span>
                     <span className={`shrink-0 text-[10px] ${c.unread ? "text-green-400" : "text-muted"}`}>{listTime(c.lastAt)}</span>
                   </span>
                   <span className="flex items-center gap-2">
@@ -424,6 +460,7 @@ export default function OffMessages({
                   </button>
                 )}
                 {current.kind === "global" && <p className="text-xs text-muted">Arrivano a tutti i giocatori, collegati e non</p>}
+                {current.kind === "system" && <p className="text-xs text-muted">Avvisi automatici del gioco</p>}
               </div>
               {activeGroup && (
                 <button type="button" onClick={() => setPanel(panel === "members" ? "none" : "members")} className="btn-ghost px-3 py-1 text-xs">
@@ -440,7 +477,9 @@ export default function OffMessages({
                 {canWriteHere ? (
                   <Composer key={current.key} onSend={send} placeholder={current.kind === "global" ? "Scrivi un messaggio a tutti i giocatori..." : "Scrivi un messaggio..."} />
                 ) : (
-                  <p className="border-t border-border p-3 text-center text-sm text-muted">Solo lo staff può scrivere a tutti i giocatori.</p>
+                  <p className="border-t border-border p-3 text-center text-sm text-muted">
+                    {current.kind === "system" ? "Ai messaggi di SISTEMA non si può rispondere." : "Solo lo staff può scrivere a tutti i giocatori."}
+                  </p>
                 )}
               </>
             )}
@@ -457,11 +496,17 @@ function ConversationIcon({ c }: { c: Conversation }) {
   return (
     <span
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border ${
-        c.kind === "global" ? "border-[#d4a72c]/70 text-[#f0c75e]" : "border-blood/60 text-accent"
+        c.kind === "global" || c.kind === "system" ? "border-[#d4a72c]/70 text-[#f0c75e]" : "border-blood/60 text-accent"
       } bg-background`}
       aria-hidden
     >
-      {c.kind === "global" ? (
+      {c.kind === "system" ? (
+        // sigillo di ceralacca
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2.5 14.2 4l2.6-.2.9 2.5 2.3 1.2-.4 2.6L21 12l-1.4 1.9.4 2.6-2.3 1.2-.9 2.5-2.6-.2L12 21.5 9.8 20l-2.6.2-.9-2.5L4 16.5l.4-2.6L3 12l1.4-1.9L4 7.5l2.3-1.2.9-2.5 2.6.2Z" />
+          <path d="m8.5 12 2.4 2.4 4.6-4.8" />
+        </svg>
+      ) : c.kind === "global" ? (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 10v4h3l8 5V5L6 10H3Z" />
           <path d="M17.5 9a4 4 0 0 1 0 6M20 6.5a7.5 7.5 0 0 1 0 11" />
