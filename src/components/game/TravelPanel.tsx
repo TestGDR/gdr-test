@@ -10,18 +10,19 @@ import { createClient } from "@/lib/supabase/client";
 // a destinazione (vedi migrazione 0053).
 // ---------------------------------------------------------------------
 
-type Mode = "piedi" | "cavallo" | "drago";
+type Mode = "piedi" | "cavallo" | "nave" | "drago";
 type Pace = "calma" | "normale" | "fretta";
 type Place = { id: string; name: string; map: { name: string } | null };
 type Travel = { id: number; to_location: string; mode: Mode; pace: Pace; departed_at: string; arrive_at: string };
 type Preview = { minutes: number | null; from_name: string | null; to_name: string | null; can_fly: boolean };
 // destinazione raggiungibile: minuti ad andatura normale per ogni mezzo (null = con quel mezzo non si puo')
-type Option = { location_id: string; name: string; map_name: string; walk: number | null; horse: number | null; dragon: number | null };
-const MODE_KEY: Record<Mode, "walk" | "horse" | "dragon"> = { piedi: "walk", cavallo: "horse", drago: "dragon" };
+type Option = { location_id: string; name: string; map_name: string; walk: number | null; horse: number | null; ship: number | null; dragon: number | null };
+const MODE_KEY: Record<Mode, "walk" | "horse" | "ship" | "dragon"> = { piedi: "walk", cavallo: "horse", nave: "ship", drago: "dragon" };
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "piedi", label: "A piedi" },
   { id: "cavallo", label: "A cavallo" },
+  { id: "nave", label: "Per mare" },
   { id: "drago", label: "In groppa al drago" },
 ];
 const PACES: { id: Pace; label: string; hint: string }[] = [
@@ -29,7 +30,7 @@ const PACES: { id: Pace; label: string; hint: string }[] = [
   { id: "normale", label: "Normale", hint: "" },
   { id: "fretta", label: "Di fretta", hint: "più veloce" },
 ];
-const MODE_TEXT: Record<Mode, string> = { piedi: "a piedi", cavallo: "a cavallo", drago: "in groppa al drago" };
+const MODE_TEXT: Record<Mode, string> = { piedi: "a piedi", cavallo: "a cavallo", nave: "per mare", drago: "in groppa al drago" };
 
 function duration(min: number) {
   if (min < 60) return `${min} minut${min === 1 ? "o" : "i"}`;
@@ -208,7 +209,7 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
 
       <fieldset className="space-y-1">
         <legend className="mb-1 text-xs tracking-[0.12em] text-muted uppercase">Come viaggi</legend>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {MODES.map((m) => {
             const disabled = !modeOk(m.id);
             return (

@@ -8,13 +8,14 @@ export type TravelSettings = { pace_slow_factor: number; pace_fast_factor: numbe
 export type MapRow = { id: string; name: string; active: boolean };
 export type PlaceRow = { id: string; name: string; map_id: string; in_game: boolean };
 
-type Times = { walk_minutes: number | null; horse_minutes: number | null; dragon_minutes: number | null };
+type Times = { walk_minutes: number | null; horse_minutes: number | null; ship_minutes: number | null; dragon_minutes: number | null };
 type RouteRow = Times & { location_a: string; location_b: string };
 type MapTimeRow = Times & { map_a: string; map_b: string };
 
 const MODES = [
   { key: "walk_minutes", label: "A piedi" },
   { key: "horse_minutes", label: "A cavallo" },
+  { key: "ship_minutes", label: "Per mare" },
   { key: "dragon_minutes", label: "In drago" },
 ] as const;
 type ModeKey = (typeof MODES)[number]["key"];
@@ -74,18 +75,20 @@ function TimeInputs({ values, onChange }: { values: Record<ModeKey, string>; onC
   );
 }
 
-const emptyTimes = (): Record<ModeKey, string> => ({ walk_minutes: "", horse_minutes: "", dragon_minutes: "" });
+const emptyTimes = (): Record<ModeKey, string> => ({ walk_minutes: "", horse_minutes: "", ship_minutes: "", dragon_minutes: "" });
 const timesOf = (r: Times): Record<ModeKey, string> => ({
   walk_minutes: toHours(r.walk_minutes),
   horse_minutes: toHours(r.horse_minutes),
+  ship_minutes: toHours(r.ship_minutes),
   dragon_minutes: toHours(r.dragon_minutes),
 });
 const minutesOf = (v: Record<ModeKey, string>) => ({
   walk_minutes: toMinutes(v.walk_minutes),
   horse_minutes: toMinutes(v.horse_minutes),
+  ship_minutes: toMinutes(v.ship_minutes),
   dragon_minutes: toMinutes(v.dragon_minutes),
 });
-const noneSet = (t: Times) => !t.walk_minutes && !t.horse_minutes && !t.dragon_minutes;
+const noneSet = (t: Times) => !t.walk_minutes && !t.horse_minutes && !t.ship_minutes && !t.dragon_minutes;
 const showTimes = (t: Times) =>
   MODES.map((m) => (
     <span key={m.key} className="block text-xs">
@@ -240,7 +243,9 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
       text={
         <>
           Un percorso collega due macroaree, nei due sensi, con un tempo per ogni mezzo ad andatura normale. Lascia vuoto un mezzo se con
-          quello non si può fare (es. a piedi attraverso il mare). Tra due macroaree il percorso vale prima dei tempi tra mappe.
+          quello non si può fare (es. a piedi attraverso il mare); per mare si viaggia solo lungo i percorsi con un tempo per mare.{" "}
+          <strong className="text-foreground">Tra mappe diverse si passa solo lungo i percorsi</strong>: per esempio Terre della Tempesta /
+          Approdo ↔ Dorne / Stepstones. Il viaggio segue da solo la strada più breve, anche con più tappe.
         </>
       }
     >
@@ -304,7 +309,6 @@ function MapTimes({ maps }: { maps: MapRow[] }) {
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<MapTimeRow[] | null>(null);
   const [a, setA] = useState("");
-  const [b, setB] = useState("");
   const [times, setTimes] = useState(emptyTimes());
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,15 +320,13 @@ function MapTimes({ maps }: { maps: MapRow[] }) {
   const mapName = (id: string) => maps.find((m) => m.id === id)?.name ?? "?";
 
   async function save() {
-    if (!a || !b) return setError("Scegli le due mappe.");
+    if (!a) return setError("Scegli la mappa.");
     const t = minutesOf(times);
-    if (noneSet(t)) return setError("Scrivi almeno un tempo (a piedi, a cavallo o in drago).");
-    const [x, y] = [a, b].sort();
-    const { error } = await supabase.from("map_travel_times").upsert({ map_a: x, map_b: y, ...t });
+    if (noneSet(t)) return setError("Scrivi almeno un tempo.");
+    const { error } = await supabase.from("map_travel_times").upsert({ map_a: a, map_b: a, ...t });
     if (error) return setError("Tempi non salvati.");
     setError(null);
     setA("");
-    setB("");
     setTimes(emptyTimes());
     setEditing(false);
     load().then(setRows);
@@ -338,39 +340,25 @@ function MapTimes({ maps }: { maps: MapRow[] }) {
 
   return (
     <Box
-      title="Tempi tra mappe"
+      title="Tempi dentro le mappe"
       text={
         <>
-          Valgono per qualsiasi viaggio tra una macroarea della prima mappa e una della seconda, se tra le due non c&apos;è un percorso.
-          Scegli la stessa mappa due volte per il tempo standard dentro quella mappa. Senza percorso né tempi tra mappe, un luogo non si
-          raggiunge.
+          Il tempo standard per andare da una macroarea a un&apos;altra della stessa mappa, se tra le due non c&apos;è un percorso. Per
+          passare a un&apos;altra mappa servono i percorsi qui sopra. Senza tempo standard, in una mappa ci si muove solo lungo i percorsi.
         </>
       }
     >
       <div className="space-y-3 border border-dashed border-border p-3">
-        <p className="text-xs tracking-[0.12em] text-accent uppercase">{editing ? "Modifica i tempi" : "Nuovi tempi tra mappe"}</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            [a, setA, "Prima mappa"],
-            [b, setB, "Seconda mappa"],
-          ].map(([value, set, label]) => (
-            <select
-              key={label as string}
-              value={value as string}
-              onChange={(e) => (set as (v: string) => void)(e.target.value)}
-              aria-label={label as string}
-              className="input w-56! py-1.5"
-            >
-              <option value="">{label as string}...</option>
-              {maps.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                  {m.active ? "" : " (spenta)"}
-                </option>
-              ))}
-            </select>
+        <p className="text-xs tracking-[0.12em] text-accent uppercase">{editing ? "Modifica i tempi" : "Tempi di una mappa"}</p>
+        <select value={a} onChange={(e) => setA(e.target.value)} aria-label="Mappa" disabled={editing} className="input w-56! py-1.5">
+          <option value="">Mappa...</option>
+          {maps.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+              {m.active ? "" : " (spenta)"}
+            </option>
           ))}
-        </div>
+        </select>
         <div className="flex flex-wrap gap-4">
           <TimeInputs values={times} onChange={setTimes} />
         </div>
@@ -380,7 +368,7 @@ function MapTimes({ maps }: { maps: MapRow[] }) {
             {editing ? "Salva le modifiche" : "+ Aggiungi"}
           </button>
           {editing && (
-            <button type="button" onClick={() => (setEditing(false), setA(""), setB(""), setTimes(emptyTimes()))} className="btn-ghost px-3 py-1.5 text-sm">
+            <button type="button" onClick={() => (setEditing(false), setA(""), setTimes(emptyTimes()))} className="btn-ghost px-3 py-1.5 text-sm">
               Annulla
             </button>
           )}
@@ -388,26 +376,16 @@ function MapTimes({ maps }: { maps: MapRow[] }) {
       </div>
 
       {rows === null && <p className="text-sm text-muted">Caricamento...</p>}
-      {rows !== null && rows.length === 0 && <p className="text-sm text-muted">Nessun tempo tra mappe.</p>}
+      {rows !== null && rows.length === 0 && <p className="text-sm text-muted">Nessuna mappa ha un tempo standard.</p>}
       <ul className="divide-y divide-border/60 border border-border/60">
         {rows?.map((r) => (
           <li key={`${r.map_a}|${r.map_b}`} className="flex flex-wrap items-center gap-4 px-3 py-2">
-            <span className="min-w-56 flex-1 font-serif">
-              {r.map_a === r.map_b ? (
-                <>
-                  Dentro {mapName(r.map_a)} <span className="text-xs text-muted">(tempo standard)</span>
-                </>
-              ) : (
-                <>
-                  {mapName(r.map_a)} ↔ {mapName(r.map_b)}
-                </>
-              )}
-            </span>
+            <span className="min-w-56 flex-1 font-serif">Dentro {mapName(r.map_a)}</span>
             <span className="min-w-40">{showTimes(r)}</span>
             <span className="flex gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => (setA(r.map_a), setB(r.map_b), setTimes(timesOf(r)), setEditing(true))}
+                onClick={() => (setA(r.map_a), setTimes(timesOf(r)), setEditing(true))}
                 className="text-muted hover:text-accent"
               >
                 Modifica
