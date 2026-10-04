@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/staff";
 import TravelManager, { type MapRow, type PgRow, type PlaceRow, type TravelSettings } from "./TravelManager";
 
 export default async function ViaggiPage() {
-  const { supabase } = await requirePermission("mondo.gestire");
+  const { supabase } = await requirePermission("viaggi.gestire");
   // con il permesso si vedono anche mappe spente e i loro luoghi
   const [{ data: settings }, { data: maps }, { data: places }, { data: pgs }] = await Promise.all([
     supabase

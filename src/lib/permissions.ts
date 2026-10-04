@@ -17,7 +17,9 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     items: [
       { key: "gestione.ruoli", label: "Ruoli & Permessi", description: "Creare, modificare, eliminare e assegnare i ruoli staff" },
       { key: "gestione.accessi", label: "Registro accessi", description: "IP, controllo VPN e IP condivisi tra account" },
-      { key: "mondo.gestire", label: "Gestione mondo", description: "Mappe, luoghi e liste di gioco" },
+      { key: "mondo.gestire", label: "Gestione mondo", description: "Mappe, macroaree (luoghi e viaggi) e chat di gioco" },
+      { key: "viaggi.gestire", label: "Viaggi e missive", description: "Percorsi, rotte dei corvi, andature, intercettazioni delle missive e posizione dei PG" },
+      { key: "meteo.gestire", label: "Meteo", description: "Regioni climatiche, stagione, semi e meteo del giorno" },
       { key: "casate.gestire", label: "Gestione casate", description: "Casate, ruoli e stipendi, alberi genealogici, PNG e membri" },
       { key: "draghi.gestire", label: "Gestione draghi", description: "Draghi e uova delle casate, fasi di crescita e punteggi" },
       { key: "documentazione.scrivere", label: "Manuale e Ambientazione", description: "Scrivere e modificare le pagine della documentazione" },
@@ -44,7 +46,27 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "chat.moderare", label: "Moderare le liste", description: "Eliminare messaggi scritti da altri" },
       { key: "chat.log", label: "Log chat", description: "Cercare e scaricare i log delle chat di gioco" },
       { key: "messaggi.log", label: "Log messaggi", description: "Cercare e scaricare missive (ON) e messaggi OFF" },
+    ],
+  },
+  {
+    id: "messaggi",
+    title: "Messaggi, missive e ticket",
+    description: "Comunicazioni con i giocatori.",
+    items: [
       { key: "ticket.gestire", label: "Gestire i ticket", description: "Vedere tutti i ticket, rispondere, prenderli in carico, sospenderli e chiuderli" },
+      { key: "ticket.categorie", label: "Categorie dei ticket", description: "Aggiungere, modificare, riordinare ed eliminare le categorie dei ticket" },
+      { key: "messaggi.tutti", label: "Messaggi OFF a tutti", description: "Scrivere nella conversazione \"Messaggi a tutti\" dei messaggi OFF" },
+      { key: "missive.castello", label: "Archivio messaggi castello", description: "Leggere i cartigli arrivati con i corvi e riceverne l'avviso di SISTEMA" },
+      { key: "missive.parti_da", label: "Missive: Parti da", description: "Scegliere il luogo da cui parte un cartiglio (per masterare e per i PNG)" },
+    ],
+  },
+  {
+    id: "gioco",
+    title: "Gioco",
+    description: "Pannelli dei giocatori.",
+    items: [
+      { key: "ricerca.moderare", label: "Moderare la ricerca gioco", description: "Togliere le ricerche gioco degli altri giocatori" },
+      { key: "assenze.gestire", label: "Gestire le assenze", description: "Togliere le assenze segnate dagli altri giocatori" },
     ],
   },
   {
@@ -55,7 +77,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "forum.moderare", label: "Moderare il forum", description: "Modificare ed eliminare post altrui", soon: true },
       { key: "forum.sezioni", label: "Gestire le sezioni", description: "Creare ed eliminare sezioni del forum", soon: true },
       { key: "notizie.on", label: "Notizie ON", description: "Scrivere, modificare ed eliminare le Notizie ON (dal mondo di gioco)" },
-      { key: "annunci.globali", label: "Annunci globali", description: "Scrivere, modificare ed eliminare le Notizie OFF" },
+      { key: "annunci.globali", label: "Notizie OFF", description: "Scrivere, modificare ed eliminare le Notizie OFF" },
     ],
   },
 ];
@@ -72,6 +94,8 @@ export const MANAGEMENT_PERMISSIONS = [
   "gestione.accessi",
   "casate.gestire",
   "mondo.gestire",
+  "viaggi.gestire",
+  "meteo.gestire",
   "draghi.gestire",
   "utenti.gestire",
   "manutenzione.sito",

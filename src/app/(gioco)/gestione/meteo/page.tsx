@@ -6,7 +6,7 @@ import type { Season, WeatherRegion, WeatherSeed } from "@/lib/weather";
 import WeatherManager from "./WeatherManager";
 
 export default async function MeteoPage() {
-  const { supabase } = await requirePermission("mondo.gestire");
+  const { supabase } = await requirePermission("meteo.gestire");
 
   const [regions, seeds, settings, maps] = await Promise.all([
     supabase.from("weather_regions").select("*").order("sort_order").order("name"),

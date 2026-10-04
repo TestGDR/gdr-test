@@ -90,10 +90,13 @@ type Props = {
   canManage: boolean; // vede la rotella della Gestione (moderatori e admin)
   canWriteNewsOn: boolean; // scrive le Notizie ON (admin, master, moderatori)
   canWriteNewsOff: boolean; // scrive le Notizie OFF
+  canBroadcast: boolean; // scrive i messaggi OFF a tutti
   canModerate: boolean; // toglie le richieste di gioco altrui
   canManageUsers: boolean; // toglie le assenze altrui
   canManageTickets: boolean; // staff dei ticket: vede e gestisce tutti i ticket
-  isAdmin: boolean; // admin: gestisce anche le categorie dei ticket
+  canTicketCategories: boolean; // gestisce le categorie dei ticket
+  canCastleArchive: boolean; // legge l'Archivio messaggi castello
+  canChooseOrigin: boolean; // sceglie da dove parte un cartiglio
   children: ReactNode;
 };
 
@@ -118,10 +121,13 @@ export default function GameShell({
   canManage,
   canWriteNewsOn,
   canWriteNewsOff,
+  canBroadcast,
   canModerate,
   canManageUsers,
   canManageTickets,
-  isAdmin,
+  canTicketCategories,
+  canCastleArchive,
+  canChooseOrigin,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -364,15 +370,15 @@ export default function GameShell({
           initialTo={messages.to}
           session={messages.session}
           onRead={unread.refresh}
-          canBroadcast={canWriteNewsOff}
-          isAdmin={isAdmin}
-          isStaff={staffRole !== null}
+          canBroadcast={canBroadcast}
+          isAdmin={canCastleArchive}
+          isStaff={canChooseOrigin}
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
       <Modal open={ticketsOpen > 0} onClose={() => setTicketsOpen(0)} title="Ticket" size="xl">
-        {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} isAdmin={isAdmin} onSeen={tickets.refresh} />}
+        {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} isAdmin={canTicketCategories} onSeen={tickets.refresh} />}
       </Modal>
       {character && (
         <Modal open={dragonOpen > 0} onClose={() => setDragonOpen(0)} title="Il mio drago" size="sheet">

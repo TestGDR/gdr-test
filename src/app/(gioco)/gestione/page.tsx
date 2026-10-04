@@ -48,13 +48,13 @@ const PANELS = [
     description: "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e punteggi.",
   },
   {
-    permission: "mondo.gestire",
+    permission: "meteo.gestire",
     href: "/gestione/meteo",
     title: "Meteo",
     description: "Regioni climatiche, stagione attuale, semi (modelli di giornata) e meteo di oggi.",
   },
   {
-    permission: "mondo.gestire",
+    permission: "viaggi.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",
     description: "Percorsi tra le macroaree (anche di mappe diverse), andature, rotte dei corvi, missive e posizione dei personaggi.",

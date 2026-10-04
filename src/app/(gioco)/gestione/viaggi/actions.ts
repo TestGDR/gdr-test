@@ -6,7 +6,7 @@ import { getStaffContext } from "@/lib/staff";
 // Andature: moltiplicano il tempo dei viaggi
 export async function saveTravelSettings(form: FormData): Promise<{ error?: string }> {
   const ctx = await getStaffContext();
-  if (!ctx.permissions.has("mondo.gestire")) return { error: "Non hai il permesso di gestire i viaggi." };
+  if (!ctx.permissions.has("viaggi.gestire")) return { error: "Non hai il permesso di gestire i viaggi." };
   const num = (key: string, fallback: number) => {
     const n = Number(String(form.get(key) ?? "").replace(",", "."));
     return Number.isFinite(n) ? Math.min(10, Math.max(0.1, Math.round(n * 100) / 100)) : fallback;
@@ -23,7 +23,7 @@ export async function saveTravelSettings(form: FormData): Promise<{ error?: stri
 // Missive: probabilita' di intercettazione e luogo di partenza dei PG
 export async function saveMissiveSettings(form: FormData): Promise<{ error?: string }> {
   const ctx = await getStaffContext();
-  if (!ctx.permissions.has("mondo.gestire")) return { error: "Non hai il permesso di gestire le missive." };
+  if (!ctx.permissions.has("viaggi.gestire")) return { error: "Non hai il permesso di gestire le missive." };
   const pct = (key: string, fallback: number) => {
     const n = Math.round(Number(form.get(key)));
     return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : fallback;
@@ -44,7 +44,7 @@ export async function saveMissiveSettings(form: FormData): Promise<{ error?: str
 // Lo staff corregge la posizione di un PG
 export async function setCharacterPosition(characterId: string, locationId: string | null): Promise<{ error?: string }> {
   const ctx = await getStaffContext();
-  if (!ctx.permissions.has("mondo.gestire")) return { error: "Non hai il permesso." };
+  if (!ctx.permissions.has("viaggi.gestire")) return { error: "Non hai il permesso." };
   const { error } = await ctx.supabase.rpc("staff_set_position", { p_character: characterId, p_location: locationId });
   if (error) return { error: "Posizione non salvata." };
   revalidatePath("/gestione/viaggi");
