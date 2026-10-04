@@ -32,6 +32,10 @@ const MODES = [
   { key: "raven_minutes", label: "Corvo" },
 ] as const;
 type ModeKey = (typeof MODES)[number]["key"];
+type Mode = (typeof MODES)[number];
+// i mezzi dei viaggi e, a parte, il corvo (rotte dei corvi)
+const TRAVEL_MODES: readonly Mode[] = MODES.slice(0, 4);
+const RAVEN_MODES: readonly Mode[] = MODES.slice(4);
 
 // minuti -> "1 g 4 h 30 min"
 function duration(min: number) {
@@ -61,6 +65,7 @@ export default function TravelManager({
     <div className="space-y-6">
       <PaceForm settings={settings} />
       <Routes maps={maps} places={gamePlaces} />
+      <Routes maps={maps} places={gamePlaces.filter((p) => p.has_ravens)} raven />
       <MissiveSection settings={settings} maps={maps} places={gamePlaces} />
       <Positions maps={maps} places={gamePlaces} pgs={pgs} />
     </div>
@@ -78,10 +83,18 @@ function Box({ title, text, children }: { title: string; text: ReactNode; childr
 }
 
 // Tre caselle (ore) per i mezzi; vuoto = con quel mezzo non si puo'
-function TimeInputs({ values, onChange }: { values: Record<ModeKey, string>; onChange: (v: Record<ModeKey, string>) => void }) {
+function TimeInputs({
+  modes,
+  values,
+  onChange,
+}: {
+  modes: readonly Mode[];
+  values: Record<ModeKey, string>;
+  onChange: (v: Record<ModeKey, string>) => void;
+}) {
   return (
     <>
-      {MODES.map((m) => (
+      {modes.map((m) => (
         <label key={m.key} className="block space-y-1 text-xs tracking-wide text-muted uppercase">
           <span>{m.label} (ore)</span>
           <input
@@ -115,9 +128,8 @@ const minutesOf = (v: Record<ModeKey, string>) => ({
   dragon_minutes: toMinutes(v.dragon_minutes),
   raven_minutes: toMinutes(v.raven_minutes),
 });
-const noneSet = (t: Times) => !t.walk_minutes && !t.horse_minutes && !t.ship_minutes && !t.dragon_minutes && !t.raven_minutes;
-const showTimes = (t: Times) =>
-  MODES.map((m) => (
+const showTimes = (t: Times, modes: readonly Mode[]) =>
+  modes.map((m) => (
     <span key={m.key} className="block text-xs">
       <span className="text-muted">{m.label}:</span> {t[m.key] ? duration(t[m.key]!) : <span className="text-muted">non si può</span>}
     </span>
@@ -208,8 +220,13 @@ function PlacePicker({
   );
 }
 
-function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
+// raven = rotte dei corvi: solo tra castelli o citta', solo il tempo del corvo.
+// Stessa tabella dei percorsi: ogni sezione tocca solo le sue colonne.
+function Routes({ maps, places, raven = false }: { maps: MapRow[]; places: PlaceRow[]; raven?: boolean }) {
   const supabase = useMemo(() => createClient(), []);
+  const modes = raven ? RAVEN_MODES : TRAVEL_MODES;
+  const others = raven ? TRAVEL_MODES : RAVEN_MODES;
+  const has = (r: Times, list: readonly Mode[]) => list.some((m) => r[m.key] != null);
   const [rows, setRows] = useState<RouteRow[] | null>(null);
   const [from, setFrom] = useState({ map: "", place: "" });
   const [to, setTo] = useState({ map: "", place: "" });
@@ -234,9 +251,11 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
     if (!from.place || !to.place) return setError("Scegli la macroarea di partenza e quella di arrivo.");
     if (from.place === to.place) return setError("Partenza e arrivo sono la stessa macroarea.");
     const t = minutesOf(times);
-    if (noneSet(t)) return setError("Scrivi almeno un tempo (a piedi, a cavallo o in drago).");
+    const part = Object.fromEntries(modes.map((m) => [m.key, t[m.key]]));
+    if (Object.values(part).every((v) => v == null)) return setError(raven ? "Scrivi il tempo del corvo." : "Scrivi almeno un tempo.");
     const [a, b] = [from.place, to.place].sort();
-    const { error } = await supabase.from("travel_routes").upsert({ location_a: a, location_b: b, ...t });
+    // solo le colonne di questa sezione: l'altra resta com'e'
+    const { error } = await supabase.from("travel_routes").upsert({ location_a: a, location_b: b, ...part });
     if (error) return setError("Percorso non salvato.");
     setError(null);
     setTimes(emptyTimes());
@@ -246,8 +265,15 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
   }
 
   async function remove(r: RouteRow) {
-    if (!window.confirm(`Cancellare il percorso ${placeName(r.location_a)} ↔ ${placeName(r.location_b)}?`)) return;
-    await supabase.from("travel_routes").delete().eq("location_a", r.location_a).eq("location_b", r.location_b);
+    if (!window.confirm(`Cancellare ${raven ? "la rotta del corvo" : "il percorso"} ${placeName(r.location_a)} ↔ ${placeName(r.location_b)}?`)) return;
+    const match = supabase.from("travel_routes");
+    // se la tratta serve anche all'altra sezione si svuotano solo le colonne di questa
+    if (has(r, others))
+      await match
+        .update(Object.fromEntries(modes.map((m) => [m.key, null])))
+        .eq("location_a", r.location_a)
+        .eq("location_b", r.location_b);
+    else await match.delete().eq("location_a", r.location_a).eq("location_b", r.location_b);
     load().then(setRows);
   }
 
@@ -261,38 +287,52 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
 
   const q = query.trim().toLowerCase();
   const shown = (rows ?? [])
+    .filter((r) => has(r, modes))
     .filter((r) => !q || placeName(r.location_a).toLowerCase().includes(q) || placeName(r.location_b).toLowerCase().includes(q))
     .sort((x, y) => placeName(x.location_a).localeCompare(placeName(y.location_a)));
 
   return (
     <Box
-      title="Percorsi"
+      title={raven ? "Rotte dei corvi" : "Percorsi"}
       text={
+        raven ? (
+          <>
+            Il tempo di volo del corvo tra due <strong className="text-foreground">castelli o città</strong> (le macroaree con la casella
+            &quot;Castello o città&quot; in Gestione mondo), nei due sensi. Ogni rotta ha il suo tempo. Un corvo parte solo se mittente e
+            destinatario sono in un castello o città collegati da una catena di rotte: con più tappe, il maestro lo inoltra. Altrimenti parte
+            una staffetta lungo i percorsi.
+          </>
+        ) : (
         <>
           Si viaggia <strong className="text-foreground">solo lungo i percorsi</strong>. Un percorso collega due macroaree, anche di mappe
           diverse (per esempio Terre della Tempesta / Approdo ↔ Dorne / Stepstones), nei due sensi, con un tempo per ogni mezzo ad andatura
           normale. Lascia vuoto un mezzo se con quello non si può fare (es. a piedi attraverso il mare). Il viaggio segue da solo la strada
           più breve, anche con più tappe, sempre con lo stesso mezzo: se tra due macroaree non c&apos;è una catena di percorsi, non ci si arriva.
           <br />
-          <strong className="text-foreground">Missive:</strong> la staffetta segue i percorsi, per ogni tratta il più veloce tra a cavallo e
-          per mare, di fretta. Il <strong className="text-foreground">corvo</strong> ha il suo tempo di volo: scrivilo solo sulle tratte tra
-          castelli o città (anche più tappe: il maestro lo inoltra).
+          <strong className="text-foreground">Missive:</strong> la staffetta segue questi percorsi, per ogni tratta il più veloce tra a
+          cavallo e per mare, di fretta. I corvi hanno le loro rotte, qui sotto.
         </>
+        )
       }
     >
       <div className="space-y-3 border border-dashed border-border p-3">
-        <p className="text-xs tracking-[0.12em] text-accent uppercase">{editing ? "Modifica il percorso" : "Nuovo percorso"}</p>
+        <p className="text-xs tracking-[0.12em] text-accent uppercase">
+          {editing ? (raven ? "Modifica la rotta" : "Modifica il percorso") : raven ? "Nuova rotta del corvo" : "Nuovo percorso"}
+        </p>
+        {raven && places.length < 2 && (
+          <p className="text-sm text-orange-300">Servono almeno due macroaree con la casella &quot;Castello o città&quot; (Gestione mondo).</p>
+        )}
         <div className="flex flex-wrap gap-4">
           <PlacePicker label="Da" maps={maps} places={places} value={from} onChange={setFrom} />
           <PlacePicker label="A" maps={maps} places={places} value={to} onChange={setTo} />
         </div>
         <div className="flex flex-wrap gap-4">
-          <TimeInputs values={times} onChange={setTimes} />
+          <TimeInputs modes={modes} values={times} onChange={setTimes} />
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <button type="button" onClick={save} className="btn px-4 py-1.5 text-sm">
-            {editing ? "Salva le modifiche" : "+ Aggiungi percorso"}
+            {editing ? "Salva le modifiche" : raven ? "+ Aggiungi rotta" : "+ Aggiungi percorso"}
           </button>
           {editing && (
             <button
@@ -308,7 +348,7 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
 
       <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca una macroarea" className="input max-w-xs py-1.5" />
       {rows === null && <p className="text-sm text-muted">Caricamento...</p>}
-      {rows !== null && shown.length === 0 && <p className="text-sm text-muted">Nessun percorso.</p>}
+      {rows !== null && shown.length === 0 && <p className="text-sm text-muted">{raven ? "Nessuna rotta dei corvi." : "Nessun percorso."}</p>}
       <ul className="divide-y divide-border/60 border border-border/60">
         {shown.map((r) => (
           <li key={key(r)} className={`flex flex-wrap items-center gap-4 px-3 py-2 ${editing === key(r) ? "bg-blood/15" : ""}`}>
@@ -318,7 +358,7 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
                 {mapOf(r.location_a) === mapOf(r.location_b) ? mapOf(r.location_a) : `${mapOf(r.location_a)} ↔ ${mapOf(r.location_b)}`}
               </span>
             </span>
-            <span className="min-w-40">{showTimes(r)}</span>
+            <span className="min-w-40">{showTimes(r, modes)}</span>
             <span className="flex gap-2 text-xs">
               <button type="button" onClick={() => edit(r)} className="text-muted hover:text-accent">
                 Modifica
