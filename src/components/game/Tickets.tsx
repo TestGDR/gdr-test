@@ -29,7 +29,16 @@ type Ticket = {
   section: { name: string } | null;
   participants: { character: { name: string } | null }[];
 };
-type Message = { id: number; author_name: string; from_staff: boolean; body: string; created_at: string };
+type Message = {
+  id: number;
+  author_name: string;
+  from_staff: boolean;
+  body: string;
+  created_at: string;
+  roll_sides: number | null; // tiro di dado: facce e risultato
+  roll_result: number | null;
+};
+const DICE = [10, 20, 100];
 
 const TICKET_SELECT = `id, title, status, created_at, last_message_at, last_author_name, opener_name, assigned_name, section_id,
   section:ticket_sections(name), participants:ticket_participants(character:characters(name))`;
@@ -590,7 +599,7 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
     (ticketId: string) =>
       supabase
         .from("ticket_messages")
-        .select("id, author_name, from_staff, body, created_at")
+        .select("id, author_name, from_staff, body, created_at, roll_sides, roll_result")
         .eq("ticket_id", ticketId)
         .order("created_at")
         .then(({ data }) => (data ?? []) as Message[]),
@@ -630,6 +639,17 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
     setError(null);
     setReply("");
     setEditorKey((k) => k + 1);
+    loadMessages(ticket.id).then(setMessages);
+  }
+
+  // Tiro di dado: il risultato lo decide il database e diventa un messaggio del ticket
+  async function roll(sides: number) {
+    if (!ticket) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("roll_ticket_dice", { p_ticket: ticket.id, p_sides: sides });
+    setBusy(false);
+    if (error) return setError("Tiro non riuscito.");
+    setError(null);
     loadMessages(ticket.id).then(setMessages);
   }
 
@@ -678,7 +698,10 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
 
       {messages === null && <p className="text-sm text-muted">Caricamento...</p>}
       <div className="space-y-3">
-        {messages?.map((m) => (
+        {messages?.map((m) =>
+          m.roll_sides ? (
+            <DiceRoll key={m.id} m={m} />
+          ) : (
           <article key={m.id} className={`border-l-4 bg-[#14110f] ${m.from_staff ? "border-[#d4a72c]" : "border-[#4a7fa6]"}`}>
             <header className="flex flex-wrap items-baseline gap-x-2 border-b border-border/50 px-4 py-2">
               <span className={`text-xs font-bold tracking-wider uppercase ${m.from_staff ? "text-[#f0c75e]" : "text-[#8fb8d8]"}`}>{m.author_name}</span>
@@ -689,7 +712,8 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
             </header>
             <div className="guide-content px-4 py-3 text-sm" dangerouslySetInnerHTML={{ __html: sanitize(m.body) }} />
           </article>
-        ))}
+          ),
+        )}
         <div ref={bottom} />
       </div>
 
@@ -702,7 +726,22 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
           <p className="text-xs tracking-[0.12em] text-muted uppercase">{isStaff ? "Rispondi come staff" : "Rispondi"}</p>
           <RichEditor key={editorKey} value={reply} onChange={setReply} />
           {error && <p className="text-sm text-red-400">{error}</p>}
-          <div className="text-center">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <span className="text-xs tracking-[0.12em] text-muted uppercase">Tira un dado</span>
+              {DICE.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => roll(d)}
+                  className="btn-ghost flex items-center gap-1.5 px-3 py-1 text-sm"
+                  title={`Tira un d${d}: il risultato lo vedono tutti nel ticket`}
+                >
+                  <DieIcon />d{d}
+                </button>
+              ))}
+            </span>
             <button type="button" disabled={busy} onClick={send} className="btn px-10">
               Invia risposta
             </button>
@@ -712,3 +751,39 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
     </div>
   );
 }
+
+// Tiro di dado nel ticket: chi ha tirato, quale dado e il risultato ben visibile
+function DiceRoll({ m }: { m: Message }) {
+  const top = m.roll_result === m.roll_sides; // massimo del dado
+  const bottom = m.roll_result === 1;
+  return (
+    <div className="flex items-center gap-4 border border-dashed border-[#d4a72c]/60 bg-[#d4a72c]/5 px-4 py-2.5">
+      <span className="text-[#f0c75e]" aria-hidden>
+        <DieIcon size={28} />
+      </span>
+      <p className="flex-1 text-sm">
+        <strong className={m.from_staff ? "text-[#f0c75e]" : "text-[#8fb8d8]"}>{m.author_name}</strong> ha tirato un{" "}
+        <strong>d{m.roll_sides}</strong>
+        <span className="block text-[11px] text-muted">
+          {date(m.created_at)} {time(m.created_at)}
+        </span>
+      </p>
+      <span
+        className={`min-w-14 border px-3 py-1 text-center font-serif text-2xl font-bold ${
+          top ? "border-green-500 text-green-400" : bottom ? "border-red-600 text-red-400" : "border-[#d4a72c] text-[#f0c75e]"
+        }`}
+        title={top ? "Risultato massimo" : bottom ? "Risultato minimo" : undefined}
+      >
+        {m.roll_result}
+      </span>
+    </div>
+  );
+}
+
+// dado a dieci facce stilizzato
+const DieIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden>
+    <path d="M12 2 21 9l-3.5 11h-11L3 9Z" />
+    <path d="M12 2v7M3 9l9 0 9 0M12 9l-5.5 11M12 9l5.5 11" />
+  </svg>
+);
