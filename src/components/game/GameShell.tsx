@@ -1024,6 +1024,14 @@ function useTicketUnread(userId: string) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, fetchCount, refresh]);
+
+  // risposta nuova a un ticket: suona (l'icona lampeggia finche' non si apre il ticket)
+  const previous = useRef(0);
+  useEffect(() => {
+    if (count > previous.current) playMessageChime();
+    previous.current = count;
+  }, [count]);
+
   return { count, refresh };
 }
 
