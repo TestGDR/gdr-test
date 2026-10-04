@@ -21,6 +21,7 @@
   --color-muted: var(--muted);
   --font-sans: var(--font-body);
   --font-serif: var(--font-title);
+  --font-plain: var(--font-readable); /* classe font-plain */
 
   /* Angoli squadrati ovunque (rounded-full resta tondo: puntini, pallini) */
   --radius: 0;

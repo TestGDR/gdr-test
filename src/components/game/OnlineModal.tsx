@@ -60,9 +60,9 @@ export default function OnlineModal(props: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="Elenco online" size="tall">
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col font-plain">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
-          <p className="font-serif text-lg tracking-[0.15em] uppercase sm:text-xl">
+          <p className="text-lg font-semibold tracking-[0.1em] uppercase sm:text-xl">
             <span className="text-accent">{online.length}</span> online
           </p>
           <div className="flex flex-wrap gap-1">
@@ -153,6 +153,7 @@ function PlayerRow({
       }`}
       title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
     >
+      <AvailabilityDot value={player.availability} onChange={isMe ? onChangeAvailability : undefined} />
       <Avatar name={player.name} url={player.avatar} size="h-8 w-8 sm:h-11 sm:w-11" />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 sm:gap-2">
@@ -160,31 +161,19 @@ function PlayerRow({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-4 w-4 shrink-0 object-contain sm:h-5 sm:w-5" />
           )}
-          {/* Il nome apre la scheda del personaggio */}
+          {/* Nome e cognome (la casata) insieme: tutto il nome apre la scheda */}
           <button
             type="button"
             onClick={() => player.characterId && onOpenSheet(player.characterId)}
             disabled={!player.characterId}
-            title={player.characterId ? `Apri la scheda di ${player.name}` : undefined}
+            title={player.characterId ? `Apri la scheda di ${fullName(player)}` : undefined}
             // su cellulare nome e cognome vanno a capo invece di essere tagliati
-            className="min-w-0 text-left font-serif text-[13px] leading-tight tracking-normal break-words text-accent uppercase hover:underline disabled:no-underline sm:truncate sm:text-base sm:tracking-wide"
+            className="min-w-0 text-left text-[13px] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[15px]"
           >
-            {player.name}
-            {player.house && <span className="text-foreground/70"> {player.house}</span>}
+            {fullName(player)}
           </button>
-          {!isMe && player.characterId && (
-            <button
-              type="button"
-              onClick={() => onMessageOff({ id: player.characterId!, name: player.name, avatar: player.avatar })}
-              title={`Messaggio OFF a ${player.name}`}
-              aria-label={`Messaggio OFF a ${player.name}`}
-              className="text-muted hover:text-accent"
-            >
-              <BubbleIcon />
-            </button>
-          )}
         </p>
-        <p className="truncate text-xs text-foreground/80 sm:text-sm">{player.phrase || " "}</p>
+        <p className="truncate text-[11px] text-[#7d7470] sm:text-xs">{player.phrase || "\u00a0"}</p>
       </div>
       {/* Simboli */}
       <div className="flex shrink-0 items-center gap-1 text-base sm:gap-2 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5">
@@ -198,15 +187,25 @@ function PlayerRow({
             <HourglassIcon />
           </span>
         )}
-        <AvailabilityDot
-          value={player.availability}
-          onChange={isMe ? onChangeAvailability : undefined}
-          align="right"
-        />
+        {!isMe && player.characterId && (
+          <button
+            type="button"
+            onClick={() => onMessageOff({ id: player.characterId!, name: fullName(player), avatar: player.avatar })}
+            title={`Messaggio OFF a ${fullName(player)}`}
+            aria-label={`Messaggio OFF a ${fullName(player)}`}
+            className="text-[#e2c99a] transition hover:text-accent"
+          >
+            <BubbleIcon />
+          </button>
+        )}
       </div>
     </li>
   );
 }
+
+// Nome e cognome (la casata), solo iniziali maiuscole: "Daemon Blackfyre"
+const titleCase = (s: string) => s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+const fullName = (p: OnlinePlayer) => titleCase([p.name, p.house].filter(Boolean).join(" "));
 
 function PhraseEditor({ phrase, onSave }: { phrase: string; onSave: (p: string) => Promise<void> }) {
   const [value, setValue] = useState(phrase);
