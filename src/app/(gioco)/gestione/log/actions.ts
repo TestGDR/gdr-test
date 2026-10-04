@@ -67,6 +67,20 @@ type PrivateRaw = {
   recipient: { name: string } | null;
 };
 
+// Missive: cartigli (con il mezzo di consegna e le intercettazioni)
+type ScrollRaw = {
+  id: number;
+  created_at: string;
+  deliver_at: string;
+  body: string;
+  read_at: string | null;
+  sender_name: string;
+  recipient_name: string;
+  method: string;
+  signed: boolean;
+  intercepted: boolean;
+};
+
 async function characterIds(admin: Admin, name: string) {
   const { data } = await admin.from("characters").select("id").ilike("name", like(name)).limit(50);
   return (data ?? []).map((c) => c.id as string);
@@ -86,6 +100,28 @@ async function buildQuery(admin: Admin, f: LogFilters, withCount: boolean) {
     if (f.roomId) q = q.eq("room_id", f.roomId);
     if (f.character?.trim()) q = q.ilike("character_name", like(f.character));
     if (f.text?.trim()) q = q.ilike("content", like(f.text));
+    if (from) q = q.gte("created_at", from);
+    if (to) q = q.lte("created_at", to);
+    return { q };
+  }
+
+  if (f.kind === "missiva") {
+    let q = admin
+      .from("scrolls")
+      .select("id, created_at, deliver_at, body, read_at, sender_name, recipient_name, method, signed, intercepted", opts);
+    if (f.character?.trim()) {
+      const a = await characterIds(admin, f.character);
+      if (a.length === 0) return null;
+      if (f.other?.trim()) {
+        const b = await characterIds(admin, f.other);
+        if (b.length === 0) return null;
+        const A = a.join(","), B = b.join(",");
+        q = q.or(`and(sender_id.in.(${A}),recipient_id.in.(${B})),and(sender_id.in.(${B}),recipient_id.in.(${A}))`);
+      } else {
+        q = q.or(`sender_id.in.(${a.join(",")}),recipient_id.in.(${a.join(",")})`);
+      }
+    }
+    if (f.text?.trim()) q = q.ilike("body", like(f.text));
     if (from) q = q.gte("created_at", from);
     if (to) q = q.lte("created_at", to);
     return { q };
@@ -126,6 +162,21 @@ function toRows(kind: LogKind, data: unknown[]): LogRow[] {
       author: m.character_name,
       tag: KIND_LABEL[m.kind] ?? m.kind,
       text: m.content,
+    }));
+  if (kind === "missiva")
+    return (data as ScrollRaw[]).map((m) => ({
+      id: m.id,
+      at: m.created_at,
+      place: `${m.sender_name} → ${m.recipient_name}`,
+      author: m.sender_name,
+      tag: [
+        m.method,
+        m.signed ? null : "senza firma",
+        m.intercepted ? "INTERCETTATO" : Date.parse(m.deliver_at) > Date.now() ? "in viaggio" : m.read_at ? "aperto" : "sigillato",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      text: m.body,
     }));
   return (data as PrivateRaw[]).map((m) => ({
     id: m.id,

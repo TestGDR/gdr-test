@@ -16,6 +16,8 @@ import {
   saveMap,
   saveRoom,
   saveRoomGroup,
+  saveMissiveSettings,
+  setCharacterPosition,
   setMapActive,
   type WorldResult,
 } from "./actions";
@@ -26,6 +28,15 @@ type Data = {
   rooms: Room[];
   groups: RoomGroup[];
   houses: { id: string; name: string }[];
+  missive: MissiveSettings | null;
+  pgs: { id: string; name: string; location_id: string | null }[];
+};
+type MissiveSettings = {
+  default_location_id: string | null;
+  raven_full_hours: number;
+  rider_full_hours: number;
+  raven_intercept_pct: number;
+  rider_intercept_pct: number;
 };
 
 const NEW = "__nuova";
@@ -33,6 +44,7 @@ const TABS = [
   { id: "mappe", label: "Mappe" },
   { id: "macroaree", label: "Macroaree" },
   { id: "chat", label: "Chat" },
+  { id: "missive", label: "Missive" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -90,6 +102,7 @@ export default function WorldManager(data: Data) {
         {tab === "mappe" && <MapsTab maps={data.maps} locations={data.locations} selectedId={mapId} onSelect={setMapId} />}
         {tab === "macroaree" && <LocationsTab {...data} mapId={mapId} onSelectMap={setMapId} />}
         {tab === "chat" && <RoomsTab {...data} mapId={mapId} onSelectMap={setMapId} />}
+        {tab === "missive" && <MissiveTab settings={data.missive} locations={data.locations} maps={data.maps} pgs={data.pgs} />}
       </div>
     </section>
   );
@@ -191,6 +204,10 @@ function MapForm({ map, onSaved }: { map: GameMap | null; onSaved: (id: string) 
       <Field label="Descrizione">
         <textarea name="description" defaultValue={map?.description} rows={3} maxLength={4000} className="input" />
       </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="safe" defaultChecked={map?.safe ?? false} className="h-4 w-4 accent-[#8b2a14]" />
+        Territorio sicuro: corvi e staffette qui non vengono mai intercettati
+      </label>
       <Field label="Immagine della mappa (larghezza mostrata: 600 px)">
         <div className="space-y-2">
           {preview && (
@@ -444,6 +461,14 @@ function LocationForm({
       <Field label="Descrizione">
         <textarea name="description" defaultValue={location?.description} rows={4} maxLength={4000} className="input" />
       </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="has_ravens" defaultChecked={location?.has_ravens ?? false} className="h-4 w-4 accent-[#8b2a14]" />
+        Castello o città: partono e arrivano i corvi
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="in_game" defaultChecked={location?.in_game ?? true} className="h-4 w-4 accent-[#8b2a14]" />
+        Luogo di gioco: entrando nelle sue chat il PG si trova qui (togli la spunta per le chat OFF)
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn" disabled={pending}>
           {pending ? "Salvataggio..." : location ? "Salva" : "Crea macroarea"}
@@ -461,6 +486,114 @@ function LocationForm({
         {feedback}
       </div>
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Missive: tempi di consegna, intercettazioni, luogo di partenza e
+// posizione dei PG
+// ---------------------------------------------------------------------
+function MissiveTab({
+  settings,
+  locations,
+  maps,
+  pgs,
+}: {
+  settings: MissiveSettings | null;
+  locations: Location[];
+  maps: GameMap[];
+  pgs: { id: string; name: string; location_id: string | null }[];
+}) {
+  const { run, pending, feedback } = useAction();
+  const [query, setQuery] = useState("");
+  const places = locations.filter((l) => l.in_game);
+  const placeLabel = (l: Location) => `${l.name} (${maps.find((m) => m.id === l.map_id)?.name ?? "?"})`;
+  const shown = query.trim() ? pgs.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 30) : [];
+
+  if (!settings) return <p className="text-red-400">Impostazioni delle missive non trovate: esegui la migrazione 0050.</p>;
+  return (
+    <div className="space-y-6">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const form = new FormData(e.currentTarget);
+          run(() => saveMissiveSettings(form), "Impostazioni salvate.");
+        }}
+        className="space-y-4 rounded-md border border-border/60 p-4"
+      >
+        <h3 className="font-serif text-xl text-accent">Consegna delle missive</h3>
+        <p className="text-sm text-muted">
+          Stesso luogo: un paggio, consegna immediata. Tra castelli e città: un corvo. Altrimenti una staffetta. Il tempo è in proporzione
+          alla distanza sulla mappa: qui scegli quante ore reali servono per attraversarla tutta (tra mappe diverse vale il tempo intero).
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Corvo: ore per tutta la mappa">
+            <input name="raven_full_hours" type="number" min={0} max={240} step={0.25} defaultValue={settings.raven_full_hours} className="input" />
+          </Field>
+          <Field label="Staffetta: ore per tutta la mappa">
+            <input name="rider_full_hours" type="number" min={0} max={240} step={0.25} defaultValue={settings.rider_full_hours} className="input" />
+          </Field>
+          <Field label="Corvo: probabilità di intercettazione (%)">
+            <input name="raven_intercept_pct" type="number" min={0} max={100} defaultValue={settings.raven_intercept_pct} className="input" />
+          </Field>
+          <Field label="Staffetta: probabilità di intercettazione (%)">
+            <input name="rider_intercept_pct" type="number" min={0} max={100} defaultValue={settings.rider_intercept_pct} className="input" />
+          </Field>
+        </div>
+        <p className="text-xs text-muted">
+          L&apos;intercettazione vale solo se il mittente o il destinatario si trovano in una mappa non segnata come &quot;territorio sicuro&quot;.
+          I cartigli intercettati non arrivano mai: li trovi nei Log, scheda Missive.
+        </p>
+        <Field label="Luogo di partenza (per i PG che non sono ancora entrati in una chat di gioco)">
+          <select name="default_location_id" defaultValue={settings.default_location_id ?? ""} className="input">
+            <option value="">— nessuno —</option>
+            {places.map((l) => (
+              <option key={l.id} value={l.id}>
+                {placeLabel(l)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="flex items-center gap-3">
+          <button className="btn" disabled={pending}>
+            Salva
+          </button>
+          {feedback}
+        </div>
+      </form>
+
+      <section className="space-y-3 rounded-md border border-border/60 p-4">
+        <h3 className="font-serif text-xl text-accent">Posizione dei personaggi</h3>
+        <p className="text-sm text-muted">
+          Ogni PG si trova nel luogo dell&apos;ultima chat di gioco in cui è entrato. Qui puoi correggerla: cerca il personaggio e scegli il luogo.
+        </p>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome del personaggio" className="input max-w-sm py-1.5" />
+        {shown.length > 0 && (
+          <ul className="divide-y divide-border/60 border border-border/60">
+            {shown.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+                <span className="flex-1 font-serif">{p.name}</span>
+                <select
+                  defaultValue={p.location_id ?? ""}
+                  disabled={pending}
+                  onChange={(e) => run(() => setCharacterPosition(p.id, e.target.value || null), `Posizione di ${p.name} aggiornata.`)}
+                  aria-label={`Posizione di ${p.name}`}
+                  className="input w-72! py-1"
+                >
+                  <option value="">— luogo di partenza —</option>
+                  {places.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {placeLabel(l)}
+                    </option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        )}
+        {feedback}
+      </section>
+    </div>
   );
 }
 

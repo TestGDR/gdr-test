@@ -833,6 +833,7 @@ function useUnread(characterId: string | null) {
   const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname(); // cambiando pagina il titolo torna quello di base: si rimette il numero
   const [counts, setCounts] = useState<Record<MessageKind, number>>({ missiva: 0, off: 0 });
+  const nextDelivery = useRef<string | null>(null); // prossimo cartiglio in arrivo
 
   const fetchCounts = useCallback(async (): Promise<Record<MessageKind, number>> => {
     const count = (kind: MessageKind) =>
@@ -843,12 +844,16 @@ function useUnread(characterId: string | null) {
         .eq("kind", kind)
         .is("read_at", null)
         .then(({ count }) => count ?? 0);
-    const [missiva, off, offShared] = await Promise.all([
-      count("missiva"),
+    const [scrolls, off, offShared] = await Promise.all([
+      // missive: cartigli gia' consegnati e ancora sigillati; prossima consegna in arrivo
+      supabase
+        .rpc("scrolls_unread", { p_character: characterId })
+        .then(({ data }) => ((data as { unread: number; next_delivery: string | null }[] | null) ?? [])[0] ?? { unread: 0, next_delivery: null }),
       count("off"),
       supabase.rpc("off_unread", { p_character: characterId }).then(({ data }) => (data as number | null) ?? 0),
     ]);
-    return { missiva, off: off + offShared };
+    nextDelivery.current = scrolls.next_delivery;
+    return { missiva: scrolls.unread, off: off + offShared };
   }, [supabase, characterId]);
 
   const refresh = useCallback(() => {
@@ -877,11 +882,23 @@ function useUnread(characterId: string | null) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_broadcasts" }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "system_messages", filter: `character_id=eq.${characterId}` }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "off_broadcast_reads", filter: `character_id=eq.${characterId}` }, () => refresh())
+      // un cartiglio e' partito per me: si conta all'ora di consegna
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "scroll_notices", filter: `character_id=eq.${characterId}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [supabase, characterId, fetchCounts, refresh]);
+
+  // Cartiglio in arrivo: all'ora di consegna l'icona delle missive si accende
+  const [deliveryTick, setDeliveryTick] = useState(0);
+  useEffect(() => {
+    const next = nextDelivery.current;
+    if (!next) return;
+    const wait = Math.max(0, Date.parse(next) - Date.now()) + 1500;
+    const timer = setTimeout(() => fetchCounts().then((c) => (setCounts(c), setDeliveryTick((t) => t + 1))), Math.min(wait, 2_147_000_000));
+    return () => clearTimeout(timer);
+  }, [counts, deliveryTick, fetchCounts]);
 
   // Avviso sonoro: subito quando arriva un messaggio, poi ogni 15 secondi finche' resta
   // qualcosa da leggere. Suona anche con la scheda in secondo piano.

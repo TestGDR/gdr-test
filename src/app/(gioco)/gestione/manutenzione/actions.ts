@@ -48,26 +48,46 @@ export async function deleteChatMessages(period: string): Promise<CleanResult> {
 // ---------------------------------------------------------------------
 const KINDS: Record<string, string[]> = { missiva: ["missiva"], off: ["off"], entrambi: ["missiva", "off"] };
 
+// missive = cartigli (tabella scrolls); OFF = messaggi privati
 export async function countPrivateMessages(period: string, kind: string): Promise<CleanResult> {
   const a = await authorized();
   const before = cutoff(period);
   if (!a || !before || !KINDS[kind]) return { error: "Operazione non permessa." };
-  const { count, error } = await a.admin
-    .from("private_messages")
-    .select("id", { count: "exact", head: true })
-    .lt("created_at", before)
-    .in("kind", KINDS[kind]);
-  return error ? { error: "Conteggio non riuscito." } : { count: count ?? 0 };
+  let total = 0;
+  if (KINDS[kind].includes("missiva")) {
+    const { count, error } = await a.admin.from("scrolls").select("id", { count: "exact", head: true }).lt("created_at", before);
+    if (error) return { error: "Conteggio non riuscito." };
+    total += count ?? 0;
+  }
+  if (KINDS[kind].includes("off")) {
+    const { count, error } = await a.admin
+      .from("private_messages")
+      .select("id", { count: "exact", head: true })
+      .lt("created_at", before)
+      .eq("kind", "off");
+    if (error) return { error: "Conteggio non riuscito." };
+    total += count ?? 0;
+  }
+  return { count: total };
 }
 
 export async function deletePrivateMessages(period: string, kind: string): Promise<CleanResult> {
   const a = await authorized();
   const before = cutoff(period);
   if (!a || !before || !KINDS[kind]) return { error: "Operazione non permessa." };
-  const { count, error } = await a.admin.from("private_messages").delete({ count: "exact" }).lt("created_at", before).in("kind", KINDS[kind]);
-  if (error) return { error: "Pulizia non riuscita." };
+  let total = 0;
+  if (KINDS[kind].includes("missiva")) {
+    const { count, error } = await a.admin.from("scrolls").delete({ count: "exact" }).lt("created_at", before);
+    if (error) return { error: "Pulizia non riuscita." };
+    total += count ?? 0;
+  }
+  if (KINDS[kind].includes("off")) {
+    const { count, error } = await a.admin.from("private_messages").delete({ count: "exact" }).lt("created_at", before).eq("kind", "off");
+    if (error) return { error: "Pulizia non riuscita." };
+    total += count ?? 0;
+  }
   revalidatePath("/", "layout");
-  return { count: count ?? 0 };
+  return { count: total };
 }
 
 // ---------------------------------------------------------------------

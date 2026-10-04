@@ -33,6 +33,7 @@ export type GameMap = {
   sort_order: number;
   active: boolean; // i giocatori vedono solo le mappe attive
   weather_region_id: string | null; // regione climatica (meteo)
+  safe: boolean; // territorio sicuro: corvi e staffette non vengono intercettati
 };
 
 export type Location = {
@@ -43,6 +44,8 @@ export type Location = {
   image_url: string | null;
   x: number;
   y: number;
+  has_ravens: boolean; // castello o citta': partono e arrivano i corvi
+  in_game: boolean; // luogo di gioco (no per es. "Chat OFF"): conta per la posizione dei PG
 };
 
 export type RoomAccess = "pubblica" | "casata" | "affitto";

@@ -355,3 +355,35 @@ body {
   color: #f0c75e;
   filter: drop-shadow(0 0 5px rgb(240 199 94 / 0.75));
 }
+
+/* ---------------------------------------------------------------------
+   Missive: scrittoio di legno scuro e cartigli di pergamena
+   --------------------------------------------------------------------- */
+.scrolls-desk {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(120 72 36 / 0.25), transparent 60%),
+    linear-gradient(180deg, #1c120b, #120b06);
+}
+/* pergamena srotolata, con un rullo di legno in alto e uno in basso */
+.unrolled-scroll {
+  position: relative;
+  background: url("/images/pagina-destra.webp") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7));
+}
+.unrolled-scroll::before,
+.unrolled-scroll::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #8a5a2c, #4a2c12 55%, #2c190a);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.6);
+}
+.unrolled-scroll::before {
+  top: -4px;
+}
+.unrolled-scroll::after {
+  bottom: -4px;
+}

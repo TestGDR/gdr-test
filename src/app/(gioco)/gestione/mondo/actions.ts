@@ -69,7 +69,7 @@ export async function saveMap(form: FormData): Promise<WorldResult> {
   const id = text(form, "id", 36) || undefined;
   const name = text(form, "name", 80);
   if (!name) return { error: "Dai un nome alla mappa." };
-  const row: Record<string, unknown> = { name, description: text(form, "description", 4000) };
+  const row: Record<string, unknown> = { name, description: text(form, "description", 4000), safe: form.get("safe") === "on" };
 
   const { data: current } = id
     ? await ctx.supabase.from("maps").select("image_url").eq("id", id).single()
@@ -131,7 +131,13 @@ export async function saveLocation(form: FormData): Promise<WorldResult> {
   const mapId = text(form, "map_id", 36);
   if (!name) return { error: "Dai un nome alla macroarea." };
   if (!mapId) return { error: "Scegli la mappa a cui appartiene." };
-  const row: Record<string, unknown> = { name, map_id: mapId, description: text(form, "description", 4000) };
+  const row: Record<string, unknown> = {
+    name,
+    map_id: mapId,
+    description: text(form, "description", 4000),
+    has_ravens: form.get("has_ravens") === "on",
+    in_game: form.get("in_game") === "on",
+  };
   if (!id) Object.assign(row, { x: 50, y: 50 }); // le nuove compaiono al centro: poi si trascinano
 
   const { data, error } = id
@@ -159,6 +165,35 @@ export async function deleteLocation(id: string): Promise<WorldResult> {
   if (error) return { error: "Eliminazione non riuscita." };
   for (const room of rooms ?? []) await removeImage(room.image_url);
   return done();
+}
+
+// ---------------------------------------------------------------------
+// Missive: tempi, probabilita' di intercettazione, luogo di partenza;
+// posizione dei PG corretta dallo staff
+// ---------------------------------------------------------------------
+export async function saveMissiveSettings(form: FormData): Promise<WorldResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const hours = (key: string, fallback: number) => {
+    const n = Number(String(form.get(key) ?? "").replace(",", "."));
+    return Number.isFinite(n) ? Math.min(240, Math.max(0, Math.round(n * 100) / 100)) : fallback;
+  };
+  const row = {
+    default_location_id: text(form, "default_location_id", 36) || null,
+    raven_full_hours: hours("raven_full_hours", 2),
+    rider_full_hours: hours("rider_full_hours", 6),
+    raven_intercept_pct: int(form, "raven_intercept_pct", 0, 100, 10),
+    rider_intercept_pct: int(form, "rider_intercept_pct", 0, 100, 20),
+  };
+  const { error } = await ctx.supabase.from("missive_settings").update(row).eq("id", true);
+  return error ? { error: "Impostazioni non salvate." } : done();
+}
+
+export async function setCharacterPosition(characterId: string, locationId: string | null): Promise<WorldResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const { error } = await ctx.supabase.rpc("staff_set_position", { p_character: characterId, p_location: locationId });
+  return error ? { error: "Posizione non salvata." } : done();
 }
 
 // ---------------------------------------------------------------------
