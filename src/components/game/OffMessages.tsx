@@ -46,14 +46,6 @@ const GROUP_MSG_SELECT = "id, group_id, sender_id, body, created_at, sender:char
 const BROADCAST_SELECT = "id, sender_id, body, created_at, sender:characters(name, avatar_url)";
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(Date.now() - 86_400_000);
-  if (d.toDateString() === today.toDateString()) return "Oggi";
-  if (d.toDateString() === yesterday.toDateString()) return "Ieri";
-  return d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
-}
 function listTime(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -315,21 +307,35 @@ export default function OffMessages({
   }, [supabase, current, unreadHere, dmId, activeGroup, groupMsgs, broadcasts, me.id, onRead]);
 
   // ----- messaggi della conversazione aperta -----
-  type Bubble = { id: string; mine: boolean; author?: string; body: string; at: string; status?: "sent" | "read" };
   const bubbles: Bubble[] = useMemo(() => {
     if (!current) return [];
+    const mine = { author: me.name, avatar: me.avatar_url };
     if (current.kind === "dm")
       return shownDms
         .filter((m) => (m.sender_id === dmId && m.recipient_id === me.id) || (m.sender_id === me.id && m.recipient_id === dmId))
-        .map((m) => ({ id: `d${m.id}`, mine: m.sender_id === me.id, body: m.body, at: m.created_at, status: m.read_at ? "read" : "sent" }));
+        .map((m) => ({
+          id: `d${m.id}`,
+          mine: m.sender_id === me.id,
+          ...(m.sender_id === me.id ? mine : { author: current.name, avatar: current.avatar ?? null }),
+          body: m.body,
+          at: m.created_at,
+          status: m.read_at ? "read" : "sent",
+        }));
     if (current.kind === "group")
       return groupMsgs
         .filter((m) => `group:${m.group_id}` === current.key)
-        .map((m) => ({ id: `g${m.id}`, mine: m.sender_id === me.id, author: m.sender?.name ?? "?", body: m.body, at: m.created_at }));
+        .map((m) => ({ id: `g${m.id}`, mine: m.sender_id === me.id, author: m.sender?.name ?? "?", avatar: m.sender?.avatar_url ?? null, body: m.body, at: m.created_at }));
     if (current.kind === "system")
-      return systemMsgs.map((m) => ({ id: `s${m.id}`, mine: false, author: "SISTEMA", body: m.body, at: m.created_at }));
-    return shownBroadcasts.map((b) => ({ id: `b${b.id}`, mine: b.sender_id === me.id, author: b.sender?.name ?? "Staff", body: b.body, at: b.created_at }));
-  }, [current, shownDms, dmId, groupMsgs, shownBroadcasts, systemMsgs, me.id]);
+      return systemMsgs.map((m) => ({ id: `s${m.id}`, mine: false, author: "SISTEMA", avatar: null, system: true, body: m.body, at: m.created_at }));
+    return shownBroadcasts.map((b) => ({
+      id: `b${b.id}`,
+      mine: b.sender_id === me.id,
+      author: b.sender?.name ?? "Staff",
+      avatar: b.sender?.avatar_url ?? null,
+      body: b.body,
+      at: b.created_at,
+    }));
+  }, [current, shownDms, dmId, groupMsgs, shownBroadcasts, systemMsgs, me.id, me.name, me.avatar_url]);
 
   async function send(body: string) {
     if (!current) return "Nessuna conversazione.";
@@ -553,7 +559,7 @@ export default function OffMessages({
               <Members group={activeGroup} meId={me.id} isOwner={isOwner} onAdd={addMember} onRemove={removeMember} onClose={() => setPanel("none")} />
             ) : (
               <>
-                <Thread bubbles={bubbles} showAuthors={current.kind !== "dm"} />
+                <Thread bubbles={bubbles} />
                 {canWriteHere ? (
                   <Composer key={current.key} onSend={send} placeholder={current.kind === "global" ? "Scrivi un messaggio a tutti i giocatori..." : "Scrivi un messaggio..."} />
                 ) : (
@@ -662,42 +668,79 @@ function ConversationIcon({ c }: { c: Conversation }) {
   );
 }
 
-function Thread({ bubbles, showAuthors }: { bubbles: { id: string; mine: boolean; author?: string; body: string; at: string; status?: "sent" | "read" }[]; showAuthors: boolean }) {
+// Un messaggio: foto, nome e data/ora in alto, testo sotto. Striscia colorata sul
+// lato con la punta: a sinistra (azzurra) quelli ricevuti, a destra (rossa) i miei
+type Bubble = {
+  id: string;
+  mine: boolean;
+  author: string;
+  avatar: string | null;
+  system?: boolean;
+  body: string;
+  at: string;
+  status?: "sent" | "read";
+};
+
+const fullDate = (iso: string) =>
+  new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", "");
+
+function Thread({ bubbles }: { bubbles: Bubble[] }) {
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [bubbles.length]);
   return (
-    <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-4">
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
       {bubbles.length === 0 && <p className="text-center text-sm text-muted">Nessun messaggio.</p>}
-      {bubbles.map((b, i) => {
-        const prev = bubbles[i - 1];
-        const newDay = !prev || dayLabel(prev.at) !== dayLabel(b.at);
-        const sameAuthor = prev && !newDay && prev.mine === b.mine && prev.author === b.author;
-        return (
-          <Fragment key={b.id}>
-            {newDay && (
-              <p className="py-2 text-center">
-                <span className="bg-black/60 px-3 py-0.5 text-[11px] text-muted capitalize">{dayLabel(b.at)}</span>
+      {bubbles.map((b) => (
+        <div key={b.id} className={`flex ${b.mine ? "justify-end pr-2.5" : "justify-start pl-2.5"}`}>
+          <article
+            className={`relative w-fit max-w-[85%] min-w-56 bg-[#14110f] shadow-[0_2px_8px_rgb(0_0_0/0.5)] ${
+              b.mine ? "border-r-4 border-accent" : b.system ? "border-l-4 border-[#d4a72c]" : "border-l-4 border-[#4a7fa6]"
+            }`}
+          >
+            {/* punta verso chi scrive */}
+            <span
+              aria-hidden
+              className={`absolute bottom-3 border-y-[8px] border-y-transparent ${
+                b.mine
+                  ? "-right-[14px] border-l-[10px] border-l-accent"
+                  : `-left-[14px] border-r-[10px] ${b.system ? "border-r-[#d4a72c]" : "border-r-[#4a7fa6]"}`
+              }`}
+            />
+            <header className={`flex items-center gap-2.5 border-b border-border/50 px-3.5 pt-2.5 pb-2 ${b.mine ? "flex-row-reverse text-right" : ""}`}>
+              {b.system ? (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d4a72c]/70 font-serif text-sm text-[#f0c75e]">S</span>
+              ) : b.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={b.avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-blood/60 bg-background font-serif text-accent">
+                  {b.author[0]}
+                </span>
+              )}
+              <span className="min-w-0">
+                <span
+                  className={`block truncate text-xs font-bold tracking-wider uppercase ${
+                    b.mine ? "text-accent" : b.system ? "text-[#f0c75e]" : "text-[#8fb8d8]"
+                  }`}
+                >
+                  {b.author}
+                </span>
+                <span className="block text-[11px] text-muted">{fullDate(b.at)}</span>
+              </span>
+            </header>
+            <p className="px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">{b.body}</p>
+            {b.mine && b.status && (
+              <p className="-mt-2 px-3.5 pb-2 text-right text-xs">
+                <span className={b.status === "read" ? "text-sky-400" : "text-muted"} title={b.status === "read" ? "Letto" : "Inviato"}>
+                  {b.status === "read" ? "✓✓" : "✓"}
+                </span>
               </p>
             )}
-            <div className={`flex ${b.mine ? "justify-end" : "justify-start"} ${sameAuthor ? "" : "pt-1"}`}>
-              <div className={`max-w-[80%] border px-3 py-1.5 ${b.mine ? "border-blood/50 bg-blood/25" : "border-border bg-background"}`}>
-                {showAuthors && !b.mine && !sameAuthor && <p className="text-xs font-semibold text-accent">{b.author}</p>}
-                <p className="text-sm break-words whitespace-pre-wrap">{b.body}</p>
-                <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-muted">
-                  {hhmm(b.at)}
-                  {b.mine && b.status && (
-                    <span className={b.status === "read" ? "text-sky-400" : ""} title={b.status === "read" ? "Letto" : "Inviato"}>
-                      {b.status === "read" ? "✓✓" : "✓"}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </Fragment>
-        );
-      })}
+          </article>
+        </div>
+      ))}
       <div ref={bottom} />
     </div>
   );
