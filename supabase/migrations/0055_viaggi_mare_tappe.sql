@@ -11,8 +11,34 @@
 --   due macroaree (anche dentro la stessa mappa).
 -- =====================================================================
 
-alter table public.travel_routes add column ship_minutes int check (ship_minutes between 1 and 1000000);
-alter table public.map_travel_times add column ship_minutes int check (ship_minutes between 1 and 1000000);
+-- ---------------------------------------------------------------------
+-- Riallineamento: funziona sia dopo la prima versione della 0054 (senza
+-- tempi dentro le mappe) sia dopo quella riscritta
+-- ---------------------------------------------------------------------
+drop function if exists public.travel_matrix();
+
+alter table public.travel_routes add column if not exists ship_minutes int check (ship_minutes between 1 and 1000000);
+
+create table if not exists public.map_travel_times (
+  map_a           uuid not null references public.maps(id) on delete cascade,
+  map_b           uuid not null references public.maps(id) on delete cascade,
+  walk_minutes    int check (walk_minutes between 1 and 1000000),
+  horse_minutes   int check (horse_minutes between 1 and 1000000),
+  dragon_minutes  int check (dragon_minutes between 1 and 1000000),
+  primary key (map_a, map_b)
+);
+alter table public.map_travel_times add column if not exists ship_minutes int check (ship_minutes between 1 and 1000000);
+alter table public.map_travel_times enable row level security;
+drop policy if exists "tempi tra mappe dello staff" on public.map_travel_times;
+create policy "tempi tra mappe dello staff" on public.map_travel_times for all to authenticated
+  using (public.has_permission('mondo.gestire')) with check (public.has_permission('mondo.gestire'));
+grant select, insert, update, delete on public.map_travel_times to authenticated;
+grant select, insert, update, delete on public.map_travel_times to service_role;
+
+-- per ogni mappa un tempo standard al suo interno (a piedi 24 ore, a cavallo 8, in drago 1)
+insert into public.map_travel_times (map_a, map_b, walk_minutes, horse_minutes, dragon_minutes)
+select id, id, 1440, 480, 60 from public.maps
+on conflict do nothing;
 
 -- Controlli rifatti: almeno un mezzo; i tempi delle mappe sono solo "dentro la mappa"
 do $$
@@ -116,6 +142,7 @@ begin
 end;
 $$;
 revoke execute on function public.travel_distances(uuid, text) from public, anon, authenticated;
+revoke execute on function public.travel_base_minutes(uuid, uuid, text) from public, anon, authenticated;
 
 create or replace function public.travel_base_minutes(p_from uuid, p_to uuid, p_mode text)
 returns int
@@ -150,6 +177,32 @@ end;
 $$;
 revoke execute on function public.travel_options(uuid) from public, anon;
 grant execute on function public.travel_options(uuid) to authenticated;
+
+-- Anteprima: tempo con l'andatura, null se non c'e' strada
+drop function if exists public.travel_preview(uuid, uuid, text, text);
+create or replace function public.travel_preview(p_character uuid, p_to uuid, p_mode text, p_pace text)
+returns table (minutes int, from_name text, to_name text, can_fly boolean)
+language plpgsql stable
+security definer set search_path = ''
+as $$
+declare
+  s public.missive_settings;
+  v_from uuid := public.character_location(p_character);
+  v_base int;
+begin
+  if not public.is_my_character(p_character) then return; end if;
+  select * into s from public.missive_settings;
+  v_base := public.travel_base_minutes(v_from, p_to, p_mode);
+  return query
+    select case when v_base is null then null
+                else greatest(1, round(v_base * case p_pace when 'fretta' then s.pace_fast_factor when 'calma' then s.pace_slow_factor else 1 end))::int end,
+           (select name from public.locations where id = v_from),
+           (select name from public.locations where id = p_to),
+           public.can_fly(p_character);
+end;
+$$;
+revoke execute on function public.travel_preview(uuid, uuid, text, text) from public, anon;
+grant execute on function public.travel_preview(uuid, uuid, text, text) to authenticated;
 
 -- Partenza: anche per mare
 create or replace function public.start_travel(p_character uuid, p_to uuid, p_mode text, p_pace text)
