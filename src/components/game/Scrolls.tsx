@@ -358,7 +358,8 @@ function WriteScroll({
   const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState(initialTo?.name ?? "");
   const [to, setTo] = useState<Contact | null>(initialTo);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [options, setOptions] = useState<Preview[] | null>(null); // mezzi possibili (vuoto: nessuna strada)
+  const [method, setMethod] = useState<Method | null>(null); // mezzo scelto
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [signed, setSigned] = useState(true);
@@ -381,8 +382,12 @@ function WriteScroll({
   useEffect(() => {
     if (!to) return;
     supabase
-      .rpc("scroll_preview", { p_from: me.id, p_to: to.id, p_from_location: origin || null })
-      .then(({ data }) => setPreview(((data as Preview[] | null) ?? [])[0] ?? null));
+      .rpc("scroll_options", { p_from: me.id, p_to: to.id, p_from_location: origin || null })
+      .then(({ data }) => {
+        const list = (data as Preview[] | null) ?? [];
+        setOptions(list);
+        setMethod(list[0]?.method ?? null); // proposto per primo: paggio, poi corvo
+      });
   }, [supabase, me.id, to, origin]);
 
   async function choose() {
@@ -392,7 +397,7 @@ function WriteScroll({
     if (!data) return setLookupError("Nessun personaggio con questo nome.");
     if (data.id === me.id) return setLookupError("Non puoi scrivere a te stesso.");
     setLookupError(null);
-    setPreview(null);
+    setOptions(null);
     setTo({ id: data.id, name: data.name });
   }
 
@@ -405,9 +410,17 @@ function WriteScroll({
       p_body: body.trim(),
       p_signed: signed,
       p_from_location: origin || null,
+      p_method: method,
     });
     setBusy(false);
-    if (error) return setError(error.message.includes("strada") ? "Nessuna strada per raggiungere il destinatario." : "Il cartiglio non è partito.");
+    if (error)
+      return setError(
+        error.message.includes("strada")
+          ? "Nessuna strada per raggiungere il destinatario."
+          : error.message.includes("mezzo")
+            ? "Il mezzo scelto non può raggiungere il destinatario."
+            : "Il cartiglio non è partito.",
+      );
     onSent();
   }
 
@@ -439,7 +452,7 @@ function WriteScroll({
             onChange={(e) => {
               setName(e.target.value);
               setTo(null);
-              setPreview(null);
+              setOptions(null);
             }}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), choose())}
             onBlur={() => name.trim() && !to && choose()}
@@ -455,30 +468,60 @@ function WriteScroll({
         {lookupError && <p className="text-xs text-red-400">{lookupError}</p>}
       </div>
 
-      {to && preview && (
-        <p className="flex items-start gap-2 border border-[#5a3d22] bg-[#24160d] px-3 py-2 text-sm text-[#e8d8b4]">
-          <span className="mt-0.5 text-[#c9a45c]">{preview.method && <MethodIcon method={preview.method} size={18} />}</span>
-          <span>
-            {preview.method === null ? (
-              <span className="text-orange-300">Nessuna strada per raggiungere il destinatario: il cartiglio non può partire da qui.</span>
-            ) : preview.method === "paggio" ? (
-              <>Vi trovate nello stesso luogo: un paggio lo consegnerà subito a mano.</>
-            ) : preview.method === "corvo" ? (
-              <>
-                Partirà un corvo{preview.from_name ? ` da ${preview.from_name}` : ""}: arriverà in circa {duration(preview.minutes ?? 0)}.
-              </>
-            ) : (
-              <>
-                Servirà una staffetta, a cavallo e per mare, di gran carriera: arriverà in circa {duration(preview.minutes ?? 0)}.
-              </>
-            )}
-            {preview.risky && preview.method && preview.method !== "paggio" && (
-              <span className="mt-1 block text-xs text-orange-300">
-                Le strade fuori dalle terre sicure sono pericolose: il cartiglio potrebbe essere intercettato e non arrivare mai.
+      {to && options && (
+        <div className="space-y-2 border border-[#5a3d22] bg-[#24160d] px-3 py-2 text-sm text-[#e8d8b4]">
+          {options.length === 0 ? (
+            <p className="text-orange-300">Nessuna strada per raggiungere il destinatario: il cartiglio non può partire da qui.</p>
+          ) : options[0].method === "paggio" ? (
+            <p className="flex items-center gap-2">
+              <span className="text-[#c9a45c]">
+                <MethodIcon method="paggio" size={18} />
               </span>
-            )}
-          </span>
-        </p>
+              Vi trovate nello stesso luogo: un paggio lo consegnerà subito a mano.
+            </p>
+          ) : (
+            <>
+              <p className="text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
+                {options.length > 1 ? "Come lo mandi?" : "Come partirà"}
+              </p>
+              {options.map((o) => (
+                <label
+                  key={o.method}
+                  className={`flex cursor-pointer items-start gap-2 border px-2 py-1.5 ${method === o.method ? "border-[#c9a45c] bg-[#3b2414]" : "border-transparent"}`}
+                >
+                  <input
+                    type="radio"
+                    name="mezzo"
+                    checked={method === o.method}
+                    onChange={() => setMethod(o.method)}
+                    className="mt-1 accent-[#8b2a14]"
+                  />
+                  <span className="mt-0.5 text-[#c9a45c]">{o.method && <MethodIcon method={o.method} size={18} />}</span>
+                  <span>
+                    {o.method === "corvo" ? (
+                      <>
+                        <strong>Corvo</strong>{o.from_name ? ` da ${o.from_name}` : ""}: arriva in circa {duration(o.minutes ?? 0)}.
+                        <span className="block text-xs text-[#a08a64]">
+                          Veloce, ma all&apos;arrivo i castellani leggono il cartiglio per sapere a chi va.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <strong>Staffetta</strong>, a cavallo e per mare, di gran carriera: arriva in circa {duration(o.minutes ?? 0)}.
+                        <span className="block text-xs text-[#a08a64]">Più lenta, ma passa di mano in mano senza castellani.</span>
+                      </>
+                    )}
+                  </span>
+                </label>
+              ))}
+              {options.some((o) => o.risky) && (
+                <p className="text-xs text-orange-300">
+                  Le strade fuori dalle terre sicure sono pericolose: il cartiglio potrebbe essere intercettato e non arrivare mai.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       <div className="unrolled-scroll px-8 py-10">
@@ -500,7 +543,7 @@ function WriteScroll({
       </label>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="text-center">
-        <button type="button" disabled={busy || !to || !body.trim() || preview?.method === null} onClick={send} className="btn px-8">
+        <button type="button" disabled={busy || !to || !body.trim() || !options?.length || !method} onClick={send} className="btn px-8">
           Sigilla e invia
         </button>
       </div>
