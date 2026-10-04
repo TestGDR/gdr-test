@@ -1,0 +1,235 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { MainCharacter } from "@/lib/main-character";
+import { createClient } from "@/lib/supabase/client";
+
+// ---------------------------------------------------------------------
+// Viaggio: da dove si trova il PG verso un altro luogo. Il tempo dipende
+// dalla distanza, dal mezzo e dall'andatura; all'arrivo il PG si trova
+// a destinazione (vedi migrazione 0053).
+// ---------------------------------------------------------------------
+
+type Mode = "piedi" | "cavallo" | "drago";
+type Pace = "calma" | "normale" | "fretta";
+type Place = { id: string; name: string; map: { name: string } | null };
+type Travel = { id: number; to_location: string; mode: Mode; pace: Pace; departed_at: string; arrive_at: string };
+type Preview = { minutes: number; from_name: string | null; to_name: string | null; can_fly: boolean };
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: "piedi", label: "A piedi" },
+  { id: "cavallo", label: "A cavallo" },
+  { id: "drago", label: "In groppa al drago" },
+];
+const PACES: { id: Pace; label: string; hint: string }[] = [
+  { id: "calma", label: "Con calma", hint: "più lento" },
+  { id: "normale", label: "Normale", hint: "" },
+  { id: "fretta", label: "Di fretta", hint: "più veloce" },
+];
+const MODE_TEXT: Record<Mode, string> = { piedi: "a piedi", cavallo: "a cavallo", drago: "in groppa al drago" };
+
+function duration(min: number) {
+  if (min < 60) return `${min} minut${min === 1 ? "o" : "i"}`;
+  const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  return [d && `${d} giorn${d === 1 ? "o" : "i"}`, h && `${h} or${h === 1 ? "a" : "e"}`, m && `${m} minuti`].filter(Boolean).join(" e ");
+}
+const at = (iso: string) =>
+  new Date(iso).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+export default function TravelPanel({ me }: { me: MainCharacter }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [here, setHere] = useState<string | null>(null); // id del luogo in cui si trova
+  const [travel, setTravel] = useState<Travel | null | undefined>(undefined);
+  const [to, setTo] = useState("");
+  const [mode, setMode] = useState<Mode>("cavallo");
+  const [pace, setPace] = useState<Pace>("normale");
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [canFly, setCanFly] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  const load = useCallback(async () => {
+    const [{ data: loc }, { data: tr }] = await Promise.all([
+      supabase.rpc("character_location", { p_character: me.id }),
+      supabase
+        .from("travels")
+        .select("id, to_location, mode, pace, departed_at, arrive_at")
+        .eq("character_id", me.id)
+        .eq("status", "in_viaggio")
+        .maybeSingle(),
+    ]);
+    return { here: (loc as string | null) ?? null, travel: (tr as Travel | null) ?? null };
+  }, [supabase, me.id]);
+
+  useEffect(() => {
+    load().then((r) => (setHere(r.here), setTravel(r.travel)));
+    supabase
+      .from("locations")
+      .select("id, name, map:maps(name)")
+      .eq("in_game", true)
+      .order("name")
+      .then(({ data }) => setPlaces((data ?? []) as unknown as Place[]));
+    supabase.rpc("can_fly", { p_character: me.id }).then(({ data }) => setCanFly(!!data));
+  }, [supabase, me.id, load]);
+
+  // il tempo che manca si aggiorna da solo; all'arrivo si ricarica
+  useEffect(() => {
+    if (!travel) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      if (Date.parse(travel.arrive_at) + 70_000 < Date.now()) load().then((r) => (setHere(r.here), setTravel(r.travel)));
+    }, 15_000);
+    return () => clearInterval(timer);
+  }, [travel, load]);
+
+  // anteprima del viaggio scelto
+  useEffect(() => {
+    if (!to) return;
+    supabase
+      .rpc("travel_preview", { p_character: me.id, p_to: to, p_mode: mode, p_pace: pace })
+      .then(({ data }) => setPreview(((data as Preview[] | null) ?? [])[0] ?? null));
+  }, [supabase, me.id, to, mode, pace]);
+
+  async function start() {
+    setBusy(true);
+    const { error } = await supabase.rpc("start_travel", { p_character: me.id, p_to: to, p_mode: mode, p_pace: pace });
+    setBusy(false);
+    if (error) return setError(error.message.includes("gia'") ? error.message.replace("gia''", "già") : "Partenza non riuscita.");
+    setError(null);
+    load().then((r) => (setHere(r.here), setTravel(r.travel)));
+  }
+
+  async function cancel() {
+    if (!window.confirm("Annullare il viaggio? Resterai nel luogo da cui sei partito.")) return;
+    await supabase.rpc("cancel_travel", { p_character: me.id });
+    load().then((r) => (setHere(r.here), setTravel(r.travel)));
+  }
+
+  const name = (id: string | null) => places.find((p) => p.id === id)?.name ?? "—";
+  const groups = places.reduce<Record<string, Place[]>>((acc, p) => {
+    (acc[p.map?.name ?? "Altro"] ??= []).push(p);
+    return acc;
+  }, {});
+
+  if (travel === undefined) return <p className="text-center text-muted">Caricamento...</p>;
+
+  // In viaggio
+  if (travel) {
+    const total = Date.parse(travel.arrive_at) - Date.parse(travel.departed_at);
+    const done = Math.min(1, Math.max(0, (now - Date.parse(travel.departed_at)) / Math.max(1, total)));
+    const left = Math.max(0, Math.ceil((Date.parse(travel.arrive_at) - now) / 60_000));
+    return (
+      <div className="space-y-4">
+        <p className="text-center font-serif text-lg">
+          In viaggio da <span className="text-accent">{name(here)}</span> a <span className="text-accent">{name(travel.to_location)}</span>
+        </p>
+        <p className="text-center text-sm text-muted">
+          {MODE_TEXT[travel.mode]}, {PACES.find((p) => p.id === travel.pace)?.label.toLowerCase()}
+        </p>
+        <div className="h-3 overflow-hidden border border-border bg-black/50">
+          <div className="h-full bg-gradient-to-r from-blood to-accent transition-[width] duration-700" style={{ width: `${done * 100}%` }} />
+        </div>
+        <p className="text-center text-sm">
+          {left > 0 ? (
+            <>
+              Arrivo previsto: <strong>{at(travel.arrive_at)}</strong> (tra {duration(left)})
+            </>
+          ) : (
+            "Stai arrivando..."
+          )}
+        </p>
+        <p className="text-center text-xs text-muted">
+          Finché sei in viaggio ti trovi ancora a {name(here)}: corvi, staffette e paggi ti cercano lì. All&apos;arrivo riceverai un messaggio di SISTEMA.
+        </p>
+        <div className="text-center">
+          <button type="button" onClick={cancel} className="btn-ghost border-red-900 px-4 py-1.5 text-sm text-red-400 hover:border-red-500">
+            Annulla il viaggio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Preparare un viaggio
+  return (
+    <div className="space-y-4">
+      <p className="text-center font-serif text-lg">
+        Ti trovi a <span className="text-accent">{name(here)}</span>
+      </p>
+      <label className="block space-y-1">
+        <span className="block text-xs tracking-[0.12em] text-muted uppercase">Destinazione</span>
+        <select value={to} onChange={(e) => setTo(e.target.value)} className="input py-1.5">
+          <option value="">Scegli dove andare</option>
+          {Object.entries(groups).map(([map, list]) => (
+            <optgroup key={map} label={map}>
+              {list
+                .filter((p) => p.id !== here)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+
+      <fieldset className="space-y-1">
+        <legend className="mb-1 text-xs tracking-[0.12em] text-muted uppercase">Come viaggi</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {MODES.map((m) => {
+            const disabled = m.id === "drago" && !canFly;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setMode(m.id)}
+                title={disabled ? "Serve un drago di cui sei il cavaliere, almeno adolescente" : undefined}
+                className={`border px-2 py-2 text-sm transition disabled:opacity-35 ${
+                  mode === m.id ? "border-accent bg-blood/30 text-accent" : "border-border bg-black/40 hover:border-accent"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-1">
+        <legend className="mb-1 text-xs tracking-[0.12em] text-muted uppercase">Andatura</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {PACES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPace(p.id)}
+              className={`border px-2 py-2 text-sm transition ${
+                pace === p.id ? "border-accent bg-blood/30 text-accent" : "border-border bg-black/40 hover:border-accent"
+              }`}
+            >
+              {p.label}
+              {p.hint && <span className="block text-[10px] text-muted">{p.hint}</span>}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {to && preview && (
+        <p className="border border-border bg-black/40 px-3 py-2 text-center text-sm">
+          Da <strong>{preview.from_name}</strong> a <strong>{preview.to_name}</strong> {MODE_TEXT[mode]}: arriverai in circa{" "}
+          <strong>{duration(preview.minutes)}</strong>.
+        </p>
+      )}
+      {error && <p className="text-center text-sm text-red-400">{error}</p>}
+      <div className="text-center">
+        <button type="button" disabled={busy || !to || (mode === "drago" && !canFly)} onClick={start} className="btn px-8">
+          Parti
+        </button>
+      </div>
+    </div>
+  );
+}

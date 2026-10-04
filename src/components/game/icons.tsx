@@ -137,6 +137,15 @@ export const GearIcon = () => (
   </svg>
 );
 
+// Viaggio: bussola
+export const CompassIcon = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="m15.5 8.5-2 5-5 2 2-5Z" />
+    <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2" />
+  </svg>
+);
+
 // Notizie ON: pergamena arrotolata (cronache dal mondo di gioco)
 export const ScrollIcon = () => (
   <svg {...base}>

@@ -26,6 +26,7 @@ import { everyEvenInBackground, playMessageChime } from "@/lib/notify-sound";
 import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
+  CompassIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -48,6 +49,7 @@ import NewsPanel from "./NewsPanel";
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
+import TravelPanel from "./TravelPanel";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -96,12 +98,13 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
   ricerca: "Ricerca gioco",
   assenze: "Assenze",
+  viaggio: "Viaggio",
 };
 
 export default function GameShell({
@@ -377,7 +380,7 @@ export default function GameShell({
         </Modal>
       )}
       <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
-        size={panel === "ricerca" || panel === "assenze" ? "panel" : panel === "notizie-on" ? "xl" : "lg"}
+        size={panel === "ricerca" || panel === "assenze" || panel === "viaggio" ? "panel" : panel === "notizie-on" ? "xl" : "lg"}
       >
         {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
         {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
@@ -391,6 +394,12 @@ export default function GameShell({
             onSeen={playRequests.markSeen}
           />
         )}
+        {panel === "viaggio" &&
+          (character ? (
+            <TravelPanel key={panelSession} me={character} />
+          ) : (
+            <p className="py-6 text-center text-muted">Per viaggiare serve un personaggio.</p>
+          ))}
         {panel === "assenze" && (
           <AbsencesPanel key={panelSession} userId={userId} character={character} canManage={canManageUsers} />
         )}
@@ -1025,6 +1034,7 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "notizie-off", icon: <HornIcon /> },
   { id: "ricerca", icon: <SwordsIcon /> },
   { id: "assenze", icon: <HourglassIcon /> },
+  { id: "viaggio", icon: <CompassIcon /> },
 ];
 const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
   p === "ricerca" && newRequests > 0
