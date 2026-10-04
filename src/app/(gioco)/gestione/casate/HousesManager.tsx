@@ -312,7 +312,7 @@ function SignupPreview() {
   return (
     <form onSubmit={check} className="mt-4 space-y-2 border-t border-border pt-3">
       <h3 className="text-xs font-semibold tracking-[0.15em] text-muted uppercase">Simulazione iscrizione</h3>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <select value={sex} onChange={(e) => setSex(e.target.value)} className="input py-1 text-sm" aria-label="Sesso">
           <option value="uomo">Uomo</option>
           <option value="donna">Donna</option>

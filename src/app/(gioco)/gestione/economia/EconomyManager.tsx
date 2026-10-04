@@ -192,7 +192,7 @@ function ResourcesTab({ supabase, resources, reload }: Cat) {
       <p className="text-sm text-muted">
         Le risorse delle casate (es. oro, legname, ferro, grano, cavalli). Servono per costruire strutture e, in seguito, eserciti e navi.
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nuova risorsa" className="input max-w-xs py-1.5" />
         <button type="button" onClick={add} className="btn px-4 py-1.5 text-sm">
           + Aggiungi

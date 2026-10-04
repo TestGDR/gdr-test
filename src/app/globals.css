@@ -399,3 +399,12 @@ body {
 @media (min-width: 3200px) {
   html { font-size: 150%; }
 }
+
+/* Campi e caselle di testo non si schiacciano: sotto questa larghezza la riga
+   va a capo (le righe di moduli usano flex-wrap). Mai piu' larghi del contenitore. */
+.input {
+  min-width: min(100%, 9rem);
+}
+textarea.input {
+  min-width: min(100%, 15rem);
+}

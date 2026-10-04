@@ -432,7 +432,7 @@ function WriteScroll({
         <label htmlFor="cartiglio-a" className="block font-serif text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
           Destinatario
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id="cartiglio-a"
             value={name}

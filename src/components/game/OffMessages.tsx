@@ -762,7 +762,7 @@ function Composer({ onSend, placeholder }: { onSend: (body: string) => Promise<s
   }
   return (
     <form onSubmit={submit} className="border-t border-border p-3">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -802,8 +802,8 @@ function NameForm({ label, button, onSubmit }: { label: string; button: string; 
       className="p-3"
     >
       <label className="mb-1 block text-xs tracking-wider text-muted uppercase">{label}</label>
-      <div className="flex gap-2">
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Nome del personaggio" className="input py-1.5 text-sm" />
+      <div className="flex flex-wrap gap-2">
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Nome del personaggio" className="input flex-1 py-1.5 text-sm" />
         <button className="btn px-3 py-1.5 text-sm">{button}</button>
       </div>
       {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
