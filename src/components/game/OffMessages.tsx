@@ -78,6 +78,7 @@ export default function OffMessages({
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [broadcastRead, setBroadcastRead] = useState<string | null>(null);
   const [systemMsgs, setSystemMsgs] = useState<SystemMsg[]>([]); // dal SISTEMA, sola lettura
+  const [hidden, setHidden] = useState<Record<string, string>>({}); // conversazione -> cancellata fino a quest'ora
   const [extra, setExtra] = useState<Contact[]>(initialTo ? [initialTo] : []);
   const [active, setActive] = useState<string | null>(initialTo ? `dm:${initialTo.id}` : null);
   const [panel, setPanel] = useState<"none" | "new-group" | "members">("none");
@@ -137,6 +138,11 @@ export default function OffMessages({
       .order("created_at", { ascending: false })
       .limit(200)
       .then(({ data }) => setSystemMsgs(((data ?? []) as SystemMsg[]).reverse()));
+    supabase
+      .from("off_hidden")
+      .select("conv_key, hidden_at")
+      .eq("character_id", me.id)
+      .then(({ data }) => setHidden(Object.fromEntries((data ?? []).map((h) => [h.conv_key as string, h.hidden_at as string]))));
   }, [supabase, me.id, loadDms, refreshGroups, loadBroadcasts]);
 
   // ----- tempo reale -----
@@ -173,7 +179,20 @@ export default function OffMessages({
     };
   }, [supabase, me.id, refreshGroups, loadBroadcasts]);
 
-  // ----- conversazioni -----
+  // ----- conversazioni (senza i messaggi di quelle cancellate) -----
+  const shownDms = useMemo(
+    () =>
+      (dms ?? []).filter((m) => {
+        const other = m.sender_id === me.id ? m.recipient_id : m.sender_id;
+        const until = hidden[`dm:${other}`];
+        return !until || m.created_at > until;
+      }),
+    [dms, hidden, me.id],
+  );
+  const shownBroadcasts = useMemo(
+    () => broadcasts.filter((b) => !hidden.global || b.created_at > hidden.global),
+    [broadcasts, hidden],
+  );
   const conversations = useMemo(() => {
     const out: Conversation[] = [];
     if (systemMsgs.length > 0) {
@@ -187,15 +206,15 @@ export default function OffMessages({
         unread: systemMsgs.filter((m) => !m.read_at).length,
       });
     }
-    if (broadcasts.length > 0 || canBroadcast) {
-      const last = broadcasts.at(-1);
+    if (shownBroadcasts.length > 0 || canBroadcast) {
+      const last = shownBroadcasts.at(-1);
       out.push({
         key: "global",
         name: "Messaggi a tutti",
         kind: "global",
         lastBody: last?.body,
         lastAt: last?.created_at,
-        unread: broadcasts.filter((b) => b.sender_id !== me.id && broadcastRead !== null && b.created_at > broadcastRead).length,
+        unread: shownBroadcasts.filter((b) => b.sender_id !== me.id && broadcastRead !== null && b.created_at > broadcastRead).length,
       });
     }
     for (const g of groups) {
@@ -213,7 +232,7 @@ export default function OffMessages({
     }
     const people = new Map<string, Conversation>();
     for (const c of extra) people.set(c.id, { key: `dm:${c.id}`, name: c.name, avatar: c.avatar, kind: "dm", unread: 0 });
-    for (const m of dms ?? []) {
+    for (const m of shownDms) {
       const mine = m.sender_id === me.id;
       const otherId = mine ? m.recipient_id : m.sender_id;
       const other = mine ? m.recipient : m.sender;
@@ -227,7 +246,7 @@ export default function OffMessages({
     // le piu' recenti in alto; SISTEMA e messaggi a tutti restano primi
     const pinned = (c: Conversation) => (c.kind === "system" ? 0 : c.kind === "global" ? 1 : 2);
     return out.sort((a, b) => pinned(a) - pinned(b) || (b.lastAt ?? "9").localeCompare(a.lastAt ?? "9"));
-  }, [systemMsgs, broadcasts, broadcastRead, groups, groupMsgs, dms, extra, me.id, canBroadcast]);
+  }, [systemMsgs, shownBroadcasts, broadcastRead, groups, groupMsgs, shownDms, extra, me.id, canBroadcast]);
 
   const current = conversations.find((c) => c.key === active) ?? null;
   const activeGroup = current?.kind === "group" ? groups.find((g) => `group:${g.id}` === active) ?? null : null;
@@ -300,7 +319,7 @@ export default function OffMessages({
   const bubbles: Bubble[] = useMemo(() => {
     if (!current) return [];
     if (current.kind === "dm")
-      return (dms ?? [])
+      return shownDms
         .filter((m) => (m.sender_id === dmId && m.recipient_id === me.id) || (m.sender_id === me.id && m.recipient_id === dmId))
         .map((m) => ({ id: `d${m.id}`, mine: m.sender_id === me.id, body: m.body, at: m.created_at, status: m.read_at ? "read" : "sent" }));
     if (current.kind === "group")
@@ -309,8 +328,8 @@ export default function OffMessages({
         .map((m) => ({ id: `g${m.id}`, mine: m.sender_id === me.id, author: m.sender?.name ?? "?", body: m.body, at: m.created_at }));
     if (current.kind === "system")
       return systemMsgs.map((m) => ({ id: `s${m.id}`, mine: false, author: "SISTEMA", body: m.body, at: m.created_at }));
-    return broadcasts.map((b) => ({ id: `b${b.id}`, mine: b.sender_id === me.id, author: b.sender?.name ?? "Staff", body: b.body, at: b.created_at }));
-  }, [current, dms, dmId, groupMsgs, broadcasts, systemMsgs, me.id]);
+    return shownBroadcasts.map((b) => ({ id: `b${b.id}`, mine: b.sender_id === me.id, author: b.sender?.name ?? "Staff", body: b.body, at: b.created_at }));
+  }, [current, shownDms, dmId, groupMsgs, shownBroadcasts, systemMsgs, me.id]);
 
   async function send(body: string) {
     if (!current) return "Nessuna conversazione.";
@@ -385,6 +404,60 @@ export default function OffMessages({
     return null;
   }
 
+  // Cancella la conversazione dal mio elenco (l'altro la conserva). Il segno e'
+  // l'ora dell'ultimo messaggio (orologio del database): i messaggi nuovi la fanno ricomparire
+  async function deleteConversation(c: Conversation) {
+    if (c.kind === "group") return leaveGroup(c.key.slice(6), c.name);
+    const question =
+      c.kind === "system"
+        ? "Eliminare tutti i messaggi di SISTEMA?"
+        : c.kind === "global"
+          ? "Cancellare i messaggi a tutti dal tuo elenco?"
+          : `Cancellare la conversazione con ${c.name}? Per ${c.name} resterà com'è.`;
+    if (!window.confirm(question)) return;
+    if (c.kind === "system") {
+      await supabase.from("system_messages").delete().eq("character_id", me.id);
+      setSystemMsgs([]);
+    } else {
+      const otherId = c.kind === "dm" ? c.key.slice(3) : null;
+      const last = (otherId ? shownDms.filter((m) => m.sender_id === otherId || m.recipient_id === otherId) : shownBroadcasts).at(-1)?.created_at;
+      if (last) {
+        // i non letti di quella conversazione diventano letti
+        if (otherId)
+          await supabase.from("private_messages").update({ read_at: new Date().toISOString() }).eq("kind", "off").eq("recipient_id", me.id).eq("sender_id", otherId).is("read_at", null);
+        else await supabase.from("off_broadcast_reads").upsert({ character_id: me.id, last_read_at: last });
+        await supabase.from("off_hidden").upsert({ character_id: me.id, conv_key: c.key, hidden_at: last });
+        setHidden((h) => ({ ...h, [c.key]: last }));
+        if (!otherId) setBroadcastRead(last);
+      }
+      if (otherId) setExtra((prev) => prev.filter((x) => x.id !== otherId));
+    }
+    if (active === c.key) setActive(null);
+    onRead();
+  }
+
+  async function leaveGroup(groupId: string, name: string) {
+    if (!window.confirm(`Uscire dal gruppo "${name}"? Non riceverai più i suoi messaggi.`)) return;
+    await supabase.rpc("remove_off_group_member", { p_group: groupId, p_character: me.id });
+    if (active === `group:${groupId}`) {
+      setActive(null);
+      setPanel("none");
+    }
+    refreshGroups();
+    onRead();
+  }
+
+  async function deleteGroup(groupId: string, name: string) {
+    if (!window.confirm(`Eliminare il gruppo "${name}" per tutti i membri, con tutti i suoi messaggi?`)) return;
+    await supabase.rpc("delete_off_group", { p_group: groupId });
+    if (active === `group:${groupId}`) {
+      setActive(null);
+      setPanel("none");
+    }
+    refreshGroups();
+    onRead();
+  }
+
   async function removeMember(characterId: string) {
     if (!activeGroup) return;
     const leaving = characterId === me.id;
@@ -414,11 +487,11 @@ export default function OffMessages({
           {dms === null && <li className="p-3 text-sm text-muted">Caricamento...</li>}
           {dms !== null && conversations.length === 0 && <li className="p-3 text-sm text-muted">Nessuna conversazione.</li>}
           {conversations.map((c) => (
-            <li key={c.key}>
+            <li key={c.key} className={`flex items-stretch border-b border-border/60 transition hover:bg-blood/15 ${c.key === active ? "bg-blood/25" : ""}`}>
               <button
                 type="button"
                 onClick={() => (setActive(c.key), setPanel("none"))}
-                className={`flex w-full items-center gap-3 border-b border-border/60 px-3 py-2.5 text-left transition hover:bg-blood/15 ${c.key === active ? "bg-blood/25" : ""}`}
+                className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 text-left"
               >
                 <ConversationIcon c={c} />
                 <span className="min-w-0 flex-1">
@@ -434,6 +507,13 @@ export default function OffMessages({
                   </span>
                 </span>
               </button>
+              <RowActions
+                c={c}
+                isGroupOwner={c.kind === "group" && groups.find((g) => `group:${g.id}` === c.key)?.created_by === me.id}
+                onDelete={() => deleteConversation(c)}
+                onLeave={() => leaveGroup(c.key.slice(6), c.name)}
+                onDeleteGroup={() => deleteGroup(c.key.slice(6), c.name)}
+              />
             </li>
           ))}
         </ul>
@@ -491,6 +571,65 @@ export default function OffMessages({
 }
 
 // ---------------------------------------------------------------------
+// Icone a destra di ogni conversazione: cestino; nei gruppi "esci" (e per chi
+// l'ha creato "elimina il gruppo per tutti")
+const rowBtn = "flex h-8 w-7 items-center justify-center text-muted transition hover:text-accent";
+
+function RowActions({
+  c,
+  isGroupOwner,
+  onDelete,
+  onLeave,
+  onDeleteGroup,
+}: {
+  c: Conversation;
+  isGroupOwner: boolean;
+  onDelete: () => void;
+  onLeave: () => void;
+  onDeleteGroup: () => void;
+}) {
+  return (
+    <span className="flex shrink-0 items-center gap-0.5 pr-1.5 pl-1">
+      {c.kind === "group" ? (
+        <>
+          <button type="button" onClick={onLeave} className={rowBtn} title="Esci dal gruppo" aria-label={`Esci dal gruppo ${c.name}`}>
+            <LeaveIcon />
+          </button>
+          {isGroupOwner && (
+            <button type="button" onClick={onDeleteGroup} className={`${rowBtn} hover:text-red-400`} title="Elimina il gruppo per tutti" aria-label={`Elimina il gruppo ${c.name}`}>
+              <TrashIcon />
+            </button>
+          )}
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onDelete}
+          className={`${rowBtn} hover:text-red-400`}
+          title={c.kind === "system" ? "Elimina i messaggi di sistema" : "Cancella la conversazione"}
+          aria-label={`Cancella la conversazione ${c.name}`}
+        >
+          <TrashIcon />
+        </button>
+      )}
+    </span>
+  );
+}
+
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h1.5v-8H10Zm3.5 0v8H15v-8h-1.5Z" />
+  </svg>
+);
+
+// persona che esce da una porta
+const LeaveIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M10 4H5v16h5" />
+    <path d="M14 8l4 4-4 4M18 12H9" />
+  </svg>
+);
+
 function ConversationIcon({ c }: { c: Conversation }) {
   if (c.kind === "dm") return <Avatar name={c.name} url={c.avatar} />;
   return (
