@@ -760,7 +760,7 @@ function TreeTab({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <FamilyForm
           key={editingId ?? `nuovo-${family.length}`}
           houseId={houseId}
@@ -999,7 +999,7 @@ function LifeFields({
             value={birth}
             onChange={(e) => onChange({ birth_year: e.target.value })}
             placeholder="es. 312"
-            className="input w-24 py-1.5"
+            className="input w-28 py-1.5"
           />
           <span className="text-sm text-muted">D.C.</span>
         </span>
@@ -1026,7 +1026,7 @@ function LifeFields({
               value={death}
               onChange={(e) => onChange({ death_year: e.target.value })}
               placeholder="es. 350"
-              className="input w-24 py-1.5"
+              className="input w-28 py-1.5"
             />
             <span className="text-sm text-muted">D.C.</span>
           </span>
@@ -1132,20 +1132,23 @@ function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; r
   const editing = npcs.find((n) => n.id === editingId) ?? null;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <ul className="grid h-fit gap-3 sm:grid-cols-2">
+    // due colonne solo se il riquadro ha spazio (non lo schermo): altrimenti schede sopra e modulo sotto
+    <div className="@container">
+    <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* schede: immagine sopra, scritte sotto; quante ne stanno per riga */}
+      <ul className="grid h-fit grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))] gap-3">
         {npcs.map((n) => (
           <li key={n.id}>
             <button
               type="button"
               onClick={() => setEditingId(n.id)}
-              className={`flex w-full gap-3 rounded-md border p-3 text-left transition hover:border-accent ${
+              className={`flex h-full w-full flex-col items-center gap-2 rounded-md border p-3 text-center transition hover:border-accent ${
                 n.id === editingId ? "border-accent bg-accent/10" : "border-border bg-background"
               }`}
             >
               <Sigil url={n.image_url} name={n.name} size="h-16 w-16" />
-              <span className="min-w-0">
-                <span className="block truncate font-serif text-accent">
+              <span className="w-full min-w-0">
+                <span className="block font-serif break-words text-accent">
                   {n.name}
                   {n.deceased && <span className="ml-1 text-muted">†</span>}
                 </span>
@@ -1169,6 +1172,7 @@ function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; r
         roles={roles}
         onDone={() => setEditingId(null)}
       />
+    </div>
     </div>
   );
 }
@@ -1203,7 +1207,7 @@ function NpcForm({
   return (
     <form onSubmit={submit} className="h-fit space-y-3 rounded-md border border-border bg-background/60 p-3">
       <h3 className="font-serif text-lg text-accent">{npc ? "Modifica PNG" : "Aggiungi PNG"}</h3>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Sigil url={preview} name={npc?.name ?? "?"} size="h-16 w-16" />
         <input
           type="file"
