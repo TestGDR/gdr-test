@@ -363,6 +363,7 @@ export default function GameShell({
           onRead={unread.refresh}
           canBroadcast={canWriteNewsOff}
           isAdmin={isAdmin}
+          isStaff={staffRole !== null}
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />

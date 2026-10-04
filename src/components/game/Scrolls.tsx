@@ -35,11 +35,13 @@ export default function Scrolls({
   me,
   initialTo,
   isAdmin,
+  isStaff,
   onRead,
 }: {
   me: MainCharacter;
   initialTo: Contact | null;
   isAdmin: boolean; // vede l'Archivio messaggi castello
+  isStaff: boolean; // sceglie da dove parte il cartiglio ("Parti da")
   onRead: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -153,6 +155,8 @@ export default function Scrolls({
             key={to?.id ?? "nuovo"}
             me={me}
             initialTo={to}
+            isStaff={isStaff}
+            here={place}
             onSent={() => {
               loadSent().then(setSent);
               setTo(null);
@@ -338,7 +342,19 @@ function SentList({ sent, onDiscard }: { sent: Sent[] | null; onDiscard: (id: nu
 
 // ---------------------------------------------------------------------
 // Scrivere: destinatario, come arrivera' e in quanto tempo, testo, firma
-function WriteScroll({ me, initialTo, onSent }: { me: MainCharacter; initialTo: Contact | null; onSent: () => void }) {
+function WriteScroll({
+  me,
+  initialTo,
+  isStaff,
+  here,
+  onSent,
+}: {
+  me: MainCharacter;
+  initialTo: Contact | null;
+  isStaff: boolean;
+  here: string | null; // dove si trova il PG
+  onSent: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState(initialTo?.name ?? "");
   const [to, setTo] = useState<Contact | null>(initialTo);
@@ -346,14 +362,28 @@ function WriteScroll({ me, initialTo, onSent }: { me: MainCharacter; initialTo: 
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [signed, setSigned] = useState(true);
+  // staff: luogo di partenza ("" = la propria posizione)
+  const [origin, setOrigin] = useState("");
+  const [places, setPlaces] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    if (!isStaff) return;
+    supabase
+      .from("locations")
+      .select("id, name")
+      .eq("in_game", true)
+      .order("name")
+      .then(({ data }) => setPlaces((data ?? []) as { id: string; name: string }[]));
+  }, [supabase, isStaff]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // destinatario scelto: anteprima del viaggio
   useEffect(() => {
     if (!to) return;
-    supabase.rpc("scroll_preview", { p_from: me.id, p_to: to.id }).then(({ data }) => setPreview(((data as Preview[] | null) ?? [])[0] ?? null));
-  }, [supabase, me.id, to]);
+    supabase
+      .rpc("scroll_preview", { p_from: me.id, p_to: to.id, p_from_location: origin || null })
+      .then(({ data }) => setPreview(((data as Preview[] | null) ?? [])[0] ?? null));
+  }, [supabase, me.id, to, origin]);
 
   async function choose() {
     const n = normalizeCharacterName(name);
@@ -369,7 +399,13 @@ function WriteScroll({ me, initialTo, onSent }: { me: MainCharacter; initialTo: 
   async function send() {
     if (!to || !body.trim()) return;
     setBusy(true);
-    const { error } = await supabase.rpc("send_scroll", { p_from: me.id, p_to: to.id, p_body: body.trim(), p_signed: signed });
+    const { error } = await supabase.rpc("send_scroll", {
+      p_from: me.id,
+      p_to: to.id,
+      p_body: body.trim(),
+      p_signed: signed,
+      p_from_location: origin || null,
+    });
     setBusy(false);
     if (error) return setError("Il cartiglio non è partito.");
     onSent();
@@ -377,6 +413,21 @@ function WriteScroll({ me, initialTo, onSent }: { me: MainCharacter; initialTo: 
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
+      {isStaff && (
+        <div className="space-y-1">
+          <label htmlFor="cartiglio-da" className="block font-serif text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
+            Parti da (solo staff)
+          </label>
+          <select id="cartiglio-da" value={origin} onChange={(e) => setOrigin(e.target.value)} className="input py-1.5">
+            <option value="">La mia posizione{here ? ` (${here})` : ""}</option>
+            {places.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-1">
         <label htmlFor="cartiglio-a" className="block font-serif text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
           Destinatario

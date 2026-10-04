@@ -76,9 +76,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     );
   }
 
-  // Entrando in una chat di gioco il PG si trova in quel luogo (per le missive)
-  await supabase.rpc("set_position_from_room", { p_room: id });
-
   const [{ data: messages }, { data: characters }] = await Promise.all([
     supabase.from("messages").select("*").eq("room_id", id).order("created_at", { ascending: false }).limit(HISTORY_SIZE),
     // Solo i personaggi attivi possono giocare (lo impone anche il database)

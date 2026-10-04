@@ -467,7 +467,7 @@ function LocationForm({
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="in_game" defaultChecked={location?.in_game ?? true} className="h-4 w-4 accent-[#8b2a14]" />
-        Luogo di gioco: entrando nelle sue chat il PG si trova qui (togli la spunta per le chat OFF)
+        Luogo di gioco: chi scrive un&apos;azione nelle sue chat si trova qui (togli la spunta per le chat OFF)
       </label>
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn" disabled={pending}>
@@ -544,7 +544,7 @@ function MissiveTab({
           L&apos;intercettazione vale solo se il mittente o il destinatario si trovano in una mappa non segnata come &quot;territorio sicuro&quot;.
           I cartigli intercettati non arrivano mai: li trovi nei Log, scheda Missive.
         </p>
-        <Field label="Luogo di partenza (per i PG che non sono ancora entrati in una chat di gioco)">
+        <Field label="Luogo di partenza (per i PG che non hanno ancora scritto un'azione in una chat di gioco)">
           <select name="default_location_id" defaultValue={settings.default_location_id ?? ""} className="input">
             <option value="">— nessuno —</option>
             {places.map((l) => (
@@ -565,7 +565,7 @@ function MissiveTab({
       <section className="space-y-3 rounded-md border border-border/60 p-4">
         <h3 className="font-serif text-xl text-accent">Posizione dei personaggi</h3>
         <p className="text-sm text-muted">
-          Ogni PG si trova nel luogo dell&apos;ultima chat di gioco in cui è entrato. Qui puoi correggerla: cerca il personaggio e scegli il luogo.
+          Ogni PG si trova nel luogo dell&apos;ultima chat di gioco in cui ha scritto un&apos;azione (entrare e leggere non lo sposta; le narrazioni da master nemmeno). Qui puoi correggerla: cerca il personaggio e scegli il luogo.
         </p>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome del personaggio" className="input max-w-sm py-1.5" />
         {shown.length > 0 && (
