@@ -27,6 +27,7 @@ import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
   CompassIcon,
+  FiefIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -50,6 +51,7 @@ import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import TravelPanel from "./TravelPanel";
+import FiefsPanel from "@/components/houses/FiefsPanel";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -101,13 +103,14 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
   ricerca: "Ricerca gioco",
   assenze: "Assenze",
   viaggio: "Viaggio",
+  feudi: "Feudi e risorse della casata",
 };
 
 export default function GameShell({
@@ -327,6 +330,7 @@ export default function GameShell({
                   onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
                   onOpenPanel={openPanel}
                   newRequests={playRequests.count}
+                  inHouse={!!character?.house}
                 />
               }
             />
@@ -355,6 +359,7 @@ export default function GameShell({
               onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
               onOpenPanel={openPanel}
               newRequests={playRequests.count}
+              inHouse={!!character?.house}
             />
           </nav>
         </div>
@@ -400,6 +405,7 @@ export default function GameShell({
             onSeen={playRequests.markSeen}
           />
         )}
+        {panel === "feudi" && character && <FiefsPanel key={panelSession} characterId={character.id} />}
         {panel === "viaggio" &&
           (character ? (
             <TravelPanel key={panelSession} me={character} />
@@ -674,6 +680,7 @@ function MobileTools({
   onOpenDragon,
   onOpenPanel,
   newRequests,
+  inHouse,
 }: {
   canManage: boolean;
   onlineCount: number;
@@ -681,6 +688,7 @@ function MobileTools({
   onOpenDragon: (() => void) | null;
   onOpenPanel: (p: Panel) => void;
   newRequests: number;
+  inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
   return (
     <div className="grid grid-cols-5 gap-2">
@@ -710,7 +718,7 @@ function MobileTools({
           {onlineCount}
         </span>
       </button>
-      {PANEL_ICONS.map((p) => (
+      {panelsFor(inHouse).map((p) => (
         <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
       ))}
     </div>
@@ -1041,7 +1049,10 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "ricerca", icon: <SwordsIcon /> },
   { id: "assenze", icon: <HourglassIcon /> },
   { id: "viaggio", icon: <CompassIcon /> },
+  { id: "feudi", icon: <FiefIcon /> },
 ];
+// Feudi: solo per chi appartiene a una casata
+const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
 const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
   p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
@@ -1094,11 +1105,13 @@ function RightRail({
   onOpenDragon,
   onOpenPanel,
   newRequests,
+  inHouse,
 }: {
   canManage: boolean;
   onOpenDragon: (() => void) | null;
   onOpenPanel: (p: Panel) => void;
   newRequests: number;
+  inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1139,7 +1152,7 @@ function RightRail({
           </Link>
         )}
         {/* Notizie, ricerca gioco e assenze (su cellulare stanno nel menu dell'hamburger) */}
-        {PANEL_ICONS.map((p) => (
+        {panelsFor(inHouse).map((p) => (
           <PanelButton
             key={p.id}
             panel={p.id}

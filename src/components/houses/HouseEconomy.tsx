@@ -36,6 +36,8 @@ export default function HouseEconomy({
   treasury,
   isMember,
   builderId,
+  onChanged,
+  bare = false,
 }: {
   houseName: string;
   playable: boolean;
@@ -46,6 +48,8 @@ export default function HouseEconomy({
   treasury: Record<string, number> | null; // null: non e' un membro
   isMember: boolean;
   builderId: string | null; // il mio PG, se puo' costruire
+  onChanged?: () => void; // nel pannello della barra: ricarica i dati
+  bare?: boolean; // senza riquadro (dentro una finestra)
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -75,14 +79,17 @@ export default function HouseEconomy({
         ? { ok: false, text: error.message.includes("insufficienti") ? `Il tesoro non basta (${error.message.split(":")[1]?.trim() ?? ""}).` : error.message.replace("piu''", "più") }
         : { ok: true, text: `${type.name} costruita a ${fief.name}.` },
     );
-    if (!error) router.refresh();
+    if (!error) {
+      if (onChanged) onChanged();
+      else router.refresh();
+    }
   }
 
   if (fiefs.length === 0 && !isMember) return null;
 
   return (
-    <section className="mt-6 space-y-4 border border-border bg-black/40 p-5">
-      <h2 className="font-serif text-2xl text-accent">Feudi e risorse</h2>
+    <section className={bare ? "space-y-4" : "mt-6 space-y-4 border border-border bg-black/40 p-5"}>
+      {!bare && <h2 className="font-serif text-2xl text-accent">Feudi e risorse</h2>}
       <p className="text-sm text-muted">
         I feudi di casa {houseName} ({playable ? "casata PG" : "casata PNG"}). Ogni 1° del mese la casata riceve le risorse dei feudi e delle
         strutture.

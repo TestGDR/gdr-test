@@ -137,6 +137,15 @@ export const GearIcon = () => (
   </svg>
 );
 
+// Feudi: torre con merli e bandiera
+export const FiefIcon = () => (
+  <svg {...base}>
+    <path d="M5 21V10h2V8h2v2h2V8h2v2h2V8h2v2h2v11Z" />
+    <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
+    <path d="M12 8V3l4 1.5L12 6" />
+  </svg>
+);
+
 // Viaggio: bussola
 export const CompassIcon = () => (
   <svg {...base}>
