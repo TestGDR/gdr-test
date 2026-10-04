@@ -22,7 +22,7 @@ import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
-import { playMessageChime } from "@/lib/notify-sound";
+import { everyEvenInBackground, playMessageChime } from "@/lib/notify-sound";
 import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
@@ -808,6 +808,7 @@ const QuillIcon = () => (
 // Messaggi non letti per tipo, aggiornati in tempo reale
 function useUnread(characterId: string | null) {
   const supabase = useMemo(() => createClient(), []);
+  const pathname = usePathname(); // cambiando pagina il titolo torna quello di base: si rimette il numero
   const [counts, setCounts] = useState<Record<MessageKind, number>>({ missiva: 0, off: 0 });
 
   const fetchCounts = useCallback(async (): Promise<Record<MessageKind, number>> => {
@@ -858,16 +859,22 @@ function useUnread(characterId: string | null) {
     };
   }, [supabase, characterId, fetchCounts, refresh]);
 
-  // Avviso sonoro: subito quando arriva un messaggio, poi ogni 15 secondi finche' resta qualcosa da leggere
+  // Avviso sonoro: subito quando arriva un messaggio, poi ogni 15 secondi finche' resta
+  // qualcosa da leggere. Suona anche con la scheda in secondo piano.
   const total = counts.missiva + counts.off;
   const previous = useRef(0);
   useEffect(() => {
     if (total > previous.current) playMessageChime();
     previous.current = total;
     if (total === 0) return;
-    const timer = setInterval(playMessageChime, 15_000);
-    return () => clearInterval(timer);
+    return everyEvenInBackground(playMessageChime, 15_000);
   }, [total]);
+
+  // Numero dei non letti nel titolo della scheda, es. "(2) Westeros GDR"
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\) /, "");
+    document.title = total > 0 ? `(${total}) ${base}` : base;
+  }, [total, pathname]);
 
   return { counts, refresh };
 }

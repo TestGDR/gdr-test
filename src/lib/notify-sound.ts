@@ -59,3 +59,23 @@ export function playMessageChime() {
     overtone.stop(start + 1);
   });
 }
+
+// Ripete una funzione a intervalli anche con la scheda in secondo piano: i timer
+// della pagina vengono rallentati dal browser (fino a una volta al minuto), quelli
+// di un Web Worker no. Restituisce la funzione per fermarlo.
+export function everyEvenInBackground(fn: () => void, ms: number): () => void {
+  if (typeof window === "undefined") return () => {};
+  try {
+    const src = `setInterval(function () { postMessage(0); }, ${Math.max(1000, Math.round(ms))});`;
+    const url = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+    const worker = new Worker(url);
+    worker.onmessage = () => fn();
+    return () => {
+      worker.terminate();
+      URL.revokeObjectURL(url);
+    };
+  } catch {
+    const timer = setInterval(fn, ms);
+    return () => clearInterval(timer);
+  }
+}
