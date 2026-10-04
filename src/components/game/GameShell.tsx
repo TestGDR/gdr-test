@@ -510,7 +510,7 @@ function LeftColumn({
       </div>
 
       {/* Data di gioco */}
-      <div className="parchment mx-auto px-6 py-1.5 text-center font-serif text-[10px] font-semibold tracking-[0.06em] whitespace-nowrap uppercase">
+      <div className="parchment mx-auto px-6 py-1.5 text-center [font-family:Verdana,Geneva,Tahoma,sans-serif] text-[10px] font-bold tracking-[0.04em] whitespace-nowrap uppercase">
         {GAME_DATE}
       </div>
 
