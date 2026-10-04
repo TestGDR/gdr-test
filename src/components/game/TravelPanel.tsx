@@ -14,7 +14,10 @@ type Mode = "piedi" | "cavallo" | "drago";
 type Pace = "calma" | "normale" | "fretta";
 type Place = { id: string; name: string; map: { name: string } | null };
 type Travel = { id: number; to_location: string; mode: Mode; pace: Pace; departed_at: string; arrive_at: string };
-type Preview = { minutes: number; from_name: string | null; to_name: string | null; can_fly: boolean };
+type Preview = { minutes: number | null; from_name: string | null; to_name: string | null; can_fly: boolean };
+// destinazione raggiungibile: minuti ad andatura normale per ogni mezzo (null = con quel mezzo non si puo')
+type Option = { location_id: string; name: string; map_name: string; walk: number | null; horse: number | null; dragon: number | null };
+const MODE_KEY: Record<Mode, "walk" | "horse" | "dragon"> = { piedi: "walk", cavallo: "horse", drago: "dragon" };
 
 const MODES: { id: Mode; label: string }[] = [
   { id: "piedi", label: "A piedi" },
@@ -38,7 +41,8 @@ const at = (iso: string) =>
 
 export default function TravelPanel({ me }: { me: MainCharacter }) {
   const supabase = useMemo(() => createClient(), []);
-  const [places, setPlaces] = useState<Place[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]); // per i nomi dei luoghi
+  const [options, setOptions] = useState<Option[] | null>(null); // dove si puo' andare da qui
   const [here, setHere] = useState<string | null>(null); // id del luogo in cui si trova
   const [travel, setTravel] = useState<Travel | null | undefined>(undefined);
   const [to, setTo] = useState("");
@@ -71,6 +75,7 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
       .eq("in_game", true)
       .order("name")
       .then(({ data }) => setPlaces((data ?? []) as unknown as Place[]));
+    supabase.rpc("travel_options", { p_character: me.id }).then(({ data }) => setOptions((data ?? []) as Option[]));
     supabase.rpc("can_fly", { p_character: me.id }).then(({ data }) => setCanFly(!!data));
   }, [supabase, me.id, load]);
 
@@ -96,7 +101,14 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
     setBusy(true);
     const { error } = await supabase.rpc("start_travel", { p_character: me.id, p_to: to, p_mode: mode, p_pace: pace });
     setBusy(false);
-    if (error) return setError(error.message.includes("gia'") ? error.message.replace("gia''", "già") : "Partenza non riuscita.");
+    if (error)
+      return setError(
+        error.message.includes("strada")
+          ? "Non c'è una strada per questo luogo con questo mezzo."
+          : error.message.includes("gia'")
+            ? error.message.replace("gia'", "già")
+            : "Partenza non riuscita.",
+      );
     setError(null);
     load().then((r) => (setHere(r.here), setTravel(r.travel)));
   }
@@ -105,13 +117,17 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
     if (!window.confirm("Annullare il viaggio? Resterai nel luogo da cui sei partito.")) return;
     await supabase.rpc("cancel_travel", { p_character: me.id });
     load().then((r) => (setHere(r.here), setTravel(r.travel)));
+    supabase.rpc("travel_options", { p_character: me.id }).then(({ data }) => setOptions((data ?? []) as Option[]));
   }
 
   const name = (id: string | null) => places.find((p) => p.id === id)?.name ?? "—";
-  const groups = places.reduce<Record<string, Place[]>>((acc, p) => {
-    (acc[p.map?.name ?? "Altro"] ??= []).push(p);
+  const groups = (options ?? []).reduce<Record<string, Option[]>>((acc, o) => {
+    (acc[o.map_name] ??= []).push(o);
     return acc;
   }, {});
+  const chosen = options?.find((o) => o.location_id === to) ?? null;
+  // mezzo possibile verso la destinazione scelta (e il drago solo per chi ne cavalca uno)
+  const modeOk = (m: Mode) => (m !== "drago" || canFly) && (!chosen || chosen[MODE_KEY[m]] != null);
 
   if (travel === undefined) return <p className="text-center text-muted">Caricamento...</p>;
 
@@ -160,34 +176,54 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
       </p>
       <label className="block space-y-1">
         <span className="block text-xs tracking-[0.12em] text-muted uppercase">Destinazione</span>
-        <select value={to} onChange={(e) => setTo(e.target.value)} className="input py-1.5">
+        <select
+          value={to}
+          onChange={(e) => {
+            const next = e.target.value;
+            setTo(next);
+            // se il mezzo scelto non va bene per la nuova destinazione, prende il primo possibile
+            const o = options?.find((x) => x.location_id === next);
+            if (o && o[MODE_KEY[mode]] == null) {
+              const first = MODES.find((m) => (m.id !== "drago" || canFly) && o[MODE_KEY[m.id]] != null);
+              if (first) setMode(first.id);
+            }
+          }}
+          className="input py-1.5"
+        >
           <option value="">Scegli dove andare</option>
           {Object.entries(groups).map(([map, list]) => (
             <optgroup key={map} label={map}>
-              {list
-                .filter((p) => p.id !== here)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+              {list.map((o) => (
+                <option key={o.location_id} value={o.location_id}>
+                  {o.name}
+                </option>
+              ))}
             </optgroup>
           ))}
         </select>
+        {options !== null && options.length === 0 && (
+          <span className="block text-xs text-muted">Da qui non ci sono strade verso altri luoghi.</span>
+        )}
       </label>
 
       <fieldset className="space-y-1">
         <legend className="mb-1 text-xs tracking-[0.12em] text-muted uppercase">Come viaggi</legend>
         <div className="grid grid-cols-3 gap-2">
           {MODES.map((m) => {
-            const disabled = m.id === "drago" && !canFly;
+            const disabled = !modeOk(m.id);
             return (
               <button
                 key={m.id}
                 type="button"
                 disabled={disabled}
                 onClick={() => setMode(m.id)}
-                title={disabled ? "Serve un drago di cui sei il cavaliere, almeno adolescente" : undefined}
+                title={
+                  disabled
+                    ? m.id === "drago" && !canFly
+                      ? "Serve un drago di cui sei il cavaliere, almeno adolescente"
+                      : "Con questo mezzo non si arriva a questa destinazione"
+                    : undefined
+                }
                 className={`border px-2 py-2 text-sm transition disabled:opacity-35 ${
                   mode === m.id ? "border-accent bg-blood/30 text-accent" : "border-border bg-black/40 hover:border-accent"
                 }`}
@@ -218,15 +254,15 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
         </div>
       </fieldset>
 
-      {to && preview && (
+      {to && preview && preview.minutes != null && modeOk(mode) && (
         <p className="border border-border bg-black/40 px-3 py-2 text-center text-sm">
           Da <strong>{preview.from_name}</strong> a <strong>{preview.to_name}</strong> {MODE_TEXT[mode]}: arriverai in circa{" "}
-          <strong>{duration(preview.minutes)}</strong>.
+          <strong>{duration(preview.minutes!)}</strong>.
         </p>
       )}
       {error && <p className="text-center text-sm text-red-400">{error}</p>}
       <div className="text-center">
-        <button type="button" disabled={busy || !to || (mode === "drago" && !canFly)} onClick={start} className="btn px-8">
+        <button type="button" disabled={busy || !to || !modeOk(mode)} onClick={start} className="btn px-8">
           Parti
         </button>
       </div>

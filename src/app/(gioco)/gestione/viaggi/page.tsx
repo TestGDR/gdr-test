@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { GameArea } from "@/components/game/GameShell";
 import { requirePermission } from "@/lib/staff";
-import TravelManager, { type TravelSettings } from "./TravelManager";
+import TravelManager, { type MapRow, type PlaceRow, type TravelSettings } from "./TravelManager";
 
 export default async function ViaggiPage() {
   const { supabase } = await requirePermission("mondo.gestire");
-  const { data } = await supabase
-    .from("missive_settings")
-    .select("walk_full_hours, horse_full_hours, dragon_full_hours, pace_slow_factor, pace_fast_factor")
-    .maybeSingle();
+  // con il permesso si vedono anche mappe spente e i loro luoghi
+  const [{ data: settings }, { data: maps }, { data: places }] = await Promise.all([
+    supabase.from("missive_settings").select("pace_slow_factor, pace_fast_factor").maybeSingle(),
+    supabase.from("maps").select("id, name, active").order("sort_order").order("name"),
+    supabase.from("locations").select("id, name, map_id, in_game").order("name"),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -17,8 +19,8 @@ export default async function ViaggiPage() {
         ← Gestione
       </Link>
       <h1 className="mt-1 mb-5 font-serif text-3xl tracking-wide text-accent">Viaggi</h1>
-      {data ? (
-        <TravelManager settings={data as TravelSettings} />
+      {settings ? (
+        <TravelManager settings={settings as TravelSettings} maps={(maps ?? []) as MapRow[]} places={(places ?? []) as PlaceRow[]} />
       ) : (
         <p className="text-red-400">Impostazioni non trovate: esegui le migrazioni 0053 e 0054.</p>
       )}

@@ -57,7 +57,7 @@ const PANELS = [
     permission: "mondo.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",
-    description: "Velocità a piedi, a cavallo e in drago, andature e tempi di percorrenza tra i luoghi.",
+    description: "Percorsi tra le macroaree, tempi tra le mappe e andature dei viaggi dei personaggi.",
   },
   {
     permission: "mondo.gestire",
