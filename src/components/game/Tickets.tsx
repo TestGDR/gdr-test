@@ -262,7 +262,7 @@ function TicketList({
   return (
     <>
       <h3 className="shrink-0 pt-4 pb-2 text-center font-serif text-sm tracking-[0.15em] text-accent uppercase">{title}</h3>
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+      <ul className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pt-2 pb-3">
         {tickets === null && <li className="text-center text-sm text-muted">Caricamento...</li>}
         {tickets !== null && shown.length === 0 && <li className="py-4 text-center text-sm text-muted">Nessun ticket.</li>}
         {shown.map((t) => {
