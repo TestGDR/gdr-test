@@ -132,6 +132,7 @@ export async function saveHouseRole(input: {
   required_sex: string | null;
   min_age: number | null;
   max_age: number | null;
+  can_build: boolean;
 }): Promise<HouseResult> {
   const ctx = await authorized();
   if (!ctx) return DENIED;
@@ -173,6 +174,7 @@ export async function saveHouseRole(input: {
     required_sex: sex,
     min_age: minAge,
     max_age: maxAge,
+    can_build: Boolean(input.can_build),
   };
   const { data, error } = input.id
     ? await ctx.supabase.from("house_roles").update(row).eq("id", input.id).select("id").single()

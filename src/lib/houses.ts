@@ -22,6 +22,7 @@ export type HouseRole = {
   required_sex: "uomo" | "donna" | null; // null = qualsiasi
   min_age: number | null;
   max_age: number | null;
+  can_build: boolean; // chi ha questo ruolo costruisce strutture nei feudi della casata
 };
 
 // Una riga di signup_house_roles(): ruolo che un PG puo' scegliere all'iscrizione

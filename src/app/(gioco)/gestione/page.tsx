@@ -54,6 +54,12 @@ const PANELS = [
     description: "Regioni climatiche, stagione attuale, semi (modelli di giornata) e meteo di oggi.",
   },
   {
+    permission: "economia.gestire",
+    href: "/gestione/economia",
+    title: "Economia",
+    description: "Risorse, tipi di feudo con i loro introiti, strutture, feudi delle casate e tesoro.",
+  },
+  {
     permission: "viaggi.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",

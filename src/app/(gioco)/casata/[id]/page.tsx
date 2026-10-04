@@ -3,11 +3,13 @@ import { GameArea } from "@/components/game/GameShell";
 import type { FamilyMember, FamilyRelation, House, HouseNpc, HouseRole } from "@/lib/houses";
 import { requireUser } from "@/lib/supabase/server";
 import HouseView, { type HouseMemberPg } from "./HouseView";
+import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "@/components/houses/HouseEconomy";
+import { getMainCharacter } from "@/lib/main-character";
 
 // Pagina di una casata, aperta da Utility giocatore -> Casate PG
 export default async function CasataPage({ params }: PageProps<"/casata/[id]">) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const { data: house } = await supabase.from("houses").select("*").eq("id", id).maybeSingle<House>();
   if (!house) notFound();
@@ -27,6 +29,32 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     supabase.from("houses").select("*"),
   ]);
 
+  // Economia: feudi (li vedono tutti), tesoro (solo i membri: le regole del database), chi puo' costruire
+  const [fiefs, fiefTypes, structureTypes, resources, treasury, me] = await Promise.all([
+    supabase
+      .from("fiefs")
+      .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id)")
+      .eq("house_id", id)
+      .order("name"),
+    supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),
+    supabase
+      .from("structure_types")
+      .select("id, name, description, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount)")
+      .order("sort_order")
+      .order("name"),
+    supabase.from("resources").select("id, name").order("sort_order").order("name"),
+    supabase.from("house_resources").select("resource_id, amount").eq("house_id", id),
+    getMainCharacter(supabase, user.id),
+  ]);
+  const { data: meRow } = me
+    ? await supabase.from("characters").select("id, house_id, house_role_id").eq("id", me.id).maybeSingle()
+    : { data: null };
+  const isMember = meRow?.house_id === id;
+  const canBuild =
+    isMember && meRow?.house_role_id
+      ? !!(await supabase.from("house_roles").select("can_build").eq("id", meRow.house_role_id).maybeSingle()).data?.can_build
+      : false;
+
   return (
     <div className="mx-auto max-w-6xl">
       <GameArea title={`Casata ${house.name}`} image={house.sigil_url} />
@@ -39,6 +67,17 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
         relations={(relations.data ?? []) as FamilyRelation[]}
         allNpcs={(allNpcs.data ?? []) as HouseNpc[]}
         allHouses={(allHouses.data ?? []) as House[]}
+      />
+      <HouseEconomy
+        houseName={house.name}
+        playable={house.playable}
+        fiefs={(fiefs.data ?? []) as unknown as EcoFief[]}
+        fiefTypes={(fiefTypes.data ?? []) as unknown as EcoFiefType[]}
+        structureTypes={(structureTypes.data ?? []) as unknown as EcoStructureType[]}
+        resources={(resources.data ?? []) as EcoResource[]}
+        treasury={isMember ? Object.fromEntries((treasury.data ?? []).map((t) => [t.resource_id as string, Number(t.amount)])) : null}
+        isMember={isMember}
+        builderId={canBuild && meRow ? (meRow.id as string) : null}
       />
     </div>
   );

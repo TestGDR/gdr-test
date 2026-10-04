@@ -580,6 +580,7 @@ function RoleRow({
     sex: role?.required_sex ?? "",
     minAge: toInput(role?.min_age),
     maxAge: toInput(role?.max_age),
+    build: role?.can_build ?? false,
   });
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -598,6 +599,7 @@ function RoleRow({
           required_sex: form.sex || null,
           min_age: fromInput(form.minAge),
           max_age: fromInput(form.maxAge),
+          can_build: form.build,
         }),
       role ? "Ruolo salvato." : "Ruolo aggiunto.",
     );
@@ -631,6 +633,10 @@ function RoleRow({
 
       {/* Disponibilita' all'iscrizione */}
       <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 py-1.5 text-sm" title="Economia: chi ha questo ruolo costruisce strutture nei feudi della casata">
+          <input type="checkbox" checked={form.build} onChange={(e) => set({ build: e.target.checked })} className="h-4 w-4 accent-[var(--accent)]" />
+          Costruisce nei feudi
+        </label>
         <label className="flex items-center gap-2 py-1.5 text-sm">
           <input type="checkbox" checked={form.signup} onChange={(e) => set({ signup: e.target.checked })} className="h-4 w-4 accent-[var(--accent)]" />
           Disponibile all&apos;iscrizione
