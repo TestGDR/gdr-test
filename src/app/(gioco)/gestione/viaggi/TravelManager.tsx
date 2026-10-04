@@ -105,7 +105,7 @@ function TimeInputs({
             placeholder="non si può"
             className="input w-28! py-1"
           />
-          <span className="block text-[10px] tracking-normal normal-case">
+          <span className="block text-[0.625rem] tracking-normal normal-case">
             {toMinutes(values[m.key]) ? duration(toMinutes(values[m.key])!) : "—"}
           </span>
         </label>
@@ -355,7 +355,7 @@ function Routes({ maps, places, raven = false }: { maps: MapRow[]; places: Place
           <li key={key(r)} className={`flex flex-wrap items-center gap-4 px-3 py-2 ${editing === key(r) ? "bg-blood/15" : ""}`}>
             <span className="min-w-56 flex-1">
               <span className="font-serif">{placeName(r.location_a)}</span> ↔ <span className="font-serif">{placeName(r.location_b)}</span>
-              <span className="block text-[11px] text-muted">
+              <span className="block text-[0.6875rem] text-muted">
                 {mapOf(r.location_a) === mapOf(r.location_b) ? mapOf(r.location_a) : `${mapOf(r.location_a)} ↔ ${mapOf(r.location_b)}`}
               </span>
             </span>

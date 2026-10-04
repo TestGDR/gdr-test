@@ -35,7 +35,7 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
   }
 
   return (
-    <div className="mx-auto w-full max-w-[610px]">{/* mappa 600px + cornice 2 x 5px */}
+    <div className="mx-auto w-full max-w-[38.125rem]">{/* mappa 600px + cornice 2 x 5px */}
       <div className="frame-ornate relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.image_url} alt={map.name} className="block w-full select-none" draggable={false} />
@@ -49,7 +49,10 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
             style={{ left: `${loc.x}%`, top: `${loc.y}%` }}
           >
             <MapDot />
-            <span className="pointer-events-none absolute top-7 left-1/2 z-10 -translate-x-1/2 rounded border border-border bg-black/90 px-2 py-0.5 font-serif text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+            <span className={`pointer-events-none absolute top-7 z-10 ${
+              // vicino ai bordi il nome si allinea al punto invece di uscire dalla mappa
+              loc.x < 15 ? "left-0" : loc.x > 85 ? "right-0" : "left-1/2 -translate-x-1/2"
+            } rounded border border-border bg-black/90 px-2 py-0.5 font-serif text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100`}>
               {loc.name}
             </span>
           </button>

@@ -305,7 +305,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
                       <button
                         type="button"
                         onClick={() => openPage(p)}
-                        className={`min-w-0 flex-1 py-0.5 pl-6 text-left text-[13px] transition ${
+                        className={`min-w-0 flex-1 py-0.5 pl-6 text-left text-[0.8125rem] transition ${
                           p.id === selectedId
                             ? "font-bold text-[#5a1408] before:mr-1 before:content-['➤']"
                             : "text-[#3b2a1a] hover:underline"
@@ -336,7 +336,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
               placeholder="Nuova macrosezione"
               onAdd={(title) => act(() => createSection(book, title), (res) => res.id && setOpen((prev) => new Set(prev).add(res.id!)))}
             />
-            <p className="mt-1.5 text-[10px] leading-snug text-[#7a6248]">
+            <p className="mt-1.5 text-[0.625rem] leading-snug text-[#7a6248]">
               Trascina ⠿ per riordinare. Una sezione rilasciata sul titolo di una macrosezione va in fondo a quella.
             </p>
           </div>

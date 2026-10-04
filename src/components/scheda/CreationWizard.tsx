@@ -99,7 +99,7 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
       </div>
 
       {/* Indicatore degli step: si puo' saltare a quelli gia' sbloccati */}
-      <ol className="my-4 grid grid-cols-5 gap-1 text-center text-[11px] tracking-wide uppercase">
+      <ol className="my-4 grid grid-cols-5 gap-1 text-center text-[0.6875rem] tracking-wide uppercase">
         {STEPS.map((label, i) => {
           const reachable = canReach(i);
           return (

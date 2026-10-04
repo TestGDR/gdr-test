@@ -68,7 +68,7 @@ export default function AgeRating() {
         className="flex h-14 w-12 flex-col items-center justify-center rounded-sm border-2 border-white bg-red-700 text-white"
       >
         <span className="text-2xl leading-none font-black">18</span>
-        <span className="mt-0.5 text-[8px] font-semibold tracking-wider">ANNI</span>
+        <span className="mt-0.5 text-[0.5rem] font-semibold tracking-wider">ANNI</span>
       </li>
       {DESCRIPTORS.map((d) => (
         <li

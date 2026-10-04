@@ -107,7 +107,7 @@ export default async function GestionePage() {
               <div className="h-full rounded-md border border-border/60 bg-black/30 p-5 opacity-60">
                 <h2 className="font-serif text-xl">
                   {panel.title}{" "}
-                  <span className="ml-1 rounded border border-border px-1.5 py-0.5 align-middle text-[10px] tracking-wider uppercase">
+                  <span className="ml-1 rounded border border-border px-1.5 py-0.5 align-middle text-[0.625rem] tracking-wider uppercase">
                     in arrivo
                   </span>
                 </h2>

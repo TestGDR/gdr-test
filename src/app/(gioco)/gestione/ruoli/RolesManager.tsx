@@ -89,7 +89,7 @@ function RolesTab({ roles, users }: { roles: StaffRole[]; users: UserRow[] }) {
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="h-fit rounded-md border border-border bg-black/50 p-3">
         <ul className="space-y-1">
           {item(SYS_ADMIN, "Admin", ADMIN_COLOR, countFor("admin"), true)}
@@ -171,11 +171,11 @@ function PermissionGrid({
                       onChange={(e) => onChange?.([item.key], e.target.checked)}
                       className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
                     />
-                    <span>
+                    <span className="min-w-0 break-words">{/* i nomi lunghi vanno a capo */}
                       <span className="block text-sm">
                         {item.label}
                         {item.soon && (
-                          <span className="ml-1.5 rounded border border-border px-1 text-[10px] tracking-wider text-muted uppercase">
+                          <span className="ml-1.5 rounded border border-border px-1 text-[0.625rem] tracking-wider text-muted uppercase">
                             in arrivo
                           </span>
                         )}
@@ -272,7 +272,7 @@ function RoleEditor({
             ogni utente. Si può modificare ma non eliminare.
           </p>
         )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
           <label className="block">
             <span className="mb-1 block text-xs text-muted uppercase">Nome</span>
             <input

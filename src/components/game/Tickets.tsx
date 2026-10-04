@@ -459,7 +459,7 @@ function TicketList({
                 }`}
               >
                 {t.section && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 border border-border bg-black px-2 text-[9px] tracking-[0.12em] text-muted uppercase">
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 border border-border bg-black px-2 text-[0.5625rem] tracking-[0.12em] text-muted uppercase">
                     {t.section.name}
                   </span>
                 )}
@@ -549,7 +549,7 @@ function NewTicket({
     onCreated(data as string);
   }
 
-  const row = "grid items-center gap-2 sm:grid-cols-[8rem_1fr]";
+  const row = "grid items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)]";
   const label = "text-xs font-semibold tracking-[0.12em] uppercase sm:text-right";
   return (
     <div className="mx-auto max-w-3xl space-y-3">
@@ -665,7 +665,7 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
   return (
     <div className="space-y-4">
       <header className="space-y-1 border-b border-border pb-3">
-        <p className="text-center text-[10px] tracking-[0.15em] text-muted uppercase">{ticket.section?.name ?? "Senza sezione"}</p>
+        <p className="text-center text-[0.625rem] tracking-[0.15em] text-muted uppercase">{ticket.section?.name ?? "Senza sezione"}</p>
         <h2 className="text-center font-serif text-2xl text-accent">{ticket.title}</h2>
         <p className="text-center text-xs text-muted">
           Aperto da <strong className="text-foreground">{ticket.opener_name}</strong> il {date(ticket.created_at)} alle {time(ticket.created_at)}
@@ -705,8 +705,8 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
           <article key={m.id} className={`border-l-4 bg-[#14110f] ${m.from_staff ? "border-[#d4a72c]" : "border-[#4a7fa6]"}`}>
             <header className="flex flex-wrap items-baseline gap-x-2 border-b border-border/50 px-4 py-2">
               <span className={`text-xs font-bold tracking-wider uppercase ${m.from_staff ? "text-[#f0c75e]" : "text-[#8fb8d8]"}`}>{m.author_name}</span>
-              {m.from_staff && <span className="border border-[#d4a72c]/60 px-1.5 text-[9px] tracking-widest text-[#f0c75e] uppercase">Staff</span>}
-              <span className="ml-auto text-[11px] text-muted">
+              {m.from_staff && <span className="border border-[#d4a72c]/60 px-1.5 text-[0.5625rem] tracking-widest text-[#f0c75e] uppercase">Staff</span>}
+              <span className="ml-auto text-[0.6875rem] text-muted">
                 {date(m.created_at)} {time(m.created_at)}
               </span>
             </header>
@@ -764,7 +764,7 @@ function DiceRoll({ m }: { m: Message }) {
       <p className="flex-1 text-sm">
         <strong className={m.from_staff ? "text-[#f0c75e]" : "text-[#8fb8d8]"}>{m.author_name}</strong> ha tirato un{" "}
         <strong>d{m.roll_sides}</strong>
-        <span className="block text-[11px] text-muted">
+        <span className="block text-[0.6875rem] text-muted">
           {date(m.created_at)} {time(m.created_at)}
         </span>
       </p>

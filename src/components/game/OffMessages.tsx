@@ -503,13 +503,13 @@ export default function OffMessages({
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">
                     <span className={`flex-1 truncate font-serif ${c.kind === "global" || c.kind === "system" ? "text-[#f0c75e]" : "text-accent"}`}>{c.name}</span>
-                    <span className={`shrink-0 text-[10px] ${c.unread ? "text-green-400" : "text-muted"}`}>{listTime(c.lastAt)}</span>
+                    <span className={`shrink-0 text-[0.625rem] ${c.unread ? "text-green-400" : "text-muted"}`}>{listTime(c.lastAt)}</span>
                   </span>
                   <span className="flex items-center gap-2">
                     <span className={`flex-1 truncate text-xs ${c.unread ? "text-foreground" : "text-muted"}`}>
                       {c.lastBody ?? (c.kind === "global" ? "Messaggi dello staff a tutti i giocatori" : "Nuova conversazione")}
                     </span>
-                    {c.unread > 0 && <span className="min-w-5 rounded-full bg-green-600 px-1.5 text-center text-[11px] font-bold text-white">{c.unread}</span>}
+                    {c.unread > 0 && <span className="min-w-5 rounded-full bg-green-600 px-1.5 text-center text-[0.6875rem] font-bold text-white">{c.unread}</span>}
                   </span>
                 </span>
               </button>
@@ -727,7 +727,7 @@ function Thread({ bubbles }: { bubbles: Bubble[] }) {
                 >
                   {b.author}
                 </span>
-                <span className="block text-[11px] text-muted">{fullDate(b.at)}</span>
+                <span className="block text-[0.6875rem] text-muted">{fullDate(b.at)}</span>
               </span>
             </header>
             <p className="px-3.5 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">{b.body}</p>

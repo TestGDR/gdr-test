@@ -110,7 +110,7 @@ export default function Scrolls({
     <div className="scrolls-desk flex h-full flex-col">
       <nav className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#5a3d22] px-4 py-3">
         <TabButton active={tab === "ricevuti"} onClick={() => (setTab("ricevuti"), setOpened(null))}>
-          Cartigli ricevuti{sealed > 0 && <span className="ml-1.5 rounded-full bg-blood px-1.5 text-[10px] text-white">{sealed}</span>}
+          Cartigli ricevuti{sealed > 0 && <span className="ml-1.5 rounded-full bg-blood px-1.5 text-[0.625rem] text-white">{sealed}</span>}
         </TabButton>
         <TabButton active={tab === "inviati"} onClick={() => (setTab("inviati"), setOpened(null))}>
           Inviati
@@ -203,11 +203,11 @@ function InboxGrid({ inbox, onOpen }: { inbox: Inbox[] | null; onOpen: (id: numb
             <span className={`font-serif text-sm ${s.opened ? "text-[#c9b48a]" : "text-[#f0dcae]"}`}>
               {s.opened ? (s.signed ? `Da ${s.sender_name}` : "Biglietto anonimo") : "Cartiglio sigillato"}
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-[#a08a64]">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-[#a08a64]">
               <MethodIcon method={s.method} />
               Consegnato da {BY[s.method]}
             </span>
-            <span className="text-[10px] text-[#8a7656]">{when(s.delivered_at)}</span>
+            <span className="text-[0.625rem] text-[#8a7656]">{when(s.delivered_at)}</span>
           </button>
         </li>
       ))}
@@ -224,7 +224,7 @@ function OpenedScroll({ s, onBack, onReply, onDiscard }: { s: Opened; onBack: ()
         Consegnato da {BY[s.method]} il {when(s.delivered_at)}
       </p>
       <article className="unrolled-scroll px-10 py-12 sm:px-14">
-        <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-[#2e2014] italic">{s.body}</p>
+        <p className="text-[0.9375rem] leading-relaxed whitespace-pre-wrap text-[#2e2014] italic">{s.body}</p>
         <p className="mt-8 text-right font-serif text-[#5a1408]">
           {s.signed ? <>— {s.sender_name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}
         </p>
@@ -281,7 +281,7 @@ function CastleArchive() {
                   {r.sender_name}
                   {!r.signed && <span className="text-xs text-[#a08a64] italic"> (non firmato)</span>} → {r.recipient_name}
                 </span>
-                <span className="block text-[11px] text-[#a08a64]">
+                <span className="block text-[0.6875rem] text-[#a08a64]">
                   Da {r.from_name ?? "?"} a {r.to_name ?? "?"} · giunto il {when(r.deliver_at)}
                 </span>
               </span>
@@ -315,7 +315,7 @@ function SentList({ sent, onDiscard }: { sent: Sent[] | null; onDiscard: (id: nu
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-serif text-[#f0dcae]">A {s.recipient_name}</span>
-                <span className="block text-[11px] text-[#a08a64]">
+                <span className="block text-[0.6875rem] text-[#a08a64]">
                   Affidato a {BY[s.method]} il {when(s.created_at)} · {s.signed ? "firmato" : "senza firma"}
                 </span>
               </span>
@@ -489,7 +489,7 @@ function WriteScroll({
           rows={9}
           placeholder="Scrivi il tuo messaggio..."
           aria-label="Testo del cartiglio"
-          className="w-full resize-none border-0 bg-transparent text-[15px] leading-relaxed text-[#2e2014] italic placeholder:text-[#8a7656] focus:outline-none"
+          className="w-full resize-none border-0 bg-transparent text-[0.9375rem] leading-relaxed text-[#2e2014] italic placeholder:text-[#8a7656] focus:outline-none"
         />
         <p className="mt-2 text-right font-serif text-[#5a1408]">{signed ? <>— {me.name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}</p>
       </div>

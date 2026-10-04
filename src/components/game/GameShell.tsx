@@ -210,12 +210,12 @@ export default function GameShell({
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
-        <header className="relative z-30 flex h-14 shrink-0 items-center justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm md:px-4">
+        <header className="relative z-30 flex h-14 shrink-0 items-center justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : news.unseen.on || news.unseen.off ? "Apri pannello: notizie nuove" : "Apri pannello"}
-            className={`${menuBtn} absolute left-2 md:hidden ${playRequests.count > 0 ? "blink-call" : news.unseen.on || news.unseen.off ? "news-new" : ""}`}
+            className={`${menuBtn} absolute left-2 lg:hidden ${playRequests.count > 0 ? "blink-call" : news.unseen.on || news.unseen.off ? "news-new" : ""}`}
           >
             <MenuIcon />
           </button>
@@ -246,15 +246,15 @@ export default function GameShell({
               }
             />
 
-            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] md:flex md:text-2xl">
+            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] lg:flex lg:text-2xl">
               Westeros GDR
             </h1>
 
-            <span className="mx-2 md:hidden">
+            <span className="mx-2 lg:hidden">
               <CharacterPicture character={character} displayName={displayName} size="h-9 w-9" small medieval />
             </span>
 
-            <span className="hidden md:contents">
+            <span className="hidden lg:contents">
               <UtilityButton
                 className={topBtn}
                 trigger={
@@ -268,7 +268,7 @@ export default function GameShell({
             </span>
 
             {character && (
-              <span className="contents md:hidden">
+              <span className="contents lg:hidden">
                 <TopMessageButton label="Missive" count={unread.counts.missiva} onClick={() => openMessages("missiva")}>
                   <QuillIcon />
                 </TopMessageButton>
@@ -287,7 +287,7 @@ export default function GameShell({
           {/* Colonna sinistra: desktop fissa e richiudibile, cellulare a scomparsa */}
           {drawerOpen && (
             <div
-              className="fixed inset-0 z-30 bg-black/70 md:hidden"
+              className="fixed inset-0 z-30 bg-black/70 lg:hidden"
               onClick={() => setDrawerOpen(false)}
             />
           )}
@@ -295,16 +295,16 @@ export default function GameShell({
               cosi' non si deforma durante la transizione */}
           <aside
             inert={!leftOpen}
-            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none md:static md:z-auto md:shrink-0 md:translate-x-0 md:overflow-hidden md:bg-black/40 ${
+            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:z-auto lg:shrink-0 lg:translate-x-0 lg:overflow-hidden lg:bg-black/40 ${
               drawerOpen ? "translate-x-0" : "-translate-x-full"
-            } ${leftOpen ? "md:w-64 md:opacity-100" : "md:w-0 md:border-transparent md:opacity-0"}`}
+            } ${leftOpen ? "lg:w-64 lg:opacity-100" : "lg:w-0 lg:border-transparent lg:opacity-0"}`}
           >
-            <div className="h-full w-72 overflow-y-auto p-3 md:w-64">
+            <div className="h-full w-72 overflow-y-auto p-3 lg:w-64">
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
               aria-label="Chiudi pannello"
-              className="mb-2 ml-auto block text-muted hover:text-accent md:hidden"
+              className="mb-2 ml-auto block text-muted hover:text-accent lg:hidden"
             >
               ✕
             </button>
@@ -336,7 +336,7 @@ export default function GameShell({
           <EdgeToggle side="left" open={leftOpen} onClick={() => setLeftOpen((v) => !v)} />
 
           {/* Centro: mappa, luoghi e chat */}
-          <main className="min-w-0 flex-1 overflow-y-auto p-3 pb-20 md:p-5 md:pb-5">{children}</main>
+          <main className="min-w-0 flex-1 overflow-y-auto p-3 pb-20 lg:p-5 lg:pb-5">{children}</main>
 
           <EdgeToggle side="right" open={rightOpen} onClick={() => setRightOpen((v) => !v)} />
 
@@ -344,10 +344,10 @@ export default function GameShell({
           <nav
             aria-label="Menu di gioco"
             inert={!rightOpen}
-            className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none md:static md:h-auto md:shrink-0 md:flex-col md:justify-start md:gap-2 md:border-t-0 md:border-l md:bg-black/40 md:px-0 md:py-4 ${
+            className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 ${
               rightOpen
-                ? "md:w-24 md:overflow-visible md:border-border md:opacity-100"
-                : "md:w-0 md:overflow-hidden md:border-transparent md:opacity-0"
+                ? "lg:w-24 lg:overflow-visible lg:border-border lg:opacity-100"
+                : "lg:w-0 lg:overflow-hidden lg:border-transparent lg:opacity-0"
             }`}
           >
             <RightRail
@@ -443,7 +443,7 @@ function EdgeToggle({
       type="button"
       onClick={onClick}
       aria-label={`${open ? "Chiudi" : "Apri"} colonna ${side === "left" ? "sinistra" : "destra"}`}
-      className="hidden w-5 shrink-0 items-center justify-center self-center rounded-sm border border-border bg-panel py-4 text-muted hover:border-accent hover:text-accent md:flex"
+      className="hidden w-5 shrink-0 items-center justify-center self-center rounded-sm border border-border bg-panel py-4 text-muted hover:border-accent hover:text-accent lg:flex"
     >
       <ChevronIcon left={pointsLeft} />
     </button>
@@ -527,15 +527,15 @@ function LeftColumn({
       </div>
 
       {/* Data di gioco */}
-      <div className="parchment mx-auto px-6 py-1.5 text-center [font-family:Verdana,Geneva,Tahoma,sans-serif] text-[10px] font-bold tracking-[0.04em] whitespace-nowrap uppercase">
+      <div className="parchment mx-auto px-6 py-1.5 text-center [font-family:Verdana,Geneva,Tahoma,sans-serif] text-[0.625rem] font-bold tracking-[0.04em] whitespace-nowrap uppercase">
         {GAME_DATE}
       </div>
 
       {/* Cellulare: gestione, utility, ticket e presenti (il personaggio e' nella barra in alto) */}
-      <div className="md:hidden">{mobileTools}</div>
+      <div className="lg:hidden">{mobileTools}</div>
 
       {/* Personaggio + messaggi (computer) */}
-      <div className="hidden items-center py-1 md:flex">
+      <div className="hidden items-center py-1 lg:flex">
         {/* L'immagine apre la scheda */}
         <CharacterPicture character={character} displayName={displayName} size="h-[4.5rem] w-[4.5rem]" balloon medieval />
         {character && (
@@ -562,7 +562,7 @@ function LeftColumn({
 
       {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me.
           Solo computer: su cellulare c'e' l'icona dei presenti nel pannello */}
-      <div className="hidden rounded-md border border-border bg-black/40 p-3 md:block">
+      <div className="hidden rounded-md border border-border bg-black/40 p-3 lg:block">
         <button
           type="button"
           onClick={onOpenOnline}
@@ -650,7 +650,7 @@ function CharacterPicture({
             <Avatar name={character.name} url={character.avatar_url} size={size} bare />
           </span>
           {character.status !== "attivo" && (
-            <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[11px] text-orange-300">
+            <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[0.6875rem] text-orange-300">
               ⧗
             </span>
           )}
@@ -706,7 +706,7 @@ function MobileTools({
       )}
       <button type="button" onClick={onOpenOnline} className={drawerBtn} aria-label={`${onlineCount} presenti online: apri l'elenco`}>
         <UsersIcon />
-        <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[11px] font-bold text-white shadow">
+        <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">
           {onlineCount}
         </span>
       </button>
@@ -723,7 +723,7 @@ function TopMessageButton({ label, count, onClick, children }: { label: string; 
     <button type="button" onClick={onClick} aria-label={count > 0 ? `${label}: ${count} non letti` : label} className={`${topBtn} ${count > 0 ? "message-glow" : ""}`}>
       {children}
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">{count}</span>
       )}
     </button>
   );
@@ -750,7 +750,7 @@ function MessageButton({
     >
       {children}
       {count > 0 && (
-        <span className="absolute -top-2 -right-2 min-w-5 rounded-full bg-blood px-1.5 text-[11px] font-bold text-white shadow">
+        <span className="absolute -top-2 -right-2 min-w-5 rounded-full bg-blood px-1.5 text-[0.6875rem] font-bold text-white shadow">
           {count}
         </span>
       )}
@@ -964,7 +964,7 @@ function PlaceInfo({ area }: { area: Area }) {
 
 // Ogni icona sta in un rombo rosso scuro, stoffa come lo stendardo dei messaggi (senza bordo)
 const topBtn =
-  "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[18px] sm:[&_svg]:w-[18px] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.7)] before:transition hover:before:brightness-125";
+  "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[1.125rem] sm:[&_svg]:w-[1.125rem] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.7)] before:transition hover:before:brightness-125";
 // Pulsante del menu (cellulare): senza rombo
 const menuBtn =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent";
@@ -973,7 +973,7 @@ function TopTip({ children }: { children: ReactNode }) {
   return (
     <span
       role="tooltip"
-      className="pointer-events-none absolute top-full left-1/2 z-50 mt-2 hidden -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-b-blood/60 before:content-[''] md:block"
+      className="pointer-events-none absolute top-full left-1/2 z-50 mt-2 hidden -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-b-blood/60 before:content-[''] lg:block"
     >
       {children}
     </span>
@@ -988,7 +988,7 @@ function TicketButton({ className, tip }: { className: string; tip?: boolean }) 
     <button type="button" onClick={open} className={`${className} ${count > 0 ? "blink-call" : ""}`} aria-label={label}>
       <TicketIcon />
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">{count}</span>
       )}
       {tip && <TopTip>{label}</TopTip>}
     </button>
@@ -1028,7 +1028,7 @@ const railBtn =
 function Tip({ children }: { children: ReactNode }) {
   // Etichetta al passaggio del mouse (solo desktop)
   return (
-    <span className="pointer-events-none absolute right-full z-50 mr-2 hidden rounded border border-border bg-panel px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 md:block">
+    <span className="pointer-events-none absolute right-full z-50 mr-2 hidden rounded border border-border bg-panel px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 lg:block">
       {children}
     </span>
   );
@@ -1076,7 +1076,7 @@ function PanelButton({
     >
       {icon}
       {calling && (
-        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
           {newRequests}
         </span>
       )}
@@ -1106,7 +1106,7 @@ function RightRail({
 
   return (
     <>
-      <div className="contents md:grid md:grid-cols-2 md:justify-items-center md:gap-2">
+      <div className="contents lg:grid lg:grid-cols-2 lg:justify-items-center lg:gap-2">
         {/* In chat: resta e aggiorna i messaggi. Altrove: torna alla mappa aggiornata */}
         <button
           type="button"
@@ -1126,14 +1126,14 @@ function RightRail({
         </Link>
         {/* Il mio drago (su cellulare sta nel menu dell'hamburger) */}
         {onOpenDragon && (
-          <button type="button" onClick={onOpenDragon} className={`${railBtn} max-md:hidden`} aria-label="Il mio drago">
+          <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
             <DragonIcon />
             <Tip>Il mio drago</Tip>
           </button>
         )}
         {/* Pannelli di gestione: solo moderatori e admin (su cellulare stanno nel pannello) */}
         {canManage && (
-          <Link href="/gestione" className={`${railBtn} ${goldGear} max-md:hidden`} aria-label="Gestione">
+          <Link href="/gestione" className={`${railBtn} ${goldGear} max-lg:hidden`} aria-label="Gestione">
             <GearIcon />
             <Tip>Gestione</Tip>
           </Link>
@@ -1146,12 +1146,12 @@ function RightRail({
             icon={p.icon}
             newRequests={newRequests}
             onOpen={onOpenPanel}
-            className={`${railBtn} max-md:hidden`}
+            className={`${railBtn} max-lg:hidden`}
             tip
           />
         ))}
       </div>
-      <form action={logout} className="md:mt-auto">
+      <form action={logout} className="lg:mt-auto">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">
           <PowerIcon />
           <Tip>Esci</Tip>

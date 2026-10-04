@@ -186,7 +186,7 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
               ))}
             </ul>
           )}
-          <p className="text-[11px] text-muted">Finché viaggi non puoi giocare nelle chat delle città e dei castelli.</p>
+          <p className="text-[0.6875rem] text-muted">Finché viaggi non puoi giocare nelle chat delle città e dei castelli.</p>
         </div>
         <div className="text-center">
           <button type="button" onClick={cancel} className="btn-ghost border-red-900 px-4 py-1.5 text-sm text-red-400 hover:border-red-500">
@@ -277,7 +277,7 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
               }`}
             >
               {p.label}
-              {p.hint && <span className="block text-[10px] text-muted">{p.hint}</span>}
+              {p.hint && <span className="block text-[0.625rem] text-muted">{p.hint}</span>}
             </button>
           ))}
         </div>

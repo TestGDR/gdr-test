@@ -10,13 +10,13 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   lg: "w-[min(46rem,calc(100vw-2rem))] max-h-[90vh]",
   xl: "w-[min(80rem,calc(100vw-2rem))] h-[min(52rem,calc(100vh-2rem))]",
   // stretta e alta (es. elenco online): max 600px, su cellulare tutta la larghezza disponibile
-  tall: "w-[min(600px,calc(100vw-1rem))] h-[min(52rem,calc(100dvh-1rem))]",
+  tall: "w-[min(37.5rem,calc(100vw-1rem))] h-[min(52rem,calc(100dvh-1rem))]",
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)
-  area: "w-[min(46rem,calc(100vw-2rem))] h-[min(700px,calc(100dvh-1rem))]",
+  area: "w-[min(46rem,calc(100vw-2rem))] h-[min(43.75rem,calc(100dvh-1rem))]",
   // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
-  sheet: "w-[min(820px,calc(100vw-1rem))] h-[min(940px,calc(100dvh-1rem))]",
+  sheet: "w-[min(51.25rem,calc(100vw-1rem))] h-[min(58.75rem,calc(100dvh-1rem))]",
   // ricerca gioco e assenze: alta al massimo 600px, il contenuto scorre dentro
-  panel: "w-[min(46rem,calc(100vw-2rem))] max-h-[min(600px,calc(100dvh-1rem))]",
+  panel: "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
 };
 
 // Finestra modale controllata dal chiamante (open / onClose).

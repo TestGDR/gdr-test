@@ -38,7 +38,7 @@ export default async function Home() {
           priority
           sizes="400px"
           // Il nero del logo si fonde con lo sfondo (blend "screen")
-          className="h-auto w-full max-w-[400px] mix-blend-screen"
+          className="h-auto w-full max-w-[25rem] mix-blend-screen"
         />
 
         <div className="mt-6 flex justify-center gap-4">

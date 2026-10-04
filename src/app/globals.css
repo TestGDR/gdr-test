@@ -387,3 +387,15 @@ body {
 .unrolled-scroll::after {
   bottom: -4px;
 }
+
+/* Schermi grandi: tutto il sito cresce in proporzione (testi, icone, spazi,
+   finestre e mappa sono misurati in rem, cioe' rispetto a questa base) */
+@media (min-width: 1800px) {
+  html { font-size: 112.5%; }
+}
+@media (min-width: 2300px) {
+  html { font-size: 125%; }
+}
+@media (min-width: 3200px) {
+  html { font-size: 150%; }
+}

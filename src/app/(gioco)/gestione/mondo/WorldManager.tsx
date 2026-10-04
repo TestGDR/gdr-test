@@ -69,7 +69,7 @@ export default function WorldManager(data: Data) {
 
   return (
     <section className="rounded-md border border-border bg-black/50">
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border px-2">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-border px-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -112,7 +112,7 @@ function MapsTab({
   const map = maps.find((m) => m.id === selectedId) ?? null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <aside className="h-fit space-y-2">
         <p className="text-xs text-muted">
           I giocatori vedono solo le mappe <strong className="text-green-300">attive</strong>, con le loro macroaree e chat.
@@ -132,7 +132,7 @@ function MapsTab({
                 disabled={pending}
                 onClick={() => run(() => setMapActive(m.id, !m.active), m.active ? `${m.name} spenta.` : `${m.name} attivata.`)}
                 title={m.active ? "Spegni la mappa" : "Attiva la mappa"}
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] tracking-wider uppercase ${
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.625rem] tracking-wider uppercase ${
                   m.active ? "border-green-700 bg-green-900/40 text-green-300" : "border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -198,7 +198,7 @@ function MapForm({ map, onSaved }: { map: GameMap | null; onSaved: (id: string) 
         <div className="space-y-2">
           {preview && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="" className="w-full max-w-[600px] rounded border border-border" />
+            <img src={preview} alt="" className="w-full max-w-[37.5rem] rounded border border-border" />
           )}
           <input
             type="file"
@@ -270,7 +270,7 @@ function LocationsTab({ maps, locations, mapId, onSelectMap }: Data & { mapId: s
     <div className="space-y-4">
       <MapPicker maps={maps} mapId={mapId} onSelect={(id) => (onSelectMap(id), setSelectedId(NEW))} />
       {map && (
-        <div className="grid gap-5 xl:grid-cols-[600px_1fr]">
+        <div className="grid gap-5 xl:grid-cols-[600px_minmax(0,1fr)]">
           <PositionEditor
             // ricomincia da capo quando arrivano posizioni nuove dal server
             key={map.id + mapLocations.map((l) => `${l.id}:${l.x}:${l.y}`).join()}
@@ -342,7 +342,7 @@ function PositionEditor({
         onPointerMove={move}
         onPointerUp={() => (dragging.current = null)}
         onPointerCancel={() => (dragging.current = null)}
-        className="relative w-full max-w-[600px] touch-none overflow-hidden rounded-md border border-border select-none"
+        className="relative w-full max-w-[37.5rem] touch-none overflow-hidden rounded-md border border-border select-none"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.image_url} alt={map.name} className="block w-full" draggable={false} />
@@ -361,7 +361,7 @@ function PositionEditor({
           >
             <MapDot />
             <span
-              className={`pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded border bg-black/90 px-1.5 py-0.5 font-serif text-[11px] whitespace-nowrap ${
+              className={`pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded border bg-black/90 px-1.5 py-0.5 font-serif text-[0.6875rem] whitespace-nowrap ${
                 l.id === selectedId ? "border-accent text-accent" : "border-border text-foreground"
               }`}
             >
@@ -549,12 +549,12 @@ function RoomsTab({
       {!current ? (
         <p className="text-muted">Questa mappa non ha ancora macroaree: creale nella scheda Macroaree.</p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
+        <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <aside className="h-fit space-y-1">
             <GroupsEditor locationId={current.id} groups={locationGroups} rooms={locationRooms} />
             {roomSections.map((section) => (
               <div key={section.id} className="space-y-1">
-                <p className="px-2 pt-2 text-[11px] tracking-[0.15em] text-accent/80 uppercase">{section.name}</p>
+                <p className="px-2 pt-2 text-[0.6875rem] tracking-[0.15em] text-accent/80 uppercase">{section.name}</p>
                 {section.rooms.map((r) => (
                   <button
                     key={r.id}
@@ -777,7 +777,7 @@ function RoomForm({
   return (
     <form onSubmit={submit} className="space-y-4">
       <h3 className="font-serif text-xl text-accent">{room ? room.name : "Nuova chat"}</h3>
-      <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-3">
           <Field label="Nome">
             <input name="name" defaultValue={room?.name} required maxLength={80} className="input" />

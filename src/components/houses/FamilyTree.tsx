@@ -344,7 +344,7 @@ function MemberCard({ member, link, selected }: { member: FamilyMember; link: Me
       } ${link.life.deceased ? "opacity-70 grayscale-[40%]" : ""}`}
     >
       {link.externalHouse && (
-        <span className="absolute -top-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sky-700/70 bg-black px-2 py-0.5 text-[10px] whitespace-nowrap text-sky-200">
+        <span className="absolute -top-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sky-700/70 bg-black px-2 py-0.5 text-[0.625rem] whitespace-nowrap text-sky-200">
           {link.externalHouse.sigil_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={link.externalHouse.sigil_url} alt="" className="h-3.5 w-3.5 object-contain" />
@@ -373,9 +373,9 @@ function MemberCard({ member, link, selected }: { member: FamilyMember; link: Me
         {member.name}
         {link.life.deceased && <span className="ml-1 text-muted">†</span>}
       </span>
-      {life && <span className="mt-0.5 text-[10px] leading-tight text-foreground/70">{life}</span>}
-      {member.note && <span className="line-clamp-1 text-[11px] leading-tight text-accent/80 italic">{member.note}</span>}
-      {member.spouse && <span className="line-clamp-1 text-[10px] leading-tight text-muted">⚭ {member.spouse}</span>}
+      {life && <span className="mt-0.5 text-[0.625rem] leading-tight text-foreground/70">{life}</span>}
+      {member.note && <span className="line-clamp-1 text-[0.6875rem] leading-tight text-accent/80 italic">{member.note}</span>}
+      {member.spouse && <span className="line-clamp-1 text-[0.625rem] leading-tight text-muted">⚭ {member.spouse}</span>}
     </div>
   );
 }

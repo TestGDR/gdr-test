@@ -340,7 +340,7 @@ function ImageButton({ editor }: { editor: Editor }) {
           <button type="button" onClick={insert} className="btn w-full py-1.5 text-xs" disabled={busy || (!file && !url.trim())}>
             {busy ? "Caricamento..." : "Inserisci"}
           </button>
-          <p className="text-[10px] leading-snug text-muted">Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine per ridimensionarla.</p>
+          <p className="text-[0.625rem] leading-snug text-muted">Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine per ridimensionarla.</p>
         </div>
       )}
     </span>

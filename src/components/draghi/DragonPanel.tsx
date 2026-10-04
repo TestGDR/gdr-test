@@ -100,7 +100,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
               type="button"
               onClick={() => setTab(t.id)}
               aria-pressed={tab === t.id}
-              className={`flex-1 rounded-l-none border-y border-r py-3 font-serif text-[11px] tracking-[0.18em] uppercase shadow-[2px_2px_4px_rgb(0_0_0/0.35)] transition [writing-mode:vertical-rl] ${
+              className={`flex-1 rounded-l-none border-y border-r py-3 font-serif text-[0.6875rem] tracking-[0.18em] uppercase shadow-[2px_2px_4px_rgb(0_0_0/0.35)] transition [writing-mode:vertical-rl] ${
                 tab === t.id
                   ? "-ml-1 border-[#3a2410] bg-[#6b2a14] text-[#f4e9cd]"
                   : "border-[#3a2410]/60 bg-[#5a3a1e] text-[#e8d8b4] hover:bg-[#6b4424]"
@@ -108,7 +108,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
             >
               {t.label}
               {t.id === "crescita" && data.dragon!.unspent_points > 0 && (
-                <span className="mt-1 inline-block rounded-full bg-[#c9a05a] px-1 text-[10px] text-[#3b2a1a] [writing-mode:horizontal-tb]">
+                <span className="mt-1 inline-block rounded-full bg-[#c9a05a] px-1 text-[0.625rem] text-[#3b2a1a] [writing-mode:horizontal-tb]">
                   {data.dragon!.unspent_points}
                 </span>
               )}
@@ -130,7 +130,7 @@ function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
         <span className="font-serif text-xl">{dragon.sex === "maschio" ? "♂" : "♀"}</span>
       </Ring>
       <div className="min-w-0 flex-1 text-center">
-        <p className="text-[11px] tracking-[0.3em] text-[#6b4a2e] uppercase">{stageLabel(dragon.stage, stages)}</p>
+        <p className="text-[0.6875rem] tracking-[0.3em] text-[#6b4a2e] uppercase">{stageLabel(dragon.stage, stages)}</p>
         <h2 className="truncate font-serif text-xl tracking-wide text-[#3b2a1a] sm:text-3xl">{dragonName(dragon)}</h2>
       </div>
       <Ring size="h-10 w-10 sm:h-12 sm:w-12" title={[dragon.color1, dragon.color2].filter(Boolean).join(" e ")}>
@@ -167,7 +167,7 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
               <span className="font-serif text-lg sm:text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
             <ModBadge mod={mods[`caratteristica:${s.key}`]} />
-            <span className="text-[8px] tracking-[0.08em] text-[#6b4a2e] uppercase sm:text-[10px] sm:tracking-[0.2em]">{s.label}</span>
+            <span className="text-[0.5rem] tracking-[0.08em] text-[#6b4a2e] uppercase sm:text-[0.625rem] sm:tracking-[0.2em]">{s.label}</span>
           </div>
         ))}
       </div>
@@ -261,7 +261,7 @@ function Skills({ dragon }: { dragon: Dragon }) {
               <span className="font-serif text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
             <ModBadge mod={mods[`caratteristica:${s.key}`]} />
-            <span className="text-[10px] tracking-[0.2em] text-[#6b4a2e] uppercase">{s.label}</span>
+            <span className="text-[0.625rem] tracking-[0.2em] text-[#6b4a2e] uppercase">{s.label}</span>
           </div>
         ))}
       </div>
@@ -542,7 +542,7 @@ function Growth({
             { title: "Abilità", items: skills },
           ].map((group) => (
             <div key={group.title}>
-              <h4 className="mb-2 text-center text-[11px] tracking-[0.25em] text-[#6b4a2e] uppercase">{group.title}</h4>
+              <h4 className="mb-2 text-center text-[0.6875rem] tracking-[0.25em] text-[#6b4a2e] uppercase">{group.title}</h4>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {group.items.map((it) => (
                   <div key={it.key} className="flex items-center justify-center gap-2">
@@ -551,7 +551,7 @@ function Growth({
                       <Ring size="h-12 w-12" highlight={!!alloc[it.key]}>
                         <span className="font-serif text-lg">{value(it.key)}</span>
                       </Ring>
-                      <span className="mt-0.5 text-[9px] tracking-[0.15em] text-[#6b4a2e] uppercase">{it.label}</span>
+                      <span className="mt-0.5 text-[0.5625rem] tracking-[0.15em] text-[#6b4a2e] uppercase">{it.label}</span>
                     </div>
                     <PointButton
                       label="+"
@@ -631,11 +631,11 @@ function Ring({ size, children, title, highlight }: { size: string; children: Re
 function BigRing({ label, value, note, className = "" }: { label: string; value: ReactNode; note?: string; className?: string }) {
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      <span className="mb-1 flex min-h-[2.6em] items-end justify-center text-center font-serif text-[11px] leading-tight tracking-[0.12em] text-[#6b4a2e] uppercase sm:tracking-[0.2em]">{label}</span>
+      <span className="mb-1 flex min-h-[2.6em] items-end justify-center text-center font-serif text-[0.6875rem] leading-tight tracking-[0.12em] text-[#6b4a2e] uppercase sm:tracking-[0.2em]">{label}</span>
       <Ring size="h-20 w-20">
         <span className="font-serif text-3xl">{value}</span>
       </Ring>
-      {note && <span className="mt-1.5 max-w-24 text-center text-[10px] leading-tight italic">{note}</span>}
+      {note && <span className="mt-1.5 max-w-24 text-center text-[0.625rem] leading-tight italic">{note}</span>}
     </div>
   );
 }
@@ -644,7 +644,7 @@ function Ribbon({ children, tone = "brown" }: { children: ReactNode; tone?: "bro
   const bg = tone === "teal" ? "bg-[#2f5a5a]" : tone === "red" ? "bg-[#6b1d0e]" : "bg-[#5a3a1e]";
   return (
     <span
-      className={`inline-block ${bg} px-5 py-1 font-serif text-[11px] tracking-[0.2em] text-[#f4e9cd] uppercase shadow-[0_2px_3px_rgb(0_0_0/0.4)] [clip-path:polygon(6%_0,94%_0,100%_50%,94%_100%,6%_100%,0_50%)]`}
+      className={`inline-block ${bg} px-5 py-1 font-serif text-[0.6875rem] tracking-[0.2em] text-[#f4e9cd] uppercase shadow-[0_2px_3px_rgb(0_0_0/0.4)] [clip-path:polygon(6%_0,94%_0,100%_50%,94%_100%,6%_100%,0_50%)]`}
     >
       {children}
     </span>

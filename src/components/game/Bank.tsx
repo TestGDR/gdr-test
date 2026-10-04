@@ -279,7 +279,7 @@ function TransferForm({
         </datalist>
         {name.trim() && !target && <span className="mt-1 block text-xs text-orange-300">Scegli un nome dall&apos;elenco.</span>}
       </label>
-      <div className="grid grid-cols-[7rem_1fr] gap-2">
+      <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
         <label className="block">
           <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Monete</span>
           <input type="number" min={1} max={account.coins} value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />

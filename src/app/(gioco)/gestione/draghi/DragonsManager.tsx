@@ -68,7 +68,7 @@ export default function DragonsManager(props: Props) {
   const [tab, setTab] = useState<Tab>("draghi");
   return (
     <section className="border border-border bg-black/50">
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border px-2">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-border px-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -112,7 +112,7 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temper
   ];
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[22rem_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
       <aside className="space-y-4">
         {feedback}
         {groups.map((g) => {
@@ -475,7 +475,7 @@ function TraitsPicker({
       disabled={!!blocked}
       title={blocked ? `Non può convivere con "${blocked}"` : undefined}
       aria-pressed={active}
-      className={`border px-2.5 py-1 font-serif text-[13px] transition ${
+      className={`border px-2.5 py-1 font-serif text-[0.8125rem] transition ${
         active
           ? "border-[#c9a05a] bg-[#c9a05a]/15 text-[#f0dcae]"
           : blocked
@@ -1045,7 +1045,7 @@ function EffectsEditor({ list, onChange, skills }: { list: EffectDraft[]; onChan
   const update = (i: number, patch: Partial<EffectDraft>) => onChange(list.map((e, k) => (k === i ? { ...e, ...patch } : e)));
   return (
     <div className="space-y-1.5 border-l-2 border-border/70 pl-2">
-      <p className="text-[11px] tracking-wider text-muted uppercase">Effetti nei tiri</p>
+      <p className="text-[0.6875rem] tracking-wider text-muted uppercase">Effetti nei tiri</p>
       {list.map((e, i) => (
         <div key={i} className="flex flex-wrap items-center gap-1.5">
           <select value={e.target} onChange={(ev) => update(i, { target: ev.target.value })} aria-label="Cosa influenza" className="input w-44! py-1 text-xs">

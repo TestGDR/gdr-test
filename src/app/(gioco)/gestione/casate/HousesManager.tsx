@@ -238,7 +238,7 @@ function HousesView(data: Data) {
   const house = data.houses.find((h) => h.id === selectedId) ?? null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="h-fit rounded-md border border-border bg-black/50 p-3">
         <ul className="space-y-1">
           {data.houses.map((h) => (
@@ -384,7 +384,7 @@ function HouseEditor({
         <Sigil url={house?.sigil_url ?? null} name={house?.name ?? "?"} size="h-12 w-12" />
         <h2 className="font-serif text-2xl tracking-wide text-accent">{house ? `Casata ${house.name}` : "Nuova casata"}</h2>
       </div>
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border px-2">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-border px-2">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -447,7 +447,7 @@ function DataTab({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-4">
           <Field label="Nome della casata (sarà il cognome dei membri)">
             <input name="name" defaultValue={house?.name} required minLength={2} maxLength={40} className="input" />
@@ -531,7 +531,7 @@ function RolesTab({
         I ruoli che i PG possono ricoprire in questa casata e quanto guadagnano ogni giorno (in monete).
         Spunta &quot;Disponibile all&apos;iscrizione&quot; per renderlo sceglibile durante la creazione del PG.
       </p>
-      <div className="hidden grid-cols-[1fr_10rem_6rem_auto] gap-2 px-3 text-xs tracking-wider text-muted uppercase sm:grid">
+      <div className="hidden grid-cols-[minmax(0,1fr)_10rem_6rem_auto] gap-2 px-3 text-xs tracking-wider text-muted uppercase sm:grid">
         <span>Ruolo</span>
         <span>Stipendio / giorno</span>
         <span>Ordine</span>
@@ -613,7 +613,7 @@ function RoleRow({
 
   return (
     <form onSubmit={save} className={`rounded-md border p-3 ${role ? "border-border/60" : "border-dashed border-accent/50"}`}>
-      <div className="grid items-center gap-2 sm:grid-cols-[1fr_10rem_6rem_auto]">
+      <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_6rem_auto]">
         <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={role ? "" : "Nuovo ruolo (es. Maestro d'armi)"} maxLength={40} className="input py-1.5" aria-label="Nome del ruolo" />
         <input type="number" min={0} max={1000000} value={form.salary} onChange={(e) => set({ salary: e.target.value })} className="input py-1.5" aria-label="Stipendio giornaliero" />
         <input type="number" value={form.order} onChange={(e) => set({ order: e.target.value })} className="input py-1.5" aria-label="Ordine" />
@@ -677,7 +677,7 @@ function RoleRow({
 function MiniField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-0.5 block text-[10px] tracking-wider text-muted uppercase">{label}</span>
+      <span className="mb-0.5 block text-[0.625rem] tracking-wider text-muted uppercase">{label}</span>
       {children}
     </label>
   );
@@ -1126,7 +1126,7 @@ function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; r
   const editing = npcs.find((n) => n.id === editingId) ?? null;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <ul className="grid h-fit gap-3 sm:grid-cols-2">
         {npcs.map((n) => (
           <li key={n.id}>
@@ -1143,7 +1143,7 @@ function NpcTab({ houseId, npcs, roles }: { houseId: string; npcs: HouseNpc[]; r
                   {n.name}
                   {n.deceased && <span className="ml-1 text-muted">†</span>}
                 </span>
-                {lifeLabel(n, GAME_YEAR) && <span className="block text-[11px] text-foreground/70">{lifeLabel(n, GAME_YEAR)}</span>}
+                {lifeLabel(n, GAME_YEAR) && <span className="block text-[0.6875rem] text-foreground/70">{lifeLabel(n, GAME_YEAR)}</span>}
                 {(n.house_role_id || n.title) && (
                   <span className="block text-xs text-muted">
                     {[roles.find((r) => r.id === n.house_role_id)?.name, n.title].filter(Boolean).join(" · ")}

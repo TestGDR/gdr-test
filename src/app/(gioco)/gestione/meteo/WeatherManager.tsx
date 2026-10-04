@@ -39,7 +39,7 @@ export default function WeatherManager(props: Props) {
   const [tab, setTab] = useState<Tab>("regioni");
   return (
     <section className="border border-border bg-black/50">
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border px-2">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-border px-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -93,7 +93,7 @@ function RegionsTab({ regions, season, maps }: Props) {
         </select>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <aside className="space-y-1">
           <p className="mb-1 text-xs text-muted">I giocatori vedono solo il meteo delle regioni attive.</p>
           {regions.map((r) => (
@@ -105,7 +105,7 @@ function RegionsTab({ regions, season, maps }: Props) {
                 type="button"
                 disabled={busy}
                 onClick={() => run(() => supabase.from("weather_regions").update({ active: !r.active }).eq("id", r.id), r.active ? `${r.name} spenta.` : `${r.name} attivata.`)}
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] tracking-wider uppercase ${
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.625rem] tracking-wider uppercase ${
                   r.active ? "border-green-700 bg-green-900/40 text-green-300" : "border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -347,7 +347,7 @@ function SeedEditor({
               />
               <span className="self-center text-xs text-muted">°</span>
             </div>
-            <p className="text-[11px] text-muted">{condition(v.periods[i]?.cond ?? "").label}</p>
+            <p className="text-[0.6875rem] text-muted">{condition(v.periods[i]?.cond ?? "").label}</p>
           </div>
         ))}
       </div>

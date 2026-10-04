@@ -14,16 +14,16 @@ export default async function PersonaggiPage() {
   const characters = (data ?? []) as Character[];
 
   return (
-    <div className="grid gap-8 md:grid-cols-[1fr_380px]">
-      <section>
+    <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_23.75rem]">
+      <section className="min-w-0">
         <GameArea title="Personaggi" />
-        <h1 className="mb-4 font-serif text-3xl text-accent">I tuoi personaggi</h1>
+        <h1 className="mb-4 font-serif text-2xl text-accent sm:text-3xl">I tuoi personaggi</h1>
         {characters.length === 0 && (
           <p className="text-muted">Non hai ancora nessun personaggio. Creane uno per iniziare!</p>
         )}
         <ul className="space-y-4">
           {characters.map((c) => (
-            <li key={c.id} className="panel flex gap-4">
+            <li key={c.id} className="panel flex flex-wrap gap-4 sm:flex-nowrap">
               {c.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -49,7 +49,7 @@ export default async function PersonaggiPage() {
           ))}
         </ul>
       </section>
-      <aside>
+      <aside className="min-w-0">
         <CharacterForm />
       </aside>
     </div>

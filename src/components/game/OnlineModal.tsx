@@ -71,7 +71,7 @@ export default function OnlineModal(props: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full border px-2 py-0.5 text-[10px] tracking-wider uppercase transition sm:px-3 sm:py-1 sm:text-xs ${
+                className={`rounded-full border px-2 py-0.5 text-[0.625rem] tracking-wider uppercase transition sm:px-3 sm:py-1 sm:text-xs ${
                   filter === f.id
                     ? "border-accent bg-accent/15 text-accent"
                     : "border-transparent text-muted hover:text-foreground"
@@ -108,7 +108,7 @@ export default function OnlineModal(props: Props) {
                 ) : (
                   <>
                     {group.label}
-                    <span className="rounded-full border border-accent/60 px-1.5 text-[10px] text-accent">{group.players.length}</span>
+                    <span className="rounded-full border border-accent/60 px-1.5 text-[0.625rem] text-accent">{group.players.length}</span>
                   </>
                 )}
               </h3>
@@ -171,12 +171,12 @@ function PlayerRow({
             disabled={!player.characterId}
             title={player.characterId ? `Apri la scheda di ${fullName(player)}` : undefined}
             // su cellulare nome e cognome vanno a capo invece di essere tagliati
-            className="min-w-0 text-left text-[13px] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[15px]"
+            className="min-w-0 text-left text-[0.8125rem] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.9375rem]"
           >
             {fullName(player)}
           </button>
         </p>
-        <p className="truncate text-[11px] text-[#7d7470] sm:text-xs">{player.phrase || "\u00a0"}</p>
+        <p className="truncate text-[0.6875rem] text-[#7d7470] sm:text-xs">{player.phrase || "\u00a0"}</p>
       </div>
       {/* Simboli */}
       <div className="flex shrink-0 items-center gap-1 text-base sm:gap-2 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5">
@@ -225,7 +225,7 @@ function PhraseEditor({ phrase, onSave }: { phrase: string; onSave: (p: string) 
 
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 sm:px-4">
-      <label htmlFor="phrase" className="text-[10px] tracking-wider text-muted uppercase sm:text-xs">
+      <label htmlFor="phrase" className="text-[0.625rem] tracking-wider text-muted uppercase sm:text-xs">
         La tua frase
       </label>
       <input

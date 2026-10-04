@@ -48,12 +48,12 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
           setSelectedId(n.id);
           setEditing(null);
         }}
-        className={`w-full py-0.5 pl-6 text-left text-[13px] transition ${
+        className={`w-full py-0.5 pl-6 text-left text-[0.8125rem] transition ${
           n.id === selected?.id ? "font-bold text-[#5a1408] before:mr-1 before:content-['➤']" : "text-[#3b2a1a] hover:underline"
         }`}
       >
         {n.title}
-        <span className="block text-[11px] font-normal text-[#7a6248]">{when(n.created_at)}</span>
+        <span className="block text-[0.6875rem] font-normal text-[#7a6248]">{when(n.created_at)}</span>
       </button>
     </li>
   );
