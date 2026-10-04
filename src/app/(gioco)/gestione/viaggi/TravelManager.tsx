@@ -10,7 +10,6 @@ export type PlaceRow = { id: string; name: string; map_id: string; in_game: bool
 
 type Times = { walk_minutes: number | null; horse_minutes: number | null; ship_minutes: number | null; dragon_minutes: number | null };
 type RouteRow = Times & { location_a: string; location_b: string };
-type MapTimeRow = Times & { map_a: string; map_b: string };
 
 const MODES = [
   { key: "walk_minutes", label: "A piedi" },
@@ -37,7 +36,6 @@ export default function TravelManager({ settings, maps, places }: { settings: Tr
     <div className="space-y-6">
       <PaceForm settings={settings} />
       <Routes maps={maps} places={places.filter((p) => p.in_game)} />
-      <MapTimes maps={maps} />
     </div>
   );
 }
@@ -242,10 +240,10 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
       title="Percorsi"
       text={
         <>
-          Un percorso collega due macroaree, nei due sensi, con un tempo per ogni mezzo ad andatura normale. Lascia vuoto un mezzo se con
-          quello non si può fare (es. a piedi attraverso il mare); per mare si viaggia solo lungo i percorsi con un tempo per mare.{" "}
-          <strong className="text-foreground">Tra mappe diverse si passa solo lungo i percorsi</strong>: per esempio Terre della Tempesta /
-          Approdo ↔ Dorne / Stepstones. Il viaggio segue da solo la strada più breve, anche con più tappe.
+          Si viaggia <strong className="text-foreground">solo lungo i percorsi</strong>. Un percorso collega due macroaree, anche di mappe
+          diverse (per esempio Terre della Tempesta / Approdo ↔ Dorne / Stepstones), nei due sensi, con un tempo per ogni mezzo ad andatura
+          normale. Lascia vuoto un mezzo se con quello non si può fare (es. a piedi attraverso il mare). Il viaggio segue da solo la strada
+          più breve, anche con più tappe, sempre con lo stesso mezzo: se tra due macroaree non c&apos;è una catena di percorsi, non ci si arriva.
         </>
       }
     >
@@ -290,104 +288,6 @@ function Routes({ maps, places }: { maps: MapRow[]; places: PlaceRow[] }) {
             <span className="min-w-40">{showTimes(r)}</span>
             <span className="flex gap-2 text-xs">
               <button type="button" onClick={() => edit(r)} className="text-muted hover:text-accent">
-                Modifica
-              </button>
-              <button type="button" onClick={() => remove(r)} className="text-red-400 hover:text-red-300">
-                Cancella
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------
-// Tempi tra due mappe (anche una mappa con se stessa)
-function MapTimes({ maps }: { maps: MapRow[] }) {
-  const supabase = useMemo(() => createClient(), []);
-  const [rows, setRows] = useState<MapTimeRow[] | null>(null);
-  const [a, setA] = useState("");
-  const [times, setTimes] = useState(emptyTimes());
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => supabase.from("map_travel_times").select("*").then(({ data }) => (data ?? []) as MapTimeRow[]), [supabase]);
-  useEffect(() => {
-    load().then(setRows);
-  }, [load]);
-  const mapName = (id: string) => maps.find((m) => m.id === id)?.name ?? "?";
-
-  async function save() {
-    if (!a) return setError("Scegli la mappa.");
-    const t = minutesOf(times);
-    if (noneSet(t)) return setError("Scrivi almeno un tempo.");
-    const { error } = await supabase.from("map_travel_times").upsert({ map_a: a, map_b: a, ...t });
-    if (error) return setError("Tempi non salvati.");
-    setError(null);
-    setA("");
-    setTimes(emptyTimes());
-    setEditing(false);
-    load().then(setRows);
-  }
-
-  async function remove(r: MapTimeRow) {
-    if (!window.confirm("Cancellare questi tempi?")) return;
-    await supabase.from("map_travel_times").delete().eq("map_a", r.map_a).eq("map_b", r.map_b);
-    load().then(setRows);
-  }
-
-  return (
-    <Box
-      title="Tempi dentro le mappe"
-      text={
-        <>
-          Il tempo standard per andare da una macroarea a un&apos;altra della stessa mappa, se tra le due non c&apos;è un percorso. Per
-          passare a un&apos;altra mappa servono i percorsi qui sopra. Senza tempo standard, in una mappa ci si muove solo lungo i percorsi.
-        </>
-      }
-    >
-      <div className="space-y-3 border border-dashed border-border p-3">
-        <p className="text-xs tracking-[0.12em] text-accent uppercase">{editing ? "Modifica i tempi" : "Tempi di una mappa"}</p>
-        <select value={a} onChange={(e) => setA(e.target.value)} aria-label="Mappa" disabled={editing} className="input w-56! py-1.5">
-          <option value="">Mappa...</option>
-          {maps.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-              {m.active ? "" : " (spenta)"}
-            </option>
-          ))}
-        </select>
-        <div className="flex flex-wrap gap-4">
-          <TimeInputs values={times} onChange={setTimes} />
-        </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <div className="flex gap-2">
-          <button type="button" onClick={save} className="btn px-4 py-1.5 text-sm">
-            {editing ? "Salva le modifiche" : "+ Aggiungi"}
-          </button>
-          {editing && (
-            <button type="button" onClick={() => (setEditing(false), setA(""), setTimes(emptyTimes()))} className="btn-ghost px-3 py-1.5 text-sm">
-              Annulla
-            </button>
-          )}
-        </div>
-      </div>
-
-      {rows === null && <p className="text-sm text-muted">Caricamento...</p>}
-      {rows !== null && rows.length === 0 && <p className="text-sm text-muted">Nessuna mappa ha un tempo standard.</p>}
-      <ul className="divide-y divide-border/60 border border-border/60">
-        {rows?.map((r) => (
-          <li key={`${r.map_a}|${r.map_b}`} className="flex flex-wrap items-center gap-4 px-3 py-2">
-            <span className="min-w-56 flex-1 font-serif">Dentro {mapName(r.map_a)}</span>
-            <span className="min-w-40">{showTimes(r)}</span>
-            <span className="flex gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => (setA(r.map_a), setTimes(timesOf(r)), setEditing(true))}
-                className="text-muted hover:text-accent"
-              >
                 Modifica
               </button>
               <button type="button" onClick={() => remove(r)} className="text-red-400 hover:text-red-300">
