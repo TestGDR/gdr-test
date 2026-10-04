@@ -14,7 +14,17 @@ export type PlaceLite = { id: string; name: string };
 type Resource = { id: string; name: string; description: string; sort_order: number };
 type Amount = { resource_id: string; amount: number };
 type FiefType = { id: string; name: string; description: string; sort_order: number; incomes: Amount[] };
-type StructureType = { id: string; name: string; description: string; sort_order: number; costs: Amount[]; incomes: Amount[] };
+type StructureType = {
+  id: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  attack: number;
+  defense: number;
+  costs: Amount[];
+  incomes: Amount[];
+  upkeep: Amount[]; // mantenimento mensile
+};
 type Fief = {
   id: string;
   name: string;
@@ -54,7 +64,7 @@ function useCatalog() {
       supabase.from("fief_types").select("*, incomes:fief_type_incomes(resource_id, amount)").order("sort_order").order("name"),
       supabase
         .from("structure_types")
-        .select("*, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount)")
+        .select("*, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
         .order("sort_order")
         .order("name"),
     ]).then(([r, f, s]) => {
@@ -307,10 +317,13 @@ function TypeEditor({
   onCancel,
 }: {
   title: string;
-  initial: { name: string; description: string; sort_order: number; incomes: Amount[]; costs?: Amount[] } | null;
+  initial: { name: string; description: string; sort_order: number; incomes: Amount[]; costs?: Amount[]; upkeep?: Amount[]; attack?: number; defense?: number } | null;
   resources: Resource[];
-  withCosts: boolean;
-  onSave: (row: { name: string; description: string; sort_order: number }, lists: { incomes: Amount[]; costs: Amount[] }) => Promise<string | null>;
+  withCosts: boolean; // strutture: costo, mantenimento, attacco e difesa
+  onSave: (
+    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number },
+    lists: { incomes: Amount[]; costs: Amount[]; upkeep: Amount[] },
+  ) => Promise<string | null>;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -318,6 +331,9 @@ function TypeEditor({
   const [order, setOrder] = useState(String(initial?.sort_order ?? 0));
   const [incomes, setIncomes] = useState<Amount[]>(initial?.incomes ?? []);
   const [costs, setCosts] = useState<Amount[]>(initial?.costs ?? []);
+  const [upkeep, setUpkeep] = useState<Amount[]>(initial?.upkeep ?? []);
+  const [attack, setAttack] = useState(String(initial?.attack ?? 0));
+  const [defense, setDefense] = useState(String(initial?.defense ?? 0));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -334,7 +350,17 @@ function TypeEditor({
       <Field label="Descrizione">
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={2000} className="input resize-y py-1.5" />
       </Field>
-      <div className={`grid gap-4 ${withCosts ? "sm:grid-cols-2" : ""}`}>
+      {withCosts && (
+        <div className="flex flex-wrap gap-3">
+          <Field label="Attacco">
+            <input type="number" min={0} value={attack} onChange={(e) => setAttack(e.target.value)} className="input w-28! py-1.5" />
+          </Field>
+          <Field label="Difesa">
+            <input type="number" min={0} value={defense} onChange={(e) => setDefense(e.target.value)} className="input w-28! py-1.5" />
+          </Field>
+        </div>
+      )}
+      <div className={`grid gap-4 ${withCosts ? "sm:grid-cols-3" : ""}`}>
         {withCosts && (
           <div className="space-y-1">
             <p className="text-xs tracking-wide text-muted uppercase">Costo di costruzione</p>
@@ -342,9 +368,15 @@ function TypeEditor({
           </div>
         )}
         <div className="space-y-1">
-          <p className="text-xs tracking-wide text-muted uppercase">{withCosts ? "Introiti extra al mese (facoltativi)" : "Introiti al mese"}</p>
+          <p className="text-xs tracking-wide text-muted uppercase">{withCosts ? "Entrate al mese (facoltative)" : "Introiti al mese"}</p>
           <AmountsEditor resources={resources} value={incomes} onChange={setIncomes} />
         </div>
+        {withCosts && (
+          <div className="space-y-1">
+            <p className="text-xs tracking-wide text-muted uppercase">Mantenimento al mese (facoltativo)</p>
+            <AmountsEditor resources={resources} value={upkeep} onChange={setUpkeep} />
+          </div>
+        )}
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex gap-2">
@@ -353,7 +385,10 @@ function TypeEditor({
           disabled={busy || !name.trim()}
           onClick={async () => {
             setBusy(true);
-            const err = await onSave({ name: name.trim(), description, sort_order: Number(order) || 0 }, { incomes, costs });
+            const stats = withCosts
+              ? { attack: Math.max(0, Math.round(Number(attack) || 0)), defense: Math.max(0, Math.round(Number(defense) || 0)) }
+              : {};
+            const err = await onSave({ name: name.trim(), description, sort_order: Number(order) || 0, ...stats }, { incomes, costs, upkeep });
             setBusy(false);
             setError(err);
           }}
@@ -393,7 +428,8 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
                 : await supabase.from("structure_types").update(row).eq("id", editing.id).select("id").single();
             if (error || !data) return "Struttura non salvata (forse il nome esiste già).";
             if (await replaceAmounts(supabase, "structure_costs", "structure_type_id", data.id, lists.costs)) return "Costi non salvati.";
-            if (await replaceAmounts(supabase, "structure_incomes", "structure_type_id", data.id, lists.incomes)) return "Introiti non salvati.";
+            if (await replaceAmounts(supabase, "structure_incomes", "structure_type_id", data.id, lists.incomes)) return "Entrate non salvate.";
+            if (await replaceAmounts(supabase, "structure_upkeep", "structure_type_id", data.id, lists.upkeep)) return "Mantenimento non salvato.";
             setEditing(null);
             reload();
             return null;
@@ -419,6 +455,15 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
               <span className="block">
                 <span className="text-xs text-muted">Rende al mese: </span>
                 {amountsText(resources, t.incomes)}
+              </span>
+              <span className="block">
+                <span className="text-xs text-muted">Mantenimento al mese: </span>
+                {amountsText(resources, t.upkeep)}
+              </span>
+              <span className="block">
+                <span className="text-xs text-muted">Attacco </span>
+                {t.attack} <span className="text-xs text-muted">· Difesa </span>
+                {t.defense}
               </span>
             </span>
             <button type="button" onClick={() => setEditing(t)} className="text-xs text-muted hover:text-accent">
@@ -527,6 +572,10 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
                 </button>
                 <span className={`text-sm ${f.structures.length >= cap ? "text-orange-300" : ""}`}>
                   Strutture {f.structures.length}/{cap}
+                  <span className="block text-xs text-muted">
+                    Attacco {f.structures.reduce((n, s) => n + (structures.find((t) => t.id === s.structure_type_id)?.attack ?? 0), 0)} · Difesa{" "}
+                    {f.structures.reduce((n, s) => n + (structures.find((t) => t.id === s.structure_type_id)?.defense ?? 0), 0)}
+                  </span>
                 </span>
                 <button type="button" onClick={() => setEditing(f)} className="text-xs text-muted hover:text-accent">
                   Modifica

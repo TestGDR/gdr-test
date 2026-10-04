@@ -12,7 +12,16 @@ import { createClient } from "@/lib/supabase/client";
 
 type Amount = { resource_id: string; amount: number };
 export type EcoResource = { id: string; name: string };
-export type EcoStructureType = { id: string; name: string; description: string; costs: Amount[]; incomes: Amount[] };
+export type EcoStructureType = {
+  id: string;
+  name: string;
+  description: string;
+  attack: number;
+  defense: number;
+  costs: Amount[];
+  incomes: Amount[];
+  upkeep: Amount[];
+};
 export type EcoFiefType = { id: string; name: string; incomes: Amount[] };
 export type EcoFief = {
   id: string;
@@ -58,13 +67,15 @@ export default function HouseEconomy({
   const res = (id: string) => resources.find((r) => r.id === id)?.name ?? "?";
   const text = (list: Amount[]) => (list.length ? list.map((a) => `${a.amount} ${res(a.resource_id)}`).join(", ") : "nulla");
 
-  // introiti del mese: tipi di feudo + strutture
+  // al mese: introiti dei tipi di feudo + entrate delle strutture - mantenimento
   const monthly: Record<string, number> = {};
   for (const f of fiefs) {
     for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
-    for (const s of f.structures)
-      for (const a of structureTypes.find((t) => t.id === s.structure_type_id)?.incomes ?? [])
-        monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
+    for (const s of f.structures) {
+      const t = structureTypes.find((x) => x.id === s.structure_type_id);
+      for (const a of t?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
+      for (const a of t?.upkeep ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) - a.amount;
+    }
   }
 
   async function build(fief: EcoFief, typeId: string) {
@@ -119,7 +130,12 @@ export default function HouseEconomy({
               <li key={r.id} className="border border-border/60 bg-black/30 px-3 py-2">
                 <span className="block text-xs text-muted uppercase">{r.name}</span>
                 <span className="font-serif text-2xl text-accent">{(treasury[r.id] ?? 0).toLocaleString("it-IT")}</span>
-                {monthly[r.id] ? <span className="ml-2 text-xs text-green-400">+{monthly[r.id]} al mese</span> : null}
+                {monthly[r.id] ? (
+                  <span className={`ml-2 text-xs ${monthly[r.id] > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {monthly[r.id] > 0 ? "+" : ""}
+                    {monthly[r.id]} al mese
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -141,8 +157,12 @@ export default function HouseEconomy({
                   {type?.name ?? "senza tipo"} · feudo {f.size}
                   {f.location && ` · ${f.location.name}`}
                 </span>
-                <span className="ml-auto text-sm">
+                <span className="ml-auto text-right text-sm">
                   Strutture {f.structures.length}/{cap}
+                  <span className="block text-xs text-muted">
+                    Attacco {f.structures.reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.attack ?? 0), 0)} · Difesa{" "}
+                    {f.structures.reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.defense ?? 0), 0)}
+                  </span>
                 </span>
               </div>
               {f.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{f.description}</p>}
@@ -180,6 +200,8 @@ export default function HouseEconomy({
                     <option key={t.id} value={t.id}>
                       {t.name} — costa {text(t.costs)}
                       {t.incomes.length ? ` · rende ${text(t.incomes)}/mese` : ""}
+                      {t.upkeep.length ? ` · mantenimento ${text(t.upkeep)}/mese` : ""}
+                      {t.attack || t.defense ? ` · ATT ${t.attack} DIF ${t.defense}` : ""}
                     </option>
                   ))}
                 </select>

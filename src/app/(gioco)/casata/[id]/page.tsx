@@ -39,7 +39,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),
     supabase
       .from("structure_types")
-      .select("id, name, description, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount)")
+      .select("id, name, description, attack, defense, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
       .order("sort_order")
       .order("name"),
     supabase.from("resources").select("id, name").order("sort_order").order("name"),
