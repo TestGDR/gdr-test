@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/server";
 import HouseView, { type HouseMemberPg } from "./HouseView";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "@/components/houses/HouseEconomy";
 import { getMainCharacter } from "@/lib/main-character";
+import { loadHouseTaxes } from "@/lib/taxes-load";
 
 // Pagina di una casata, aperta da Utility giocatore -> Casate PG
 export default async function CasataPage({ params }: PageProps<"/casata/[id]">) {
@@ -50,6 +51,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     ? await supabase.from("characters").select("id, house_id, house_role_id").eq("id", me.id).maybeSingle()
     : { data: null };
   const isMember = meRow?.house_id === id;
+  const taxes = await loadHouseTaxes(supabase, id);
   const canBuild =
     isMember && meRow?.house_role_id
       ? !!(await supabase.from("house_roles").select("can_build").eq("id", meRow.house_role_id).maybeSingle()).data?.can_build
@@ -78,6 +80,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
         treasury={isMember ? Object.fromEntries((treasury.data ?? []).map((t) => [t.resource_id as string, Number(t.amount)])) : null}
         isMember={isMember}
         builderId={canBuild && meRow ? (meRow.id as string) : null}
+        taxes={taxes}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 
 // ---------------------------------------------------------------------
 // Feudi e tesoro di una casata, nella pagina della casata.
@@ -47,6 +48,7 @@ export default function HouseEconomy({
   builderId,
   onChanged,
   bare = false,
+  taxes,
 }: {
   houseName: string;
   playable: boolean;
@@ -59,6 +61,8 @@ export default function HouseEconomy({
   builderId: string | null; // il mio PG, se puo' costruire
   onChanged?: () => void; // nel pannello della barra: ricarica i dati
   bare?: boolean; // senza riquadro (dentro una finestra)
+  // tasse: impostazioni, nome della casata regnante, se questa casata e' la regnante e quanto riceve
+  taxes?: { settings: TaxSettings; rulerName: string | null; isRuler: boolean; received: Record<string, number> } | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -67,8 +71,12 @@ export default function HouseEconomy({
   const res = (id: string) => resources.find((r) => r.id === id)?.name ?? "?";
   const text = (list: Amount[]) => (list.length ? list.map((a) => `${a.amount} ${res(a.resource_id)}`).join(", ") : "nulla");
 
-  // al mese: introiti dei tipi di feudo + entrate delle strutture - mantenimento
+  // al mese: introiti dei tipi di feudo + entrate delle strutture - mantenimento - tasse (+ tasse ricevute)
+  const vassal = !!taxes?.settings.ruling_house_id && !taxes.isRuler;
+  const paid = vassal && taxes ? fiefsTaxes(fiefs, taxes.settings, fiefTypes, structureTypes) : {};
   const monthly: Record<string, number> = {};
+  for (const [r, n] of Object.entries(paid)) monthly[r] = (monthly[r] ?? 0) - n;
+  if (taxes?.isRuler) for (const [r, n] of Object.entries(taxes.received)) monthly[r] = (monthly[r] ?? 0) + n;
   for (const f of fiefs) {
     for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
     for (const s of f.structures) {
@@ -122,6 +130,18 @@ export default function HouseEconomy({
         strutture.
       </p>
 
+      {taxes?.isRuler && (
+        <p className="border border-[#d4a72c]/50 bg-[#d4a72c]/10 px-3 py-2 text-sm text-[#f0c75e]">
+          Casata regnante: ogni mese riceve le tasse delle casate feudatarie
+          {Object.keys(taxes.received).length ? `: ${text(Object.entries(taxes.received).map(([resource_id, amount]) => ({ resource_id, amount })))}.` : "."}
+        </p>
+      )}
+      {vassal && taxes?.rulerName && (
+        <p className="text-sm text-muted">
+          Casata feudataria: ogni mese paga le tasse a casa {taxes.rulerName}
+          {Object.keys(paid).length ? `: ${text(Object.entries(paid).map(([resource_id, amount]) => ({ resource_id, amount })))}.` : " (per ora i feudi non producono nulla)."}
+        </p>
+      )}
       {isMember && treasury && (
         <div className="space-y-2">
           <h3 className="text-xs tracking-[0.12em] text-muted uppercase">Tesoro della casata</h3>
@@ -167,6 +187,7 @@ export default function HouseEconomy({
               </div>
               {f.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{f.description}</p>}
               {type && <p className="mt-1 text-xs text-muted">Rende ogni mese: {text(type.incomes)}</p>}
+              {vassal && taxes && <p className="text-xs text-muted">Tasse: {fiefTaxPct(f, taxes.settings)}% di ciò che produce</p>}
               {f.structures.length === 0 ? (
                 <p className="mt-2 text-sm text-muted">Nessuna struttura.</p>
               ) : builderId ? (

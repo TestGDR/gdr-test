@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
+import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
 
 // Pannello "Feudi" della barra di destra: feudi e tesoro della casata del PG.
 // Costruisce solo chi ha un ruolo di casata con "Costruisce nei feudi".
@@ -14,6 +15,7 @@ type Data = {
   resources: EcoResource[];
   treasury: Record<string, number>;
   builderId: string | null;
+  taxes: HouseTaxes | null;
 };
 
 export default function FiefsPanel({ characterId }: { characterId: string }) {
@@ -44,6 +46,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", house.id),
     ]);
     const role = me.house_role as unknown as { can_build: boolean } | null;
+    const taxes = await loadHouseTaxes(supabase, house.id);
     return {
       house,
       fiefs: (fiefs.data ?? []) as unknown as EcoFief[],
@@ -52,6 +55,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       resources: (resources.data ?? []) as EcoResource[],
       treasury: Object.fromEntries((treasury.data ?? []).map((t) => [t.resource_id as string, Number(t.amount)])),
       builderId: role?.can_build ? me.id : null,
+      taxes,
     };
   }, [supabase, characterId]);
 
@@ -74,6 +78,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       isMember
       builderId={data.builderId}
       onChanged={() => load().then(setData)}
+      taxes={data.taxes}
       bare
     />
   );

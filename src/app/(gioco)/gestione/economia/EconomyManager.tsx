@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 
 // ---------------------------------------------------------------------
 // Economia: risorse, tipi di feudo (introiti), strutture (costi e introiti),
@@ -48,6 +49,7 @@ const TABS = [
   { id: "tipi", label: "Tipi di feudo" },
   { id: "strutture", label: "Strutture" },
   { id: "feudi", label: "Feudi" },
+  { id: "tasse", label: "Tasse" },
   { id: "tesoro", label: "Tesoro delle casate" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -102,6 +104,7 @@ export default function EconomyManager({ houses, places }: { houses: HouseLite[]
         {tab === "tipi" && <FiefTypesTab {...cat} />}
         {tab === "strutture" && <StructuresTab {...cat} />}
         {tab === "feudi" && <FiefsTab {...cat} houses={houses} places={places} />}
+        {tab === "tasse" && <TaxesTab {...cat} houses={houses} />}
         {tab === "tesoro" && <TreasuryTab {...cat} houses={houses} />}
       </div>
     </section>
@@ -784,6 +787,127 @@ function FiefStructures({
         <p className="text-xs text-orange-300">Il feudo è pieno: {cap} strutture su {cap}.</p>
       )}
       <Msg msg={msg} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Tasse: casata regnante, percentuali e quanto paghera' ogni feudataria
+function TaxesTab({ supabase, resources, fiefTypes, structures, houses }: Cat & { houses: HouseLite[] }) {
+  const [settings, setSettings] = useState<TaxSettings | null>(null);
+  const [fiefs, setFiefs] = useState<Fief[]>([]);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    supabase
+      .from("tax_settings")
+      .select("ruling_house_id, small_pct, medium_pct, large_pct, per_structure_pct, max_pct")
+      .maybeSingle()
+      .then(({ data }) => setSettings((data as TaxSettings | null) ?? null));
+    supabase
+      .from("fiefs")
+      .select("*, structures:fief_structures(id, structure_type_id, built_by, built_at, is_background)")
+      .order("name")
+      .then(({ data }) => setFiefs((data ?? []) as Fief[]));
+  }, [supabase]);
+
+  if (!settings) return <p className="text-sm text-muted">Caricamento... (serve la migrazione 0064)</p>;
+  const set = (p: Partial<TaxSettings>) => setSettings((s) => (s ? { ...s, ...p } : s));
+  const num = (v: string) => Math.min(100, Math.max(0, Number(v.replace(",", ".")) || 0));
+
+  async function save() {
+    if (!settings) return;
+    const { error } = await supabase.from("tax_settings").update(settings).eq("id", true);
+    setMsg(error ? { ok: false, text: "Tasse non salvate." } : { ok: true, text: "Tasse salvate." });
+  }
+
+  const ruler = houses.find((h) => h.id === settings.ruling_house_id);
+  const vassals = houses.filter((h) => h.id !== settings.ruling_house_id && fiefs.some((f) => f.house_id === h.id));
+  // tasse di ogni feudataria e totale per la regnante (calcolati prima di disegnare)
+  const byHouse = new Map(vassals.map((h) => [h.id, fiefsTaxes(fiefs.filter((f) => f.house_id === h.id), settings, fiefTypes, structures)]));
+  const totalIn: Record<string, number> = {};
+  for (const t of byHouse.values()) for (const [r, n] of Object.entries(t)) totalIn[r] = (totalIn[r] ?? 0) + n;
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted">
+        Ogni 1° del mese, dopo introiti e mantenimento, le casate feudatarie versano alla casata regnante una percentuale di ciò che i loro
+        feudi producono, risorsa per risorsa. La percentuale di un feudo dipende dalla grandezza e da quante strutture ha. Se il tesoro
+        non basta si paga quello che c&apos;è; il resto resta scritto come non pagato.
+      </p>
+      <div className="space-y-3 border border-dashed border-border p-4">
+        <Field label="Casata regnante (riceve le tasse)">
+          <select
+            value={settings.ruling_house_id ?? ""}
+            onChange={(e) => set({ ruling_house_id: e.target.value || null })}
+            className="input max-w-sm py-1.5"
+          >
+            <option value="">— nessuna: niente tasse —</option>
+            {houses.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name} ({h.playable ? "PG" : "PNG"})
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="flex flex-wrap gap-3">
+          {(
+            [
+              ["small_pct", "Feudo piccolo (%)"],
+              ["medium_pct", "Feudo medio (%)"],
+              ["large_pct", "Feudo grande (%)"],
+              ["per_structure_pct", "In più per struttura (%)"],
+              ["max_pct", "Massimo (%)"],
+            ] as const
+          ).map(([k, label]) => (
+            <Field key={k} label={label}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={settings[k]}
+                onChange={(e) => set({ [k]: num(e.target.value) } as Partial<TaxSettings>)}
+                className="input w-28! py-1.5"
+              />
+            </Field>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={save} className="btn px-4 py-1.5 text-sm">
+            Salva
+          </button>
+          <Msg msg={msg} />
+        </div>
+      </div>
+
+      {!ruler ? (
+        <p className="text-sm text-orange-300">Scegli la casata regnante: senza, nessuno paga tasse.</p>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="font-serif text-lg text-accent">Tasse del prossimo mese</h3>
+          {vassals.length === 0 && <p className="text-sm text-muted">Nessuna casata feudataria con feudi.</p>}
+          <ul className="space-y-2">
+            {vassals.map((h) => {
+              const own = fiefs.filter((f) => f.house_id === h.id);
+              const taxes = byHouse.get(h.id) ?? {};
+              return (
+                <li key={h.id} className="border border-border/60 bg-black/30 px-3 py-2 text-sm">
+                  <span className="font-serif text-accent">{h.name}</span>{" "}
+                  <span className="text-muted">paga:</span>{" "}
+                  {Object.keys(taxes).length ? Object.entries(taxes).map(([r, n]) => `${n} ${resName(resources, r)}`).join(", ") : "nulla (i feudi non producono)"}
+                  <span className="block text-xs text-muted">
+                    {own.map((f) => `${f.name} ${fiefTaxPct(f, settings)}%`).join(" · ")}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-sm">
+            <span className="text-muted">Casa {ruler.name} riceve in tutto: </span>
+            {Object.keys(totalIn).length ? Object.entries(totalIn).map(([r, n]) => `${n} ${resName(resources, r)}`).join(", ") : "nulla"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
