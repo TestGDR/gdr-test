@@ -49,6 +49,7 @@ import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import { useNewsUnseen } from "./news-unseen";
+import HelpDesk from "./HelpDesk";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
@@ -67,6 +68,8 @@ type Area = { title: string; image?: string | null; description?: string | null;
 const AreaContext = createContext<(area: Area) => void>(() => {});
 // Notizie ON / OFF nuove, non ancora viste: l'icona cambia colore
 const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
+// Ticket: quanti da leggere e come aprire l'Help Desk
+const TicketContext = createContext<{ count: number; open: () => void }>({ count: 0, open: () => {} });
 
 export function GameArea({ title, image, description, weatherRegionId }: Area) {
   const setArea = useContext(AreaContext);
@@ -87,6 +90,7 @@ type Props = {
   canWriteNewsOff: boolean; // scrive le Notizie OFF
   canModerate: boolean; // toglie le richieste di gioco altrui
   canManageUsers: boolean; // toglie le assenze altrui
+  canManageTickets: boolean; // staff dell'Help Desk: vede e gestisce tutti i ticket
   children: ReactNode;
 };
 
@@ -112,6 +116,7 @@ export default function GameShell({
   canWriteNewsOff,
   canModerate,
   canManageUsers,
+  canManageTickets,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -160,6 +165,9 @@ export default function GameShell({
   const unread = useUnread(character?.id ?? null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
+  const tickets = useTicketUnread(userId);
+  const [helpDeskOpen, setHelpDeskOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
+  const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setHelpDeskOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
   const openPanel = (p: Panel) => {
@@ -187,6 +195,7 @@ export default function GameShell({
   return (
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
+      <TicketContext.Provider value={ticketCtx}>
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
@@ -244,7 +253,7 @@ export default function GameShell({
                   </>
                 }
               />
-              <ComingSoonButton title="Ticket" icon={<TicketIcon />} />
+              <TicketButton className={topBtn} tip />
             </span>
 
             {character && (
@@ -355,6 +364,9 @@ export default function GameShell({
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
+      <Modal open={helpDeskOpen > 0} onClose={() => setHelpDeskOpen(0)} title="Help Desk" size="xl">
+        {helpDeskOpen > 0 && <HelpDesk key={helpDeskOpen} me={character} isStaff={canManageTickets} onSeen={tickets.refresh} />}
+      </Modal>
       {character && (
         <Modal open={dragonOpen > 0} onClose={() => setDragonOpen(0)} title="Il mio drago" size="sheet">
           {dragonOpen > 0 && <DragonPanel key={dragonOpen} characterId={character.id} />}
@@ -389,6 +401,7 @@ export default function GameShell({
         onChangeAvailability={changeAvailability}
         onMessageOff={(to) => openMessages("off", to)}
       />
+      </TicketContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
   );
@@ -666,7 +679,7 @@ function MobileTools({
           </>
         }
       />
-      <ComingSoonButton title="Ticket" icon={<TicketIcon />} className={drawerBtn} />
+      <TicketButton className={drawerBtn} />
       {onOpenDragon && (
         <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
           <DragonIcon />
@@ -931,26 +944,43 @@ function TopTip({ children }: { children: ReactNode }) {
   );
 }
 
-// Sezioni non ancora realizzate: l'icona c'e' gia', il contenuto arrivera'
-function ComingSoonButton({ title, icon, className = topBtn }: { title: string; icon: ReactNode; className?: string }) {
+// Ticket: apre l'Help Desk; lampeggia finche' ci sono risposte (o, per lo staff, richieste) da leggere
+function TicketButton({ className, tip }: { className: string; tip?: boolean }) {
+  const { count, open } = useContext(TicketContext);
+  const label = count > 0 ? `Ticket: ${count} da leggere` : "Ticket";
   return (
-    <ModalButton
-      title={title}
-      className={className}
-      label={
-        <>
-          {icon}
-          <TopTip>{title}</TopTip>
-        </>
-      }
-    >
-      {() => (
-        <p className="py-6 text-center text-muted">
-          La sezione <strong className="text-accent">{title}</strong> è in preparazione.
-        </p>
+    <button type="button" onClick={open} className={`${className} ${count > 0 ? "blink-call" : ""}`} aria-label={label}>
+      <TicketIcon />
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[10px] font-bold text-white shadow">{count}</span>
       )}
-    </ModalButton>
+      {tip && <TopTip>{label}</TopTip>}
+    </button>
   );
+}
+
+function useTicketUnread(userId: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [count, setCount] = useState(0);
+  const fetchCount = useCallback(
+    () => supabase.rpc("ticket_unread_ids").then(({ data }) => ((data as unknown[] | null) ?? []).length),
+    [supabase],
+  );
+  const refresh = useCallback(() => {
+    fetchCount().then(setCount);
+  }, [fetchCount]);
+  useEffect(() => {
+    fetchCount().then(setCount);
+    const ch = supabase
+      .channel(`ticket-da-leggere:${userId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => refresh())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [supabase, userId, fetchCount, refresh]);
+  return { count, refresh };
 }
 
 // ---------------------------------------------------------------------

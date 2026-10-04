@@ -45,6 +45,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canWriteNewsOff={permissions.has("annunci.globali")}
       canModerate={permissions.has("chat.moderare")}
       canManageUsers={permissions.has("utenti.gestire")}
+      canManageTickets={permissions.has("ticket.gestire")}
     >
       {children}
     </GameShell>

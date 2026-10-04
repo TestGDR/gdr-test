@@ -44,6 +44,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "chat.moderare", label: "Moderare le liste", description: "Eliminare messaggi scritti da altri" },
       { key: "chat.log", label: "Log chat", description: "Cercare e scaricare i log delle chat di gioco" },
       { key: "messaggi.log", label: "Log messaggi", description: "Cercare e scaricare missive (ON) e messaggi OFF" },
+      { key: "ticket.gestire", label: "Gestire i ticket", description: "Vedere tutti i ticket dell'Help Desk, rispondere, prenderli in carico, sospenderli e chiuderli" },
     ],
   },
   {
