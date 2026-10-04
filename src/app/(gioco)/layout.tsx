@@ -15,7 +15,7 @@ type Profile = {
 // Mondo di gioco: barra con titolo e icone, colonna sinistra (luogo, data,
 // personaggio, presenti), area centrale e colonna destra con le icone
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
-  const { supabase, user, permissions } = await getStaffContext();
+  const { supabase, user, permissions, isAdmin } = await getStaffContext();
   const [{ data: profile }, character, cookieStore] = await Promise.all([
     supabase
       .from("profiles")
@@ -46,6 +46,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canModerate={permissions.has("chat.moderare")}
       canManageUsers={permissions.has("utenti.gestire")}
       canManageTickets={permissions.has("ticket.gestire")}
+      isAdmin={isAdmin}
     >
       {children}
     </GameShell>

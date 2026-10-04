@@ -58,9 +58,24 @@ function ago(iso: string) {
   return m <= 1 ? "circa un mese fa" : `circa ${m} mesi fa`;
 }
 
-type View = { page: "home" } | { page: "nuovo" } | { page: "archivio" } | { page: "ticket"; id: string; from: "aperti" | "archivio" };
+type View =
+  | { page: "home" }
+  | { page: "nuovo" }
+  | { page: "archivio" }
+  | { page: "categorie" }
+  | { page: "ticket"; id: string; from: "aperti" | "archivio" };
 
-export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | null; isStaff: boolean; onSeen: () => void }) {
+export default function Tickets({
+  me,
+  isStaff,
+  isAdmin,
+  onSeen,
+}: {
+  me: MainCharacter | null;
+  isStaff: boolean;
+  isAdmin: boolean; // solo l'admin vede la scheda Categorie
+  onSeen: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<View>({ page: "home" });
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
@@ -82,14 +97,18 @@ export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | n
     });
   }, [load]);
 
-  useEffect(() => {
-    refresh();
+  const loadSections = useCallback(() => {
     supabase
       .from("ticket_sections")
       .select("id, name, instructions")
       .eq("active", true)
       .order("sort_order")
       .then(({ data }) => setSections((data ?? []) as Section[]));
+  }, [supabase]);
+
+  useEffect(() => {
+    refresh();
+    loadSections();
     const ch = supabase
       .channel(`ticket-finestra:${me?.id ?? "staff"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => refresh())
@@ -98,7 +117,7 @@ export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | n
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [supabase, me?.id, refresh]);
+  }, [supabase, me?.id, refresh, loadSections]);
 
   const archive = view.page === "archivio" || (view.page === "ticket" && view.from === "archivio");
   const openTicket = (t: Ticket) => setView({ page: "ticket", id: t.id, from: OPEN.includes(t.status) ? "aperti" : "archivio" });
@@ -116,12 +135,18 @@ export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | n
         <NavButton active={archive} onClick={() => setView({ page: "archivio" })} icon="▤">
           Archivio
         </NavButton>
+        {isAdmin && (
+          <NavButton active={view.page === "categorie"} onClick={() => setView({ page: "categorie" })} icon="⚙">
+            Categorie
+          </NavButton>
+        )}
       </nav>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Centro */}
         <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5">
           {view.page === "home" && <Home isStaff={isStaff} />}
+          {view.page === "categorie" && isAdmin && <Categories onChanged={loadSections} />}
           {view.page === "archivio" && (
             <p className="py-10 text-center text-muted">Scegli un ticket sospeso o chiuso dall&apos;elenco a destra.</p>
           )}
@@ -158,7 +183,11 @@ export default function Tickets({ me, isStaff, onSeen }: { me: MainCharacter | n
         </section>
 
         {/* Destra: elenco dei ticket o istruzioni della sezione */}
-        <aside className="flex max-h-[45%] shrink-0 flex-col border-t border-border bg-black/30 md:max-h-none md:w-80 md:border-t-0 md:border-l">
+        <aside
+          className={`max-h-[45%] shrink-0 flex-col border-t border-border bg-black/30 md:max-h-none md:w-80 md:border-t-0 md:border-l ${
+            view.page === "categorie" ? "hidden" : "flex"
+          }`}
+        >
           {view.page === "nuovo" ? (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <h3 className="mb-3 text-center font-serif text-sm tracking-[0.15em] text-accent uppercase">Istruzioni sezione</h3>
@@ -233,6 +262,149 @@ function Home({ isStaff }: { isStaff: boolean }) {
         </p>
       )}
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Categorie dei ticket (solo admin): aggiungere, modificare, riordinare, eliminare
+type CategoryRow = { id: string; name: string; instructions: string; sort_order: number };
+
+function Categories({ onChanged }: { onChanged: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [rows, setRows] = useState<CategoryRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from("ticket_sections")
+      .select("id, name, instructions, sort_order")
+      .order("sort_order")
+      .then(({ data }) => setRows((data ?? []) as CategoryRow[]));
+  }, [supabase, version]);
+
+  const reload = () => {
+    setVersion((v) => v + 1);
+    onChanged();
+  };
+  async function run(p: PromiseLike<{ error: unknown }>, fail: string) {
+    const { error } = await p;
+    if (error) return setError(fail);
+    setError(null);
+    reload();
+  }
+
+  async function move(i: number, dir: -1 | 1) {
+    if (!rows) return;
+    if (!rows[i + dir]) return;
+    // nuovo ordine: le due categorie si scambiano, poi ogni posizione viene riscritta 0, 1, 2...
+    const next = [...rows];
+    [next[i], next[i + dir]] = [next[i + dir], next[i]];
+    const results = await Promise.all(
+      next.map((r, pos) => (r.sort_order === pos ? null : supabase.from("ticket_sections").update({ sort_order: pos }).eq("id", r.id))),
+    );
+    if (results.some((r) => r?.error)) setError("Ordine non salvato.");
+    reload();
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-4">
+      <h2 className="text-center font-serif text-2xl tracking-[0.12em] text-accent uppercase">Categorie dei ticket</h2>
+      <p className="text-center text-sm text-muted">
+        Le categorie compaiono nel menu &quot;Sezione&quot; del nuovo ticket; le istruzioni si vedono a destra quando la si sceglie.
+      </p>
+      <NewCategory onAdd={(name) => run(supabase.from("ticket_sections").insert({ name, sort_order: rows?.length ?? 0 }), "Categoria non aggiunta (forse il nome esiste già).")} />
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {rows === null && <p className="text-sm text-muted">Caricamento...</p>}
+      <ul className="space-y-3">
+        {rows?.map((r, i) => (
+          <CategoryEditor
+            key={`${r.id}-${version}`}
+            row={r}
+            first={i === 0}
+            last={i === rows.length - 1}
+            onMove={(dir) => move(i, dir)}
+            onSave={(name, instructions) =>
+              run(supabase.from("ticket_sections").update({ name, instructions }).eq("id", r.id), "Categoria non salvata (forse il nome esiste già).")
+            }
+            onDelete={() =>
+              window.confirm(`Eliminare la categoria "${r.name}"? I ticket già aperti in questa categoria restano, senza sezione.`) &&
+              run(supabase.from("ticket_sections").delete().eq("id", r.id), "Categoria non eliminata.")
+            }
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function NewCategory({ onAdd }: { onAdd: (name: string) => Promise<void> }) {
+  const [name, setName] = useState("");
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        await onAdd(name.trim());
+        setName("");
+      }}
+      className="flex gap-2 border border-dashed border-border p-3"
+    >
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Nome della nuova categoria" className="input py-1.5 text-sm" />
+      <button className="btn shrink-0 px-4 py-1.5 text-sm">+ Aggiungi</button>
+    </form>
+  );
+}
+
+function CategoryEditor({
+  row,
+  first,
+  last,
+  onMove,
+  onSave,
+  onDelete,
+}: {
+  row: CategoryRow;
+  first: boolean;
+  last: boolean;
+  onMove: (dir: -1 | 1) => void;
+  onSave: (name: string, instructions: string) => void;
+  onDelete: () => void;
+}) {
+  const [name, setName] = useState(row.name);
+  const [instructions, setInstructions] = useState(row.instructions);
+  const changed = name.trim() !== row.name || instructions !== row.instructions;
+  const arrow = "flex h-7 w-7 items-center justify-center border border-border text-muted hover:border-accent hover:text-accent disabled:opacity-30";
+  return (
+    <li className="space-y-2 border border-border bg-black/40 p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex flex-col gap-0.5">
+          <button type="button" disabled={first} onClick={() => onMove(-1)} className={arrow} aria-label="Sposta su">
+            ▲
+          </button>
+          <button type="button" disabled={last} onClick={() => onMove(1)} className={arrow} aria-label="Sposta giù">
+            ▼
+          </button>
+        </span>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome della categoria" className="input py-1.5 font-serif" />
+        <button type="button" onClick={onDelete} className="btn-ghost shrink-0 border-red-900 px-3 py-1.5 text-xs text-red-400 hover:border-red-500">
+          Elimina
+        </button>
+      </div>
+      <textarea
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+        rows={4}
+        placeholder="Istruzioni mostrate quando si sceglie questa categoria"
+        aria-label="Istruzioni"
+        className="input resize-y text-sm"
+      />
+      <div className="text-right">
+        <button type="button" disabled={!changed || !name.trim()} onClick={() => onSave(name.trim(), instructions)} className="btn px-4 py-1.5 text-sm">
+          Salva
+        </button>
+      </div>
+    </li>
   );
 }
 

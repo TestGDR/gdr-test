@@ -91,6 +91,7 @@ type Props = {
   canModerate: boolean; // toglie le richieste di gioco altrui
   canManageUsers: boolean; // toglie le assenze altrui
   canManageTickets: boolean; // staff dei ticket: vede e gestisce tutti i ticket
+  isAdmin: boolean; // admin: gestisce anche le categorie dei ticket
   children: ReactNode;
 };
 
@@ -117,6 +118,7 @@ export default function GameShell({
   canModerate,
   canManageUsers,
   canManageTickets,
+  isAdmin,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -365,7 +367,7 @@ export default function GameShell({
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
       <Modal open={ticketsOpen > 0} onClose={() => setTicketsOpen(0)} title="Ticket" size="xl">
-        {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} onSeen={tickets.refresh} />}
+        {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} isAdmin={isAdmin} onSeen={tickets.refresh} />}
       </Modal>
       {character && (
         <Modal open={dragonOpen > 0} onClose={() => setDragonOpen(0)} title="Il mio drago" size="sheet">
