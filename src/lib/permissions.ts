@@ -36,6 +36,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "schede.approvare", label: "Approvare e rimandare", description: "Approvare le schede in revisione", soon: true },
       { key: "schede.correggere", label: "Correggere una scheda", description: "Ritoccare anagrafica e caratteristiche altrui", soon: true },
       { key: "schede.background", label: "Correggere un background", description: "Riscrivere la storia di un PG", soon: true },
+      { key: "schede.storia", label: "Leggere la Storia", description: "Leggere la Storia (background) dei personaggi, nascosta ai giocatori" },
+      { key: "schede.note_fato", label: "Note del Fato", description: "Scrivere e modificare le Note del Fato nella pagina Dati delle schede" },
     ],
   },
   {

@@ -1,21 +1,22 @@
-import type { CreationData } from "@/lib/character-creation";
-
 export type Character = {
   id: string;
   owner_id: string;
   name: string;
   description: string;
-  avatar_url: string | null;
-  cover_url?: string | null; // immagine lunga della prima pagina della scheda
+  avatar_url: string | null; // immagine di chat 100 x 100 (barra a sinistra, OFF, elenchi)
+  portrait_url?: string | null; // ritratto della scheda (pagina Dati)
+  cover_url?: string | null; // immagine lunga della prima pagina della scheda (computer)
+  cover_mobile_url?: string | null; // la stessa, verticale, per il cellulare
+  sheet_html?: string | null; // pagina Principale scritta in HTML e CSS (ripulita al momento di mostrarla)
+  fate_notes?: string | null; // Note del Fato (le scrive lo staff)
+  known_html?: string | null; // "Si sa che" (editor di testo del giocatore)
+  affections_html?: string | null; // "Affetti"
   face_claim?: string | null; // prestavolto
   created_at: string;
   status: "bozza" | "attivo";
   creation_step: number;
-  creation_data: CreationData;
   sex: string | null;
   age: number | null;
-  region: string | null;
-  social_class: string | null;
   attributes: Record<string, number> | null;
   appearance: string | null;
   activated_at: string | null;

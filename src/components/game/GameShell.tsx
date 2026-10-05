@@ -18,6 +18,7 @@ import { logout } from "@/app/(pubblico)/login/actions";
 import GuideButton from "@/components/guide/GuideButton";
 import ModalButton from "@/components/ui/ModalButton";
 import SheetButton, { SheetModal } from "@/components/scheda/SheetButton";
+import { SheetActionsContext } from "@/components/scheda/sheet-actions";
 import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
@@ -181,6 +182,8 @@ export default function GameShell({
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
   const tickets = useTicketUnread(userId);
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
+  // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
+  const sheetActions = useMemo(() => ({ message: (kind: MessageKind, to: Contact) => openMessages(kind, to) }), []);
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
@@ -210,6 +213,7 @@ export default function GameShell({
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
       <TicketContext.Provider value={ticketCtx}>
+      <SheetActionsContext.Provider value={sheetActions}>
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
@@ -426,6 +430,7 @@ export default function GameShell({
         onChangeAvailability={changeAvailability}
         onMessageOff={(to) => openMessages("off", to)}
       />
+      </SheetActionsContext.Provider>
       </TicketContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>

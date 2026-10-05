@@ -10,9 +10,7 @@ import {
   ATTRIBUTE_BASE,
   ATTRIBUTE_MAX,
   ATTRIBUTE_POINTS,
-  REGIONS,
   SEXES,
-  SOCIAL_CLASSES,
   STEPS,
   STORY_MIN,
   TEXT_MAX,
@@ -26,14 +24,20 @@ import type { Character } from "@/lib/types";
 
 type Props = {
   character: Character;
+  initialData: CreationData; // bozza salvata (la vede solo il proprietario)
   onExit: () => void;
   onCreated: () => void;
 };
 
 const LAST = STEPS.length - 1;
 
-export default function CreationWizard({ character, onExit, onCreated }: Props) {
-  const [data, setData] = useState<CreationData>(character.creation_data ?? {});
+export default function CreationWizard({
+  character,
+  initialData,
+  onExit,
+  onCreated,
+}: Props) {
+  const [data, setData] = useState<CreationData>(initialData);
   const [step, setStep] = useState(Math.min(character.creation_step, LAST));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -45,7 +49,10 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
 
   // Uno step e' raggiungibile se tutti quelli prima sono completi
   const canReach = (target: number) =>
-    target <= step || Array.from({ length: target }, (_, i) => i).every((i) => !validateStep(i, data));
+    target <= step ||
+    Array.from({ length: target }, (_, i) => i).every(
+      (i) => !validateStep(i, data),
+    );
 
   // Salva SEMPRE le scelte prima di cambiare step, avanti o indietro
   function goTo(target: number) {
@@ -87,7 +94,9 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">
-        <h3 className="font-serif text-xl text-accent">Creazione di {character.name}</h3>
+        <h3 className="font-serif text-xl text-accent">
+          Creazione di {character.name}
+        </h3>
         <button
           type="button"
           onClick={saveAndExit}
@@ -126,10 +135,9 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
 
       <div className="min-h-64">
         {step === 0 && <StepIdentity data={data} update={update} />}
-        {step === 1 && <StepOrigin data={data} update={update} />}
-        {step === 2 && <StepAttributes data={data} update={update} />}
-        {step === 3 && <StepStory data={data} update={update} />}
-        {step === 4 && <StepSummary name={character.name} data={data} />}
+        {step === 1 && <StepAttributes data={data} update={update} />}
+        {step === 2 && <StepStory data={data} update={update} />}
+        {step === 3 && <StepSummary name={character.name} data={data} />}
       </div>
 
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
@@ -144,11 +152,21 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
           ← Indietro
         </button>
         {step < LAST ? (
-          <button type="button" onClick={() => goTo(step + 1)} disabled={pending} className="btn">
+          <button
+            type="button"
+            onClick={() => goTo(step + 1)}
+            disabled={pending}
+            className="btn"
+          >
             {pending ? "Salvataggio..." : "Avanti →"}
           </button>
         ) : (
-          <button type="button" onClick={confirm} disabled={pending} className="btn tracking-widest uppercase">
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={pending}
+            className="btn tracking-widest uppercase"
+          >
             {pending ? "Creazione..." : "Conferma e crea PG"}
           </button>
         )}
@@ -157,7 +175,10 @@ export default function CreationWizard({ character, onExit, onCreated }: Props) 
   );
 }
 
-type StepProps = { data: CreationData; update: (patch: Partial<CreationData>) => void };
+type StepProps = {
+  data: CreationData;
+  update: (patch: Partial<CreationData>) => void;
+};
 
 function Choice({
   selected,
@@ -174,7 +195,9 @@ function Choice({
       onClick={onClick}
       aria-pressed={selected}
       className={`rounded-md border px-4 py-3 text-left transition ${
-        selected ? "border-accent bg-accent/15" : "border-border bg-background hover:border-accent/60"
+        selected
+          ? "border-accent bg-accent/15"
+          : "border-border bg-background hover:border-accent/60"
       }`}
     >
       {children}
@@ -189,7 +212,11 @@ function StepIdentity({ data, update }: StepProps) {
         <p className="mb-2 text-sm text-muted">Sesso</p>
         <div className="grid grid-cols-2 gap-3">
           {SEXES.map((s) => (
-            <Choice key={s.id} selected={data.sex === s.id} onClick={() => update({ sex: s.id })}>
+            <Choice
+              key={s.id}
+              selected={data.sex === s.id}
+              onClick={() => update({ sex: s.id })}
+            >
               {s.label}
             </Choice>
           ))}
@@ -204,47 +231,14 @@ function StepIdentity({ data, update }: StepProps) {
           min={AGE_MIN}
           max={AGE_MAX}
           value={data.age ?? ""}
-          onChange={(e) => update({ age: e.target.value === "" ? undefined : Number(e.target.value) })}
+          onChange={(e) =>
+            update({
+              age: e.target.value === "" ? undefined : Number(e.target.value),
+            })
+          }
           className="input w-32"
         />
       </label>
-    </div>
-  );
-}
-
-function StepOrigin({ data, update }: StepProps) {
-  return (
-    <div className="space-y-5">
-      <label className="block">
-        <span className="mb-2 block text-sm text-muted">Regione d&apos;origine</span>
-        <select
-          value={data.region ?? ""}
-          onChange={(e) => update({ region: e.target.value || undefined })}
-          className="input"
-        >
-          <option value="">— Scegli —</option>
-          {REGIONS.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div>
-        <p className="mb-2 text-sm text-muted">Ceto sociale</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {SOCIAL_CLASSES.map((c) => (
-            <Choice
-              key={c.id}
-              selected={data.social_class === c.id}
-              onClick={() => update({ social_class: c.id })}
-            >
-              <span className="block font-semibold">{c.label}</span>
-              <span className="block text-xs text-muted">{c.description}</span>
-            </Choice>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -254,13 +248,18 @@ function StepAttributes({ data, update }: StepProps) {
   const left = ATTRIBUTE_POINTS - pointsSpent(attributes);
 
   const change = (id: string, delta: number) =>
-    update({ attributes: { ...attributes, [id]: (attributes[id] ?? ATTRIBUTE_BASE) + delta } });
+    update({
+      attributes: {
+        ...attributes,
+        [id]: (attributes[id] ?? ATTRIBUTE_BASE) + delta,
+      },
+    });
 
   return (
     <div>
       <p className="mb-4 text-sm text-muted">
-        Ogni caratteristica parte da {ATTRIBUTE_BASE} e può arrivare a {ATTRIBUTE_MAX}. Distribuisci
-        tutti i punti:{" "}
+        Ogni caratteristica parte da {ATTRIBUTE_BASE} e può arrivare a{" "}
+        {ATTRIBUTE_MAX}. Distribuisci tutti i punti:{" "}
         <strong className={left === 0 ? "text-green-400" : "text-accent"}>
           {left} punt{left === 1 ? "o" : "i"} rimast{left === 1 ? "o" : "i"}
         </strong>
@@ -284,7 +283,9 @@ function StepAttributes({ data, update }: StepProps) {
                 >
                   −
                 </button>
-                <strong className="w-6 text-center text-lg text-accent">{value}</strong>
+                <strong className="w-6 text-center text-lg text-accent">
+                  {value}
+                </strong>
                 <button
                   type="button"
                   onClick={() => change(a.id, +1)}
@@ -354,20 +355,20 @@ function StepSummary({ name, data }: { name: string; data: CreationData }) {
   return (
     <div className="space-y-4 text-sm">
       <p className="text-muted">
-        Controlla le tue scelte. Puoi tornare a qualsiasi step per modificarle. Dopo la conferma il
-        personaggio diventa attivo e potrà giocare nelle chat.
+        Controlla le tue scelte. Puoi tornare a qualsiasi step per modificarle.
+        Dopo la conferma il personaggio diventa attivo e potrà giocare nelle
+        chat.
       </p>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
         <Item label="Nome" value={name} />
         <Item label="Sesso" value={labelOf(SEXES, data.sex)} />
         <Item label="Età" value={data.age ? `${data.age} anni` : "—"} />
-        <Item label="Origine" value={labelOf(REGIONS, data.region)} />
-        <Item label="Ceto" value={labelOf(SOCIAL_CLASSES, data.social_class)} />
       </dl>
       <div className="flex flex-wrap gap-2">
         {ATTRIBUTES.map((a) => (
           <span key={a.id} className="rounded border border-border px-2 py-1">
-            {a.label} <strong className="text-accent">{attributes[a.id]}</strong>
+            {a.label}{" "}
+            <strong className="text-accent">{attributes[a.id]}</strong>
           </span>
         ))}
       </div>
