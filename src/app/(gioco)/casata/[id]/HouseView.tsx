@@ -44,7 +44,7 @@ export default function HouseView({ house, roles, npcs, members, family, relatio
       <header className="flex flex-col items-center gap-3 rounded-md border border-border bg-[radial-gradient(ellipse_at_top,#2a1612_0%,#0b0a0a_75%)] px-6 py-8 text-center">
         {house.sigil_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={house.sigil_url} alt={`Stemma della casata ${house.name}`} className="h-32 w-32 object-contain drop-shadow-[0_0_18px_rgba(226,98,45,0.35)]" />
+          <img src={house.sigil_url} alt={`Stemma della casata ${house.name}`} className="h-32 w-32 object-contain drop-shadow-[0_0_18px_rgba(201,164,92,0.35)]" />
         ) : (
           <span className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-accent/60 font-serif text-5xl text-accent">
             {house.name[0]}

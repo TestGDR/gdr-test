@@ -147,7 +147,7 @@ function AlignIcon({ kind }: { kind: "left" | "center" | "right" | "justify" }) 
 // Colore del testo: tavolozza del sito + colore libero
 // ---------------------------------------------------------------------
 const PALETTE = [
-  { label: "Arancio brace", value: "#e2622d" },
+  { label: "Oro antico", value: "#c9a45c" },
   { label: "Rosso sangue", value: "#c2302a" },
   { label: "Oro", value: "#d4a84b" },
   { label: "Avorio", value: "#e4dfdb" },

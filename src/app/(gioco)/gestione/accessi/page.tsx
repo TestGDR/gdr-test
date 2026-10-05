@@ -195,7 +195,7 @@ function CharacterActivity({ rows, failed }: { rows: ActivityRow[]; failed: bool
                   {r.status === "attivo" ? (
                     (dateTime(r.activated_at) ?? "—")
                   ) : (
-                    <span className="text-orange-300">non ancora approvato</span>
+                    <span className="text-amber-200">non ancora approvato</span>
                   )}
                 </td>
                 <td className="whitespace-nowrap p-2">{dateTime(r.last_entry) ?? <span className="text-muted">mai</span>}</td>

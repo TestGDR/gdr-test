@@ -160,7 +160,7 @@ function AssignPgView({ houses, roles, pgs }: { houses: House[]; roles: HouseRol
               <span className="min-w-44 flex-1 font-serif">
                 {p.name}
                 {p.house_id && <span className="text-muted"> {houseName(p.house_id)}</span>}
-                {p.status !== "attivo" && <span className="ml-2 text-xs text-orange-300">non attivo</span>}
+                {p.status !== "attivo" && <span className="ml-2 text-xs text-amber-200">non attivo</span>}
               </span>
               <select
                 value={e.house}
@@ -1320,7 +1320,7 @@ function MembersTab({ house, roles, members }: { house: House; roles: HouseRole[
             <Sigil url={house.sigil_url} name={house.name} size="h-8 w-8" />
             <span className="min-w-40 flex-1 font-serif">
               {m.name} <span className="text-accent">{house.name}</span>
-              {m.status !== "attivo" && <span className="ml-2 text-xs text-orange-300">(PG non attivo)</span>}
+              {m.status !== "attivo" && <span className="ml-2 text-xs text-amber-200">(PG non attivo)</span>}
             </span>
             <select
               value={m.house_role_id ?? ""}

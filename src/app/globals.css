@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-/* Palette ispirata a Game of Thrones: nero, grigio ferro, rosso sangue, arancio brace */
+/* Palette ispirata a Game of Thrones: nero, grigio ferro, rosso sangue, oro antico */
 :root {
   --background: #0b0a0a;
   --foreground: #e4dfdb;
   --panel: #161313;
   --border: #3a2c2a;
-  --accent: #e2622d; /* arancio brace: titoli, link, evidenze */
+  --accent: #c9a45c; /* oro antico: titoli, link, evidenze */
   --blood: #a3201b; /* rosso sangue: pulsanti principali */
   --muted: #968d89;
 }
@@ -40,7 +40,7 @@ body {
 }
 
 /* Barre di scorrimento intonate al sito: sottili, binario scuro, cursore rosso
-   che diventa arancio al passaggio. (Firefox e Chrome recenti usano le prime due
+   che diventa oro al passaggio. (Firefox e Chrome recenti usano le prime due
    proprieta'; Safari e i Chrome meno recenti le regole ::-webkit-scrollbar) */
 * {
   scrollbar-width: thin;
@@ -108,7 +108,7 @@ body {
   @apply font-bold text-foreground;
 }
 .guide-content em {
-  @apply text-orange-200;
+  @apply text-amber-100;
 }
 .guide-content a {
   @apply text-accent underline;

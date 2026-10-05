@@ -305,7 +305,7 @@ export function FamilyCanvas({
         <span
           key={i}
           title={m.title}
-          className="absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-accent/70 bg-black text-sm text-accent shadow-[0_0_10px_rgba(226,98,45,0.35)]"
+          className="absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-accent/70 bg-black text-sm text-accent shadow-[0_0_10px_rgba(201,164,92,0.35)]"
           style={{ left: m.x, top: m.y }}
         >
           {m.symbol}

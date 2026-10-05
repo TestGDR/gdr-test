@@ -85,7 +85,7 @@ export function MapDot() {
   return (
     <span className="relative block h-4 w-4">
       <span className="absolute inset-0 animate-ping rounded-full bg-accent/50" />
-      <span className="absolute inset-0 rounded-full border-2 border-black bg-accent shadow-[0_0_10px_rgba(226,98,45,0.9)] transition group-hover:scale-125" />
+      <span className="absolute inset-0 rounded-full border-2 border-black bg-accent shadow-[0_0_10px_rgba(201,164,92,0.9)] transition group-hover:scale-125" />
     </span>
   );
 }
@@ -131,7 +131,7 @@ function RoomList({
       const until = inBrowser ? ` ${untilLabel(rental.ends_at)}` : "";
       return rental.character?.owner_id === userId
         ? { text: `Affittata da te${until}`, tone: "text-accent" }
-        : { text: `Occupata${until}`, tone: "text-orange-300" };
+        : { text: `Occupata${until}`, tone: "text-amber-200" };
     }
     return null;
   }

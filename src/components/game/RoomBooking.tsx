@@ -102,7 +102,7 @@ export default function RoomBooking() {
       </div>
 
       {me?.status !== "attivo" && (
-        <p className="mb-4 rounded border border-blood/60 bg-blood/15 px-3 py-2 text-sm text-orange-200">
+        <p className="mb-4 rounded border border-blood/60 bg-blood/15 px-3 py-2 text-sm text-amber-100">
           Per affittare una stanza devi prima completare la creazione del personaggio.
         </p>
       )}
@@ -129,7 +129,7 @@ export default function RoomBooking() {
                 <p className="text-xs text-muted">
                   {room.location?.name} · {room.price_per_hour} monete/ora · massimo {room.max_hours} ore
                 </p>
-                <p className={`mt-1 text-xs ${mine ? "text-accent" : rental ? "text-orange-300" : "text-green-300"}`}>
+                <p className={`mt-1 text-xs ${mine ? "text-accent" : rental ? "text-amber-200" : "text-green-300"}`}>
                   {mine
                     ? `Affittata da te ${untilLabel(rental.ends_at)}`
                     : rental

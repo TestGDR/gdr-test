@@ -29,7 +29,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
 
   // L'admin e' staff anche senza un ruolo assegnato
   const staffRole =
-    profile?.staff_role ?? (profile?.role === "admin" ? { name: "Admin", color: "#e2622d" } : null);
+    profile?.staff_role ?? (profile?.role === "admin" ? { name: "Admin", color: "#c9a45c" } : null);
 
   return (
     <GameShell

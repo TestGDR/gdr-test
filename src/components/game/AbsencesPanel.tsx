@@ -116,7 +116,7 @@ export default function AbsencesPanel({
               <span>
                 {a.from_date === a.to_date ? day(a.from_date) : `dal ${day(a.from_date)} al ${day(a.to_date)}`}
               </span>
-              {current && <span className="text-xs text-orange-300">assente ora</span>}
+              {current && <span className="text-xs text-amber-200">assente ora</span>}
               {(a.author_id === userId || canManage) && (
                 <button type="button" onClick={() => remove(a)} className="ml-auto text-xs text-red-400 hover:text-red-300">
                   Togli

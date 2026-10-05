@@ -45,7 +45,7 @@ const TICKET_SELECT = `id, title, status, created_at, last_message_at, last_auth
 
 const STATUS_LABEL: Record<Status, string> = { attesa: "In attesa", in_carico: "Preso in carico", sospeso: "Sospeso", chiuso: "Chiuso" };
 const STATUS_COLOR: Record<Status, string> = {
-  attesa: "text-orange-300",
+  attesa: "text-amber-200",
   in_carico: "text-green-400",
   sospeso: "text-sky-300",
   chiuso: "text-muted",

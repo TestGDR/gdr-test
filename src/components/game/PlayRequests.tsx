@@ -163,7 +163,7 @@ export default function PlayRequestsPanel({
         )}
       </div>
       {character?.status !== "attivo" && (
-        <p className="border border-orange-300/40 bg-orange-300/10 px-3 py-2 text-sm text-orange-200">
+        <p className="border border-amber-200/40 bg-amber-200/10 px-3 py-2 text-sm text-amber-100">
           Potrai inserire una ricerca gioco quando il tuo personaggio sarà attivo: completa la creazione del PG (clicca sulla sua immagine e
           poi su CREA PG). Intanto puoi vedere le ricerche degli altri e rispondere con un OFF.
         </p>

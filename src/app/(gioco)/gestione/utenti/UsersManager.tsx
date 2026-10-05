@@ -81,7 +81,7 @@ export default function UsersManager({ rows, myId, iAmAdmin }: { rows: UserRow[]
                   {banned(r) ? (
                     <span className="text-red-400">Bannato</span>
                   ) : r.character?.status !== "attivo" ? (
-                    <span className="text-orange-300">PG non attivo</span>
+                    <span className="text-amber-200">PG non attivo</span>
                   ) : (
                     <span className="text-green-400">Attivo</span>
                   )}

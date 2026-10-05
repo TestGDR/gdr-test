@@ -156,7 +156,7 @@ function UtilityPanel() {
                       {p.name}
                       {p.house && <span className="text-foreground"> {p.house.name}</span>}
                     </span>
-                    {p.status !== "attivo" && <span className="text-xs text-orange-300">PG non ancora attivo</span>}
+                    {p.status !== "attivo" && <span className="text-xs text-amber-200">PG non ancora attivo</span>}
                   </span>
                   {p.house?.sigil_url && (
                     // eslint-disable-next-line @next/next/no-img-element

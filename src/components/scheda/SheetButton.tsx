@@ -620,7 +620,7 @@ function CoverEditor({
           rows={8}
           spellCheck={false}
           placeholder={
-            "<style>\n  h1 { color: #e2622d; }\n</style>\n<h1>Il mio personaggio</h1>"
+            "<style>\n  h1 { color: #c9a45c; }\n</style>\n<h1>Il mio personaggio</h1>"
           }
           aria-label="Pagina principale in HTML e CSS"
           className="input resize-y font-mono text-xs"
@@ -1142,8 +1142,8 @@ function Radar({
       })}
       <polygon
         points={poly((i) => values[i] / max)}
-        fill="rgba(226,98,45,0.35)"
-        stroke="#e2622d"
+        fill="rgba(201,164,92,0.35)"
+        stroke="#c9a45c"
         strokeWidth="2"
       />
       {labels.map((l, i) => {
@@ -1158,7 +1158,7 @@ function Radar({
             className="fill-[#968d89] text-[9px] uppercase"
           >
             {l}{" "}
-            <tspan className="fill-[#e2622d] font-bold">
+            <tspan className="fill-[#c9a45c] font-bold">
               {values[i] || ""}
             </tspan>
           </text>

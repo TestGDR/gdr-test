@@ -573,7 +573,7 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
                     {f.location_id && ` · ${places.find((p) => p.id === f.location_id)?.name ?? ""}`}
                   </span>
                 </button>
-                <span className={`text-sm ${f.structures.length >= cap ? "text-orange-300" : ""}`}>
+                <span className={`text-sm ${f.structures.length >= cap ? "text-amber-200" : ""}`}>
                   Strutture {f.structures.length}/{cap}
                   <span className="block text-xs text-muted">
                     Attacco {f.structures.reduce((n, s) => n + (structures.find((t) => t.id === s.structure_type_id)?.attack ?? 0), 0)} · Difesa{" "}
@@ -784,7 +784,7 @@ function FiefStructures({
           </button>
         </div>
       ) : (
-        <p className="text-xs text-orange-300">Il feudo è pieno: {cap} strutture su {cap}.</p>
+        <p className="text-xs text-amber-200">Il feudo è pieno: {cap} strutture su {cap}.</p>
       )}
       <Msg msg={msg} />
     </div>
@@ -881,7 +881,7 @@ function TaxesTab({ supabase, resources, fiefTypes, structures, houses }: Cat & 
       </div>
 
       {!ruler ? (
-        <p className="text-sm text-orange-300">Scegli la casata regnante: senza, nessuno paga tasse.</p>
+        <p className="text-sm text-amber-200">Scegli la casata regnante: senza, nessuno paga tasse.</p>
       ) : (
         <div className="space-y-2">
           <h3 className="font-serif text-lg text-accent">Tasse del prossimo mese</h3>

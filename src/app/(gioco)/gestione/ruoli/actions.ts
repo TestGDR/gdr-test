@@ -27,7 +27,7 @@ export async function saveRole(input: RoleInput): Promise<RoleResult> {
 
   const name = input.name.trim().replace(/\s+/g, " ");
   const description = input.description.trim().slice(0, 200);
-  const color = /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : "#e2622d";
+  const color = /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : "#c9a45c";
   // Solo permessi esistenti nel catalogo, senza doppioni
   const permissions = [...new Set(input.permissions.filter(isPermissionKey))];
 

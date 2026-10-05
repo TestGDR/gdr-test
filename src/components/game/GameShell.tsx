@@ -253,7 +253,7 @@ export default function GameShell({
               }
             />
 
-            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(226,98,45,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] lg:flex lg:text-2xl">
+            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(201,164,92,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] lg:flex lg:text-2xl">
               Westeros GDR
             </h1>
 
@@ -616,7 +616,7 @@ function LeftColumn({
               >
                 {p.name}
               </button>
-              {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-orange-300">⧗</span>}
+              {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-amber-200">⧗</span>}
             </li>
           ))}
         </ul>
@@ -661,7 +661,7 @@ function CharacterPicture({
             <Avatar name={character.name} url={character.avatar_url} size={size} bare />
           </span>
           {character.status !== "attivo" && (
-            <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-orange-300/70 bg-black text-[0.6875rem] text-orange-300">
+            <span className="absolute -right-1.5 -bottom-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-amber-200/70 bg-black text-[0.6875rem] text-amber-200">
               ⧗
             </span>
           )}

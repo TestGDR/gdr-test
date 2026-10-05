@@ -60,7 +60,7 @@ Se dimentichi la password puoi reimpostarla con "Password dimenticata?" nella fi
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#161313;border:1px solid #3a2c2a;border-top:3px solid #a3201b;border-radius:8px">
         <tr><td style="padding:28px 32px">
-          <h1 style="margin:0 0 20px;font-size:24px;color:#e2622d;letter-spacing:1px">Westeros GDR</h1>
+          <h1 style="margin:0 0 20px;font-size:24px;color:#c9a45c;letter-spacing:1px">Westeros GDR</h1>
           <p style="margin:0 0 16px;font-size:16px;line-height:1.5">Grazie per aver scelto di giocare con noi. Questi sono i tuoi dati di accesso:</p>
           <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;background:#0b0a0a;border:1px solid #3a2c2a;border-radius:6px">
             <tr><td style="padding:12px 16px;color:#968d89;font-size:13px">Nome del personaggio</td>

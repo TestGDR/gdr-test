@@ -86,7 +86,7 @@ export default function Bank() {
             <>
               <p className="mt-1 font-serif text-3xl text-foreground">{salary}</p>
               <p className="text-xs text-muted">al giorno · {account.house_role?.name}</p>
-              <p className={`mt-1 text-xs ${paidToday ? "text-green-300" : "text-orange-300"}`}>
+              <p className={`mt-1 text-xs ${paidToday ? "text-green-300" : "text-amber-200"}`}>
                 {paidToday ? "Ritirato oggi" : "Si ritira al prossimo accesso"}
               </p>
             </>
@@ -277,7 +277,7 @@ function TransferForm({
             <option key={r.id} value={r.label} />
           ))}
         </datalist>
-        {name.trim() && !target && <span className="mt-1 block text-xs text-orange-300">Scegli un nome dall&apos;elenco.</span>}
+        {name.trim() && !target && <span className="mt-1 block text-xs text-amber-200">Scegli un nome dall&apos;elenco.</span>}
       </label>
       <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
         <label className="block">

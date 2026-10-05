@@ -11,7 +11,7 @@ export type UserRow = { id: string; username: string | null; role: string; staff
 
 type Props = { roles: StaffRole[]; users: UserRow[]; currentIsAdmin: boolean; currentUserId: string };
 
-const ADMIN_COLOR = "#e2622d";
+const ADMIN_COLOR = "#c9a45c";
 const TABS = [
   { id: "ruoli", label: "Ruoli" },
   { id: "staffer", label: "Staffer" },
@@ -224,7 +224,7 @@ function RoleEditor({
     id: role?.id,
     name: role?.name ?? "",
     description: role?.description ?? "",
-    color: role?.color ?? "#e2622d",
+    color: role?.color ?? "#c9a45c",
     permissions: role?.permissions ?? [],
   });
   const [message, setMessage] = useState<{ error?: string; ok?: string } | null>(null);

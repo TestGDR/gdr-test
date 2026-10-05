@@ -49,7 +49,7 @@ export default function SheetHtml({
     () => `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${CSP}">
 <base target="_blank">
-<style>html,body{margin:0;min-height:100%;background:#0d0b0b;color:#e4dfdb;font-family:Georgia,serif}img{max-width:100%}a{color:#e2622d}</style>
+<style>html,body{margin:0;min-height:100%;background:#0d0b0b;color:#e4dfdb;font-family:Georgia,serif}img{max-width:100%}a{color:#c9a45c}</style>
 </head><body>${cleanSheetHtml(html)}</body></html>`,
     [html],
   );

@@ -186,7 +186,7 @@ function PlayerRow({
           </span>
         )}
         {!player.active && (
-          <span title="Personaggio non ancora attivo" className="text-orange-300">
+          <span title="Personaggio non ancora attivo" className="text-amber-200">
             <HourglassIcon />
           </span>
         )}

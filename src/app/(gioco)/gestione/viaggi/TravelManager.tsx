@@ -321,7 +321,7 @@ function Routes({ maps, places, raven = false }: { maps: MapRow[]; places: Place
           {editing ? (raven ? "Modifica la rotta" : "Modifica il percorso") : raven ? "Nuova rotta del corvo" : "Nuovo percorso"}
         </p>
         {raven && places.length < 2 && (
-          <p className="text-sm text-orange-300">Servono almeno due macroaree con la casella &quot;Castello o città&quot; (Gestione mondo).</p>
+          <p className="text-sm text-amber-200">Servono almeno due macroaree con la casella &quot;Castello o città&quot; (Gestione mondo).</p>
         )}
         <div className="flex flex-wrap gap-4">
           <PlacePicker label="Da" maps={maps} places={places} value={from} onChange={setFrom} />

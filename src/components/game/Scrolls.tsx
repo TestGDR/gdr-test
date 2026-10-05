@@ -319,7 +319,7 @@ function SentList({ sent, onDiscard }: { sent: Sent[] | null; onDiscard: (id: nu
                   Affidato a {BY[s.method]} il {when(s.created_at)} · {s.signed ? "firmato" : "senza firma"}
                 </span>
               </span>
-              <span className={`shrink-0 text-xs ${travelling ? "text-orange-300" : "text-[#a08a64]"}`}>
+              <span className={`shrink-0 text-xs ${travelling ? "text-amber-200" : "text-[#a08a64]"}`}>
                 {travelling ? `In viaggio · arriva verso le ${new Date(s.deliver_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : "Consegnato"}
               </span>
             </button>
@@ -471,7 +471,7 @@ function WriteScroll({
       {to && options && (
         <div className="space-y-2 border border-[#5a3d22] bg-[#24160d] px-3 py-2 text-sm text-[#e8d8b4]">
           {options.length === 0 ? (
-            <p className="text-orange-300">Nessuna strada per raggiungere il destinatario: il cartiglio non può partire da qui.</p>
+            <p className="text-amber-200">Nessuna strada per raggiungere il destinatario: il cartiglio non può partire da qui.</p>
           ) : options[0].method === "paggio" ? (
             <p className="flex items-center gap-2">
               <span className="text-[#c9a45c]">
@@ -515,7 +515,7 @@ function WriteScroll({
                 </label>
               ))}
               {options.some((o) => o.risky) && (
-                <p className="text-xs text-orange-300">
+                <p className="text-xs text-amber-200">
                   Le strade fuori dalle terre sicure sono pericolose: il cartiglio potrebbe essere intercettato e non arrivare mai.
                 </p>
               )}
