@@ -190,3 +190,13 @@ export const HourglassIcon = () => (
     <path d="M9.5 19h5" />
   </svg>
 );
+
+// Mercato: bancarella con la tenda a festoni
+export const MarketIcon = () => (
+  <svg {...base}>
+    <path d="M3 9.5 5 4h14l2 5.5" />
+    <path d="M3 9.5a2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0" />
+    <path d="M5 11.5V20h14v-8.5" />
+    <path d="M9.5 20v-5h5v5" />
+  </svg>
+);

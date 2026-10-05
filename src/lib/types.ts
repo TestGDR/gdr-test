@@ -8,6 +8,8 @@ export type Character = {
   cover_url?: string | null; // immagine lunga della prima pagina della scheda (computer)
   cover_mobile_url?: string | null; // la stessa, verticale, per il cellulare
   sheet_html?: string | null; // pagina Principale scritta in HTML e CSS (ripulita al momento di mostrarla)
+  sheet_unlocks?: string[]; // parti della scheda sbloccate dall'admin ("storia", "anagrafica")
+  coins?: number; // monete sul conto
   fate_notes?: string | null; // Note del Fato (le scrive lo staff)
   known_html?: string | null; // "Si sa che" (editor di testo del giocatore)
   affections_html?: string | null; // "Affetti"

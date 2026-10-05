@@ -60,6 +60,12 @@ const PANELS = [
     description: "Risorse, tipi di feudo con i loro introiti, strutture, feudi delle casate e tesoro.",
   },
   {
+    permission: "oggetti.gestire",
+    href: "/gestione/oggetti",
+    title: "Oggetti",
+    description: "Oggetti indossabili e negozio, parti del corpo, oggetti da assegnare ai PG.",
+  },
+  {
     permission: "viaggi.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",

@@ -10,10 +10,13 @@ import {
 } from "react";
 import { saveSheetFields, type SheetFields } from "@/app/scheda/actions";
 import DragonSection from "@/components/draghi/DragonSection";
+import { dragonName, type Dragon } from "@/lib/dragons";
 import RichEditor from "@/components/guide/RichEditor";
 import Modal from "@/components/ui/Modal";
 import ModalButton from "@/components/ui/ModalButton";
 import {
+  AGE_MAX,
+  AGE_MIN,
   ATTRIBUTES,
   ATTRIBUTE_MAX,
   SEXES,
@@ -25,6 +28,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
 import Affections from "./Affections";
+import Equipment from "./Equipment";
 import { cleanPlayerHtml } from "./player-html";
 import { useSheetActions } from "./sheet-actions";
 import SheetHtml, { SHEET_HTML_MAX } from "./SheetHtml";
@@ -159,7 +163,7 @@ type Tab =
   | "caratteristiche"
   | "aspetto"
   | "storia"
-  | "draghi";
+  | "equipaggiamento";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "principale", label: "Principale" },
@@ -169,7 +173,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "caratteristiche", label: "Caratteristiche" },
   { id: "aspetto", label: "Aspetto" },
   { id: "storia", label: "Storia" },
-  { id: "draghi", label: "Draghi" },
+  { id: "equipaggiamento", label: "Equipaggiamento" },
 ];
 
 type SheetInfo = {
@@ -177,6 +181,7 @@ type SheetInfo = {
   last_chat_action: string | null;
   can_write_fate: boolean;
   can_read_story: boolean;
+  is_admin: boolean; // vede "Sblocca"
 };
 
 const date = (iso: string | null) =>
@@ -316,17 +321,15 @@ function CharacterSheet({
           />
         )}
         {active && tab === "storia" && (
-          <StoryPage character={character} info={info} />
+          <StoryPage
+            character={character}
+            info={info}
+            isOwn={isOwn}
+            onSaved={onSaved}
+          />
         )}
-        {active && tab === "draghi" && (
-          <div className="p-6">
-            <DragonSection
-              characterId={character.id}
-              characterName={character.name}
-              houseId={character.house_id ?? null}
-              isOwn={isOwn}
-            />
-          </div>
+        {active && tab === "equipaggiamento" && (
+          <Equipment characterId={character.id} isOwn={isOwn} />
         )}
       </div>
       <SheetModal
@@ -763,7 +766,15 @@ function DataPage({
               label="Ultima azione"
               value={info ? dateTime(info.last_chat_action) : "..."}
             />
+            <DragonField character={character} isOwn={isOwn} />
           </dl>
+          <UnlockBar
+            character={character}
+            section="anagrafica"
+            label="Anagrafica (sesso ed età)"
+            info={info}
+            onSaved={onSaved}
+          />
         </div>
       </div>
       <FateNotes
@@ -787,7 +798,30 @@ function DataEditor({
   const [faceClaim, setFaceClaim] = useState(character.face_claim ?? "");
   const [avatar, setAvatar] = useState(character.avatar_url ?? "");
   const [portrait, setPortrait] = useState(character.portrait_url ?? "");
+  // anagrafica sbloccata dall'admin: si cambiano anche sesso ed eta'
+  const identity = !!character.sheet_unlocks?.includes("anagrafica");
+  const [sex, setSex] = useState(character.sex ?? "");
+  const [age, setAge] = useState(String(character.age ?? ""));
+  const [identityError, setIdentityError] = useState<string | null>(null);
   const { busy, error, save } = useSectionSave(character, onSaved, onDone);
+
+  async function saveAll() {
+    setIdentityError(null);
+    if (identity) {
+      const { error } = await createClient().rpc("update_my_identity", {
+        p_character: character.id,
+        p_sex: sex,
+        p_age: Number(age),
+      });
+      if (error)
+        return setIdentityError(
+          error.message.includes("età")
+            ? `L'età deve essere tra ${AGE_MIN} e ${AGE_MAX} anni.`
+            : "Anagrafica non salvata.",
+        );
+    }
+    save({ faceClaim, avatarUrl: avatar, portraitUrl: portrait });
+  }
 
   return (
     <div className="space-y-4 p-6">
@@ -820,16 +854,52 @@ function DataEditor({
         onChange={setPortrait}
         frame="aspect-[3/4] w-[100px]"
       />
-      <p className="text-xs text-muted">
-        Nome, sesso, età e casata non si cambiano da qui: per correzioni apri un
-        ticket.
-      </p>
+      {identity ? (
+        <div className="flex flex-wrap items-end gap-4 border border-[#d4a72c]/40 bg-[#d4a72c]/5 p-3">
+          <p className="w-full text-xs text-[#f0c75e]">
+            L&apos;admin ha sbloccato l&apos;anagrafica: puoi correggere sesso
+            ed età.
+          </p>
+          <label className="block">
+            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+              Sesso
+            </span>
+            <select
+              value={sex}
+              onChange={(e) => setSex(e.target.value)}
+              className="input w-40! py-1.5"
+            >
+              {SEXES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+              Età
+            </span>
+            <input
+              type="number"
+              min={AGE_MIN}
+              max={AGE_MAX}
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              className="input w-28! py-1.5"
+            />
+          </label>
+        </div>
+      ) : (
+        <p className="text-xs text-muted">
+          Nome, sesso, età e casata non si cambiano da qui: per correzioni apri
+          un ticket.
+        </p>
+      )}
       <EditButtons
         busy={busy}
-        error={error}
-        onSave={() =>
-          save({ faceClaim, avatarUrl: avatar, portraitUrl: portrait })
-        }
+        error={identityError ?? error}
+        onSave={saveAll}
         onCancel={onDone}
       />
     </div>
@@ -1029,32 +1099,82 @@ function AppearancePage({
 
 // ---------------------------------------------------------------------
 // Storia: il background della creazione. La leggono solo master, moderatori
-// e admin (permesso "schede.storia"); non si modifica piu'
+// e admin (permesso "schede.storia"). Non si modifica, a meno che l'admin
+// non la sblocchi: allora il proprietario la legge e la riscrive
 // ---------------------------------------------------------------------
 function StoryPage({
   character,
   info,
+  isOwn,
+  onSaved,
 }: {
   character: Character;
   info: SheetInfo | null;
+  isOwn: boolean;
+  onSaved: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [story, setStory] = useState<string | null>(null);
-  const canRead = !!info?.can_read_story;
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const unlocked = isOwn && !!character.sheet_unlocks?.includes("storia");
+  const canRead = !!info?.can_read_story || unlocked;
+
+  const load = useCallback(
+    () =>
+      supabase
+        .from("character_backgrounds")
+        .select("body")
+        .eq("character_id", character.id)
+        .maybeSingle()
+        .then(({ data }) => setStory((data?.body as string | undefined) ?? "")),
+    [supabase, character.id],
+  );
 
   useEffect(() => {
-    if (!canRead) return;
-    supabase
-      .from("character_backgrounds")
-      .select("body")
-      .eq("character_id", character.id)
-      .maybeSingle()
-      .then(({ data }) => setStory((data?.body as string | undefined) ?? ""));
-  }, [supabase, character.id, canRead]);
+    if (canRead) load();
+  }, [canRead, load]);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase.rpc("update_my_background", {
+      p_character: character.id,
+      p_body: text,
+    });
+    setBusy(false);
+    if (error)
+      return setError(
+        error.message.includes("caratteri")
+          ? "La storia deve avere tra 100 e 4.000 caratteri."
+          : "Storia non salvata.",
+      );
+    setEditing(false);
+    load();
+  }
 
   return (
     <div className="p-6">
-      <PageTitle title="Storia" />
+      <PageTitle
+        title="Storia"
+        onEdit={
+          unlocked && story !== null && !editing
+            ? () => {
+                setText(story);
+                setEditing(true);
+              }
+            : undefined
+        }
+      />
+      <UnlockBar
+        character={character}
+        section="storia"
+        label="Storia (background)"
+        info={info}
+        onSaved={onSaved}
+      />
       {info === null ? (
         <p className="text-muted">Caricamento...</p>
       ) : !canRead ? (
@@ -1063,15 +1183,160 @@ function StoryPage({
         </p>
       ) : story === null ? (
         <p className="text-muted">Caricamento...</p>
+      ) : editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={4000}
+            rows={14}
+            className="input resize-y"
+          />
+          <p className="text-xs text-muted">
+            {text.trim().length} / 4.000 caratteri (almeno 100)
+          </p>
+          <EditButtons
+            busy={busy}
+            error={error}
+            onSave={save}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
       ) : (
         <>
+          {unlocked && (
+            <p className="mb-3 border border-[#d4a72c]/40 bg-[#d4a72c]/5 px-3 py-2 text-xs text-[#f0c75e]">
+              L&apos;admin ha sbloccato la tua Storia: puoi leggerla e
+              correggerla con la pennina.
+            </p>
+          )}
           <p className="leading-relaxed whitespace-pre-line">{story || "—"}</p>
-          <p className="mt-4 text-xs text-muted">
-            Background scritto alla creazione del personaggio: non si modifica
-            più.
-          </p>
+          {!unlocked && (
+            <p className="mt-4 text-xs text-muted">
+              Background scritto alla creazione del personaggio: non si modifica
+              più.
+            </p>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+// "Sblocca": lo vede solo l'admin. Sblocca o riblocca una parte della scheda
+// perche' il giocatore la possa modificare
+function UnlockBar({
+  character,
+  section,
+  label,
+  info,
+  onSaved,
+}: {
+  character: Character;
+  section: "storia" | "anagrafica";
+  label: string;
+  info: SheetInfo | null;
+  onSaved: () => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  if (!info?.is_admin) return null;
+  const on = !!character.sheet_unlocks?.includes(section);
+
+  async function toggle() {
+    setBusy(true);
+    setError(false);
+    const { error } = await supabase.rpc("set_sheet_unlock", {
+      p_character: character.id,
+      p_section: section,
+      p_on: !on,
+    });
+    setBusy(false);
+    if (error) return setError(true);
+    onSaved();
+  }
+
+  return (
+    <div className="my-3 flex flex-wrap items-center justify-between gap-2 border border-dashed border-accent/50 bg-black/40 px-3 py-2 text-xs">
+      <span className="text-muted">
+        <strong className="text-accent">Solo admin</strong> · {label}:{" "}
+        {on ? (
+          <span className="text-green-400">
+            sbloccata, il giocatore può modificarla
+          </span>
+        ) : (
+          "bloccata"
+        )}
+        {error && (
+          <span className="ml-2 text-red-400">operazione non riuscita</span>
+        )}
+      </span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={toggle}
+        className={`${on ? "btn-ghost" : "btn"} px-3 py-1 text-xs tracking-[0.12em] uppercase`}
+      >
+        {on ? "Blocca" : "Sblocca"}
+      </button>
+    </div>
+  );
+}
+
+// Drago del PG tra i dati: il nome apre la scheda del drago in una finestra
+// sopra quella del personaggio (il proprietario la apre anche senza drago,
+// per vedere le uova della casata)
+function DragonField({
+  character,
+  isOwn,
+}: {
+  character: Character;
+  isOwn: boolean;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [dragon, setDragon] = useState<Dragon | null | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from("dragons")
+      .select("*")
+      .eq("rider_id", character.id)
+      .maybeSingle()
+      .then(({ data }) => setDragon((data as Dragon | null) ?? null));
+  }, [supabase, character.id]);
+
+  if (dragon === undefined) return <Field label="Drago" value="..." />;
+  if (!dragon && !isOwn) return <Field label="Drago" value="—" />;
+
+  return (
+    <div>
+      <dt className="text-[0.7rem] font-semibold tracking-[0.14em] text-muted uppercase">
+        Drago
+      </dt>
+      <dd>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-accent underline-offset-2 hover:underline"
+        >
+          {dragon ? dragonName(dragon) : "Nessuno · uova della casata"}
+        </button>
+      </dd>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={dragon ? `Drago di ${character.name}` : "Draghi"}
+        size="lg"
+      >
+        <DragonSection
+          characterId={character.id}
+          characterName={character.name}
+          houseId={character.house_id ?? null}
+          isOwn={isOwn}
+        />
+      </Modal>
     </div>
   );
 }

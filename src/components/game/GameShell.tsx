@@ -29,6 +29,7 @@ import {
   BookIcon,
   CompassIcon,
   FiefIcon,
+  MarketIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -53,6 +54,7 @@ import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import TravelPanel from "./TravelPanel";
 import FiefsPanel from "@/components/houses/FiefsPanel";
+import MarketPanel from "./MarketPanel";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -104,7 +106,7 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -112,6 +114,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   assenze: "Assenze",
   viaggio: "Viaggio",
   feudi: "Feudi e risorse della casata",
+  mercato: "Mercato",
 };
 
 export default function GameShell({
@@ -410,6 +413,7 @@ export default function GameShell({
           />
         )}
         {panel === "feudi" && character && <FiefsPanel key={panelSession} characterId={character.id} />}
+        {panel === "mercato" && <MarketPanel key={panelSession} character={character} />}
         {panel === "viaggio" &&
           (character ? (
             <TravelPanel key={panelSession} me={character} />
@@ -1063,6 +1067,7 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "assenze", icon: <HourglassIcon /> },
   { id: "viaggio", icon: <CompassIcon /> },
   { id: "feudi", icon: <FiefIcon /> },
+  { id: "mercato", icon: <MarketIcon /> },
 ];
 // Feudi: solo per chi appartiene a una casata
 const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
