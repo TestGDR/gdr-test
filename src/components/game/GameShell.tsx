@@ -796,8 +796,11 @@ function MobileTools({
   inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
   return (
-    <div className="space-y-2">
-    <div className="grid grid-cols-5 gap-2">
+    <div className="space-y-3">
+    {/* come la barra del computer: titolo, poi le icone per categoria, centrate */}
+    <p className="text-center font-serif text-sm tracking-[0.25em] text-accent uppercase">Menu</p>
+    <RailRule />
+    <div className="flex flex-wrap justify-center gap-3 [&>*]:w-14">
       <ManageButton canManage={canManage} className={`${drawerBtn} ${goldGear}`} />
       <UtilityButton
         className={drawerBtn}
@@ -818,24 +821,18 @@ function MobileTools({
     </div>
       {/* stesse categorie della barra di destra del computer */}
       {panelGroups(inHouse).map((group, i) => (
-        <Fragment key={i}>
-          <RailRule />
-          <div className="grid grid-cols-5 gap-2">
-            {group.map((p) => (
-              <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
-            ))}
-          </div>
-        </Fragment>
+        <div key={i} className="flex flex-wrap justify-center gap-3 [&>*]:w-14">
+          {group.map((p) => (
+            <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
+          ))}
+        </div>
       ))}
       {onOpenDragon && (
-        <>
-          <RailRule />
-          <div className="grid grid-cols-5 gap-2">
-            <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
-              <DragonIcon />
-            </button>
-          </div>
-        </>
+        <div className="flex justify-center [&>*]:w-14">
+          <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
+            <DragonIcon />
+          </button>
+        </div>
       )}
     </div>
   );
