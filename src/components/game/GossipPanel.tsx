@@ -74,7 +74,7 @@ export default function GossipPanel({
           </button>
         ))}
       </div>
-      {tab === "voci" && <Rumors />}
+      {tab === "voci" && <Rumors canDelete={canReview} />}
       {tab === "fine" && (
         <EndOfPlay character={character} onSent={() => setTab("mie")} />
       )}
@@ -87,18 +87,33 @@ export default function GossipPanel({
 // ---------------------------------------------------------------------
 // Voci che girano (approvate)
 // ---------------------------------------------------------------------
-function Rumors() {
+function Rumors({ canDelete }: { canDelete: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const [list, setList] = useState<Report[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      supabase
+        .from("gossip_reports")
+        .select("*")
+        .eq("status", "approvato")
+        .order("reviewed_at", { ascending: false })
+        .limit(50)
+        .then(({ data }) => setList((data ?? []) as Report[])),
+    [supabase],
+  );
   useEffect(() => {
-    supabase
-      .from("gossip_reports")
-      .select("*")
-      .eq("status", "approvato")
-      .order("reviewed_at", { ascending: false })
-      .limit(50)
-      .then(({ data }) => setList((data ?? []) as Report[]));
-  }, [supabase]);
+    load();
+  }, [load]);
+
+  async function remove(r: Report) {
+    if (!window.confirm("Eliminare questa voce? Non si potrà recuperare."))
+      return;
+    setError(null);
+    const ok = await deleteGossip(r.id);
+    if (!ok) return setError("Voce non eliminata.");
+    load();
+  }
 
   if (list === null)
     return <p className="text-sm text-muted">Caricamento...</p>;
@@ -118,13 +133,34 @@ function Rumors() {
           <p className="text-sm whitespace-pre-line text-[#f2e7c9] italic">
             «{r.published_text}»
           </p>
-          <p className="mt-1 text-xs text-muted">
-            {r.zone_name} · {when(r.reviewed_at ?? r.created_at)}
+          <p className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-muted">
+            <span>
+              {r.zone_name} · {when(r.reviewed_at ?? r.created_at)}
+            </span>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => remove(r)}
+                className="text-red-400 hover:text-red-300"
+              >
+                Elimina
+              </button>
+            )}
           </p>
         </li>
       ))}
+      {error && <li className="text-sm text-red-400">{error}</li>}
     </ul>
   );
+}
+
+// Elimina un pettegolezzo (permesso "pettegolezzi.gestire"); il ticket resta
+async function deleteGossip(id: string) {
+  const { error, count } = await createClient()
+    .from("gossip_reports")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  return !error && (count ?? 0) > 0;
 }
 
 // ---------------------------------------------------------------------
@@ -650,6 +686,26 @@ function ReviewItem({
           className="btn-ghost px-4 py-1.5 text-sm text-red-400"
         >
           Non approvare
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            if (
+              !window.confirm(
+                "Eliminare del tutto questo pettegolezzo? Il ticket resta.",
+              )
+            )
+              return;
+            setBusy(true);
+            const ok = await deleteGossip(report.id);
+            setBusy(false);
+            if (!ok) return setError("Pettegolezzo non eliminato.");
+            onDone();
+          }}
+          className="ml-auto px-2 py-1.5 text-sm text-red-400 hover:text-red-300"
+        >
+          Elimina
         </button>
       </div>
     </li>

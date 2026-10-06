@@ -10,7 +10,7 @@ import {
 import { createPortal } from "react-dom";
 
 export type ModalSize =
-  "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel" | "pg";
+  "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel" | "pg" | "panel600";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
@@ -28,6 +28,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
     "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
   // scheda del personaggio: linguette (13rem) + pagina 750 x 600, il contenuto gestisce lo scorrimento
   pg: "w-[min(59.875rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem)]",
+  // voci e pettegolezzi: sempre alta 600px (meno su schermi bassi), il contenuto scorre dentro
+  panel600: "w-[min(46rem,calc(100vw-2rem))] h-[min(37.5rem,calc(100dvh-1rem))]",
 };
 
 // Finestra modale controllata dal chiamante (open / onClose).

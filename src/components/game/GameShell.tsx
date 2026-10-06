@@ -417,7 +417,15 @@ export default function GameShell({
         </Modal>
       )}
       <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
-        size={panel === "ricerca" || panel === "assenze" || panel === "viaggio" ? "panel" : panel === "notizie-on" || panel === "forum" ? "xl" : "lg"}
+        size={
+          panel === "ricerca" || panel === "assenze" || panel === "viaggio"
+            ? "panel"
+            : panel === "voci"
+              ? "panel600"
+              : panel === "notizie-on" || panel === "forum"
+                ? "xl"
+                : "lg"
+        }
       >
         {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
         {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
