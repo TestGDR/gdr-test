@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  isWearable,
+  itemPlace,
   ItemImage,
   type Category,
   type Item,
@@ -70,8 +72,7 @@ export default function MarketPanel({
         Per comprare al mercato serve un personaggio attivo.
       </p>
     );
-  const slotName = (id: string | null) =>
-    slots.find((s) => s.id === id)?.name ?? "Non si indossa";
+  const slotName = (i: Item) => itemPlace(i, slots);
 
   return (
     <div className="space-y-3">
@@ -131,7 +132,7 @@ function Shop({
   characterId: string;
   coins: number | null;
   categories: Category[];
-  slotName: (id: string | null) => string;
+  slotName: (i: Item) => string;
   onPaid: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -231,9 +232,7 @@ function Shop({
                 >
                   {it.name}
                 </span>
-                <span className="block text-xs text-muted">
-                  {slotName(it.slot_id)}
-                </span>
+                <span className="block text-xs text-muted">{slotName(it)}</span>
               </span>
               <span className="text-xs whitespace-nowrap text-accent">
                 {it.price} monete
@@ -266,7 +265,7 @@ function Smith({
   characterId: string;
   coins: number | null;
   qualities: Quality[];
-  slotName: (id: string | null) => string;
+  slotName: (i: Item) => string;
   onPaid: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -285,7 +284,9 @@ function Smith({
         .order("acquired_at")
         .then(({ data }) =>
           setMine(
-            ((data ?? []) as unknown as Mine[]).filter((m) => m.item?.slot_id),
+            ((data ?? []) as unknown as Mine[]).filter(
+              (m) => m.item && isWearable(m.item),
+            ),
           ),
         ),
     [supabase, characterId],
@@ -380,7 +381,7 @@ function Smith({
                     <span className="text-[#d8c39a]">
                       {m.quality?.name ?? qualities[0]?.name ?? "—"}
                     </span>{" "}
-                    · {slotName(m.item.slot_id)}
+                    · {slotName(m.item)}
                     {m.equipped && " · indossato"}
                   </span>
                 </span>

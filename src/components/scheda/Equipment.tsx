@@ -8,6 +8,7 @@ export type Slot = {
   name: string;
   side: "sinistra" | "destra" | "sotto";
   capacity: number;
+  slot_group: string | null; // es. "Mano": Mano dx e Mano sx
   sort_order: number;
 };
 export type Category = { id: string; name: string; sort_order: number };
@@ -16,7 +17,8 @@ export type Item = {
   name: string;
   description: string;
   image_url: string | null;
-  slot_id: string | null;
+  slot_id: string | null; // nicchia precisa
+  slot_group: string | null; // oppure un gruppo di nicchie (es. "Mano": destra o sinistra, a scelta)
   category_id: string | null;
   price: number | null;
   in_shop: boolean;
@@ -28,9 +30,24 @@ export type Quality = {
   upgrade_cost: number;
   success_pct: number;
 };
+// Si indossa: in una nicchia precisa o in una del suo gruppo
+export const isWearable = (i: Pick<Item, "slot_id" | "slot_group">) =>
+  !!(i.slot_id || i.slot_group);
+// Dove si indossa, da mostrare (es. "Busto", "Mano (destra o sinistra)")
+export const itemPlace = (
+  i: Pick<Item, "slot_id" | "slot_group">,
+  slots: Slot[],
+) =>
+  i.slot_id
+    ? (slots.find((s) => s.id === i.slot_id)?.name ?? "—")
+    : i.slot_group
+      ? `${i.slot_group} (a scelta)`
+      : "Non si indossa";
+
 type Owned = {
   id: string;
   equipped: boolean;
+  equipped_slot_id: string | null; // nicchia dove e' indossato
   quality_id: string | null;
   quality: Pick<Quality, "name" | "level"> | null;
   item: Item;
@@ -79,7 +96,7 @@ export default function Equipment({
         supabase
           .from("character_items")
           .select(
-            "id, equipped, quality_id, quality:item_qualities(name, level), item:items(*)",
+            "id, equipped, equipped_slot_id, quality_id, quality:item_qualities(name, level), item:items(*)",
           )
           .eq("character_id", characterId)
           .order("acquired_at"),
@@ -95,12 +112,17 @@ export default function Equipment({
     load();
   }, [load]);
 
-  async function equip(ownedId: string, on: boolean) {
+  async function equip(
+    ownedId: string,
+    on: boolean,
+    slotId: string | null = null,
+  ) {
     setBusy(true);
     setError(null);
     const { error } = await supabase.rpc("equip_item", {
       p_character_item: ownedId,
       p_on: on,
+      p_slot: slotId,
     });
     setBusy(false);
     if (error)
@@ -119,12 +141,12 @@ export default function Equipment({
 
   const worn = owned.filter((o) => o.equipped);
   const bag = owned.filter((o) => !o.equipped);
-  const slotName = (id: string | null) =>
-    slots.find((s) => s.id === id)?.name ?? "Non si indossa";
+  const place = (i: Item) => itemPlace(i, slots);
+  const slotOf = (o: Owned) => o.equipped_slot_id ?? o.item.slot_id;
 
   // Nicchia: un riquadro per ogni posto della parte del corpo
   const niche = (s: Slot) => {
-    const inSlot = worn.filter((w) => w.item.slot_id === s.id);
+    const inSlot = worn.filter((w) => slotOf(w) === s.id);
     const boxes = Array.from(
       { length: Math.max(1, s.capacity) },
       (_, i) => inSlot[i] ?? null,
@@ -194,7 +216,10 @@ export default function Equipment({
               {picked.quality && (
                 <span className="text-[#d8c39a]">{picked.quality.name} · </span>
               )}
-              {slotName(picked.item.slot_id)}
+              {picked.equipped
+                ? (slots.find((s) => s.id === slotOf(picked))?.name ??
+                  place(picked.item))
+                : place(picked.item)}
               {pick?.kind === "borsa" &&
                 ` · ${bag.filter((b) => groupKey(b) === pick.key).length} in borsa`}
               {picked.equipped && " · indossato"}
@@ -204,15 +229,34 @@ export default function Equipment({
                 {picked.item.description}
               </p>
             )}
-            {isOwn && picked.item.slot_id && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => equip(picked.id, !picked.equipped)}
-                className={`${picked.equipped ? "btn-ghost" : "btn"} mt-2 px-3 py-1 text-xs tracking-[0.12em] uppercase`}
-              >
-                {picked.equipped ? "Togli" : "Indossa"}
-              </button>
+            {isOwn && isWearable(picked.item) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {picked.equipped || picked.item.slot_id ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => equip(picked.id, !picked.equipped)}
+                    className={`${picked.equipped ? "btn-ghost" : "btn"} px-3 py-1 text-xs tracking-[0.12em] uppercase`}
+                  >
+                    {picked.equipped ? "Togli" : "Indossa"}
+                  </button>
+                ) : (
+                  // oggetto di un gruppo (es. Mano): si sceglie la nicchia
+                  slots
+                    .filter((s) => s.slot_group === picked.item.slot_group)
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => equip(picked.id, true, s.id)}
+                        className="btn px-3 py-1 text-xs tracking-[0.12em] uppercase"
+                      >
+                        Indossa: {s.name}
+                      </button>
+                    ))
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -355,7 +399,7 @@ function Inventory({
                 }`}
               >
                 <ItemImage item={g.item} fill />
-                {g.quality && g.item.slot_id && (
+                {g.quality && isWearable(g.item) && (
                   <span className="absolute top-0.5 left-1 text-[0.55rem] tracking-wider text-[#d8c39a] uppercase drop-shadow">
                     {g.quality.name}
                   </span>

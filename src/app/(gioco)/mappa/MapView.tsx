@@ -85,7 +85,7 @@ export function MapDot() {
   return (
     <span className="relative block h-4 w-4">
       <span className="absolute inset-0 animate-ping rounded-full bg-accent/50" />
-      <span className="absolute inset-0 rounded-full border-2 border-black bg-accent shadow-[0_0_10px_rgba(201,164,92,0.9)] transition group-hover:scale-125" />
+      <span className="absolute inset-0 rounded-full bg-accent shadow-[0_0_10px_rgba(201,164,92,0.9)] transition group-hover:scale-125" />
     </span>
   );
 }

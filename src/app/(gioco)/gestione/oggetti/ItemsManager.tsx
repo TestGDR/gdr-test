@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ItemImage,
+  itemPlace,
   type Category,
   type Item,
   type Quality,
@@ -81,6 +82,7 @@ const EMPTY: Omit<Item, "id"> = {
   description: "",
   image_url: null,
   slot_id: null,
+  slot_group: null,
   category_id: null,
   price: null,
   in_shop: false,
@@ -138,8 +140,7 @@ function ItemsTab({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-accent">{i.name}</span>
                   <span className="block text-xs text-muted">
-                    {slots.find((s) => s.id === i.slot_id)?.name ??
-                      "Non si indossa"}
+                    {itemPlace(i, slots)}
                     {i.in_shop && i.price !== null && ` · negozio ${i.price}`}
                   </span>
                 </span>
@@ -302,12 +303,32 @@ function ItemForm({
           <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
             Dove si indossa
           </span>
+          {/* una nicchia precisa, oppure un gruppo (es. Mano: destra o sinistra, la sceglie il giocatore) */}
           <select
-            value={v.slot_id ?? ""}
-            onChange={(e) => set({ slot_id: e.target.value || null })}
-            className="input w-56! py-1.5"
+            value={v.slot_id ?? (v.slot_group ? `gruppo:${v.slot_group}` : "")}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.startsWith("gruppo:"))
+                set({ slot_id: null, slot_group: val.slice(7) });
+              else set({ slot_id: val || null, slot_group: null });
+            }}
+            className="input w-64! py-1.5"
           >
             <option value="">— non si indossa —</option>
+            {[
+              ...new Set(
+                slots.map((s) => s.slot_group).filter((g): g is string => !!g),
+              ),
+            ].map((g) => (
+              <option key={g} value={`gruppo:${g}`}>
+                {g} (a scelta:{" "}
+                {slots
+                  .filter((s) => s.slot_group === g)
+                  .map((s) => s.name)
+                  .join(" o ")}
+                )
+              </option>
+            ))}
             {slots.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -553,8 +574,7 @@ function GiveTab({ slots, items }: { slots: Slot[]; items: Item[] }) {
                     <span className="min-w-0 flex-1">
                       <span className="text-accent">{o.item!.name}</span>
                       <span className="block text-xs text-muted">
-                        {slots.find((s) => s.id === o.item!.slot_id)?.name ??
-                          "Non si indossa"}
+                        {itemPlace(o.item!, slots)}
                         {o.equipped && " · indossato"} ·{" "}
                         {o.source === "negozio"
                           ? "comprato"
@@ -585,18 +605,26 @@ function GiveTab({ slots, items }: { slots: Slot[]; items: Item[] }) {
 function SlotsTab({ slots }: { slots: Slot[] }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  type Row = Pick<Slot, "name" | "side" | "capacity">;
+  type Row = Pick<Slot, "name" | "side" | "capacity" | "slot_group">;
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [added, setAdded] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
   const row = (s: Slot): Row =>
-    rows[s.id] ?? { name: s.name, side: s.side, capacity: s.capacity };
+    rows[s.id] ?? {
+      name: s.name,
+      side: s.side,
+      capacity: s.capacity,
+      slot_group: s.slot_group,
+    };
   const set = (s: Slot, p: Partial<Row>) =>
     setRows((r) => ({ ...r, [s.id]: { ...row(s), ...p } }));
   const changed = (s: Slot) => {
     const r = row(s);
     return (
-      r.name.trim() !== s.name || r.side !== s.side || r.capacity !== s.capacity
+      r.name.trim() !== s.name ||
+      r.side !== s.side ||
+      r.capacity !== s.capacity ||
+      (r.slot_group ?? "") !== (s.slot_group ?? "")
     );
   };
 
@@ -655,6 +683,15 @@ function SlotsTab({ slots }: { slots: Slot[] }) {
               <option value="destra">a destra</option>
               <option value="sotto">sotto</option>
             </select>
+            <input
+              value={row(s).slot_group ?? ""}
+              onChange={(e) => set(s, { slot_group: e.target.value || null })}
+              maxLength={40}
+              placeholder="gruppo"
+              title="Gruppo: le nicchie con lo stesso gruppo (es. Mano) accolgono gli oggetti creati per il gruppo"
+              aria-label="Gruppo della nicchia"
+              className="input w-24! py-1 text-sm"
+            />
             <label className="flex items-center gap-1 text-xs text-muted">
               posti
               <input
@@ -698,7 +735,11 @@ function SlotsTab({ slots }: { slots: Slot[] }) {
                 run(
                   supabase
                     .from("equipment_slots")
-                    .update({ ...row(s), name: row(s).name.trim() })
+                    .update({
+                      ...row(s),
+                      name: row(s).name.trim(),
+                      slot_group: row(s).slot_group?.trim() || null,
+                    })
                     .eq("id", s.id),
                   "Salvato.",
                 )

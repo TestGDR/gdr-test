@@ -30,6 +30,7 @@ import {
   CompassIcon,
   FiefIcon,
   MarketIcon,
+  ForumIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -55,6 +56,8 @@ import AbsencesPanel from "./AbsencesPanel";
 import TravelPanel from "./TravelPanel";
 import FiefsPanel from "@/components/houses/FiefsPanel";
 import MarketPanel from "./MarketPanel";
+import Forum from "@/components/forum/Forum";
+import { ForumUnreadContext, useForumUnread } from "@/components/forum/forum-data";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -102,11 +105,13 @@ type Props = {
   canTicketCategories: boolean; // gestisce le categorie dei ticket
   canCastleArchive: boolean; // legge l'Archivio messaggi castello
   canChooseOrigin: boolean; // sceglie da dove parte un cartiglio
+  canModerateForum: boolean; // modera il forum
+  canManageForum: boolean; // categorie e sezioni del forum
   children: ReactNode;
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -115,6 +120,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   viaggio: "Viaggio",
   feudi: "Feudi e risorse della casata",
   mercato: "Mercato",
+  forum: "Forum",
 };
 
 export default function GameShell({
@@ -135,6 +141,8 @@ export default function GameShell({
   canTicketCategories,
   canCastleArchive,
   canChooseOrigin,
+  canModerateForum,
+  canManageForum,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -187,6 +195,7 @@ export default function GameShell({
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
   const sheetActions = useMemo(() => ({ message: (kind: MessageKind, to: Contact) => openMessages(kind, to) }), []);
+  const forumUnread = useForumUnread(userId); // discussioni con interventi nuovi: l'icona del forum si accende
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
@@ -216,6 +225,7 @@ export default function GameShell({
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
       <TicketContext.Provider value={ticketCtx}>
+      <ForumUnreadContext.Provider value={forumUnread.count}>
       <SheetActionsContext.Provider value={sheetActions}>
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
@@ -398,7 +408,7 @@ export default function GameShell({
         </Modal>
       )}
       <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
-        size={panel === "ricerca" || panel === "assenze" || panel === "viaggio" ? "panel" : panel === "notizie-on" ? "xl" : "lg"}
+        size={panel === "ricerca" || panel === "assenze" || panel === "viaggio" ? "panel" : panel === "notizie-on" || panel === "forum" ? "xl" : "lg"}
       >
         {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
         {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
@@ -414,6 +424,15 @@ export default function GameShell({
         )}
         {panel === "feudi" && character && <FiefsPanel key={panelSession} characterId={character.id} />}
         {panel === "mercato" && <MarketPanel key={panelSession} character={character} />}
+        {panel === "forum" && (
+          <Forum
+            key={panelSession}
+            userId={userId}
+            canModerate={canModerateForum}
+            canManage={canManageForum}
+            onUnreadChanged={forumUnread.refresh}
+          />
+        )}
         {panel === "viaggio" &&
           (character ? (
             <TravelPanel key={panelSession} me={character} />
@@ -435,6 +454,7 @@ export default function GameShell({
         onMessageOff={(to) => openMessages("off", to)}
       />
       </SheetActionsContext.Provider>
+      </ForumUnreadContext.Provider>
       </TicketContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
@@ -616,7 +636,7 @@ function LeftColumn({
                 onClick={() => p.characterId && onOpenSheet(p.characterId)}
                 disabled={!p.characterId}
                 title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
-                className={`truncate text-left hover:underline disabled:no-underline ${p.userId === userId ? "text-accent" : ""}`}
+                className={`font-name truncate text-left hover:underline disabled:no-underline ${p.userId === userId ? "text-accent" : ""}`}
               >
                 {p.name}
               </button>
@@ -1068,11 +1088,14 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "viaggio", icon: <CompassIcon /> },
   { id: "feudi", icon: <FiefIcon /> },
   { id: "mercato", icon: <MarketIcon /> },
+  { id: "forum", icon: <ForumIcon /> },
 ];
 // Feudi: solo per chi appartiene a una casata
 const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
 const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
-  p === "ricerca" && newRequests > 0
+  p === "forum" && newNews
+    ? "Forum: interventi nuovi"
+    : p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
     : newNews
       ? `${PANEL_TITLE[p]}: notizie nuove`
@@ -1095,7 +1118,9 @@ function PanelButton({
 }) {
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
   const unseen = useContext(NewsUnseenContext);
-  const newNews = (panel === "notizie-on" && unseen.on) || (panel === "notizie-off" && unseen.off); // dorata finche' non si apre
+  const forumNew = useContext(ForumUnreadContext);
+  const newNews =
+    (panel === "notizie-on" && unseen.on) || (panel === "notizie-off" && unseen.off) || (panel === "forum" && forumNew > 0); // dorata finche' non si apre
   return (
     <button
       type="button"
@@ -1107,6 +1132,12 @@ function PanelButton({
       {calling && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
           {newRequests}
+        </span>
+      )}
+      {/* Forum: quante discussioni hanno risposte nuove */}
+      {panel === "forum" && forumNew > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
+          {forumNew}
         </span>
       )}
       {tip && <Tip>{panelLabel(panel, newRequests, newNews)}</Tip>}

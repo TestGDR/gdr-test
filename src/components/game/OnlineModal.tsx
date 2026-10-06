@@ -171,7 +171,7 @@ function PlayerRow({
             disabled={!player.characterId}
             title={player.characterId ? `Apri la scheda di ${fullName(player)}` : undefined}
             // su cellulare nome e cognome vanno a capo invece di essere tagliati
-            className="min-w-0 text-left text-[0.8125rem] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.9375rem]"
+            className="font-name min-w-0 text-left text-[0.8125rem] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.9375rem]"
           >
             {fullName(player)}
           </button>

@@ -4,36 +4,75 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
-import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
+import {
+  Color,
+  FontFamily,
+  FontSize,
+  TextStyle,
+} from "@tiptap/extension-text-style";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { uploadGuideImage } from "./actions";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
-export default function RichEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+export default function RichEditor({
+  value,
+  onChange,
+  textClassName = "",
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  textClassName?: string; // stile di base del testo (es. "forum-text": quello del forum)
+}) {
   const [mode, setMode] = useState<"visuale" | "html">("visuale");
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: { openOnClick: false } }),
       // Allineamento di paragrafi e titoli (salvato come style="text-align: ...")
-      TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right", "justify"] }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+        alignments: ["left", "center", "right", "justify"],
+      }),
       // Colore e dimensione del testo (salvati come style="color: ...; font-size: ...")
       TextStyle,
       Color,
       FontSize,
+      FontFamily, // carattere (salvato come style="font-family: ...")
       // Immagini: si ridimensionano trascinando l'angolo, mantenendo le proporzioni
-      Image.configure({ resize: { enabled: true, minWidth: 60, minHeight: 40, alwaysPreserveAspectRatio: true } }),
+      Image.configure({
+        resize: {
+          enabled: true,
+          minWidth: 60,
+          minHeight: 40,
+          alwaysPreserveAspectRatio: true,
+        },
+      }),
     ],
     content: value,
     immediatelyRender: false, // la pagina viene generata anche sul server
     shouldRerenderOnTransaction: true, // la barra mostra lo stato del testo selezionato
-    editorProps: { attributes: { class: "guide-content min-h-64 p-4 outline-none" } },
+    editorProps: {
+      // Testo incollato da altre pagine: via grandezza, carattere e colori di
+      // origine (restano grassetto, corsivo, allineamento): si adatta al sito
+      transformPastedHTML: (html) =>
+        html.replace(/style="([^"]*)"/gi, (_, css: string) => {
+          const kept = css
+            .split(";")
+            .filter((rule) => /^\s*text-align\s*:/i.test(rule))
+            .join(";");
+          return kept ? `style="${kept}"` : "";
+        }),
+      attributes: {
+        class: `guide-content min-h-64 p-4 outline-none ${textClassName}`,
+      },
+    },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
 
   function switchTo(next: "visuale" | "html") {
     // Tornando all'editor visuale, carica l'HTML scritto a mano
-    if (next === "visuale" && editor) editor.commands.setContent(value, { emitUpdate: false });
+    if (next === "visuale" && editor)
+      editor.commands.setContent(value, { emitUpdate: false });
     setMode(next);
   }
 
@@ -48,7 +87,9 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
               type="button"
               onClick={() => switchTo(m)}
               className={`rounded px-2 py-1 tracking-wider uppercase ${
-                mode === m ? "bg-blood/40 text-foreground" : "text-muted hover:text-foreground"
+                mode === m
+                  ? "bg-blood/40 text-foreground"
+                  : "text-muted hover:text-foreground"
               }`}
             >
               {m === "visuale" ? "Editor" : "HTML"}
@@ -73,7 +114,12 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
 
 function Toolbar({ editor }: { editor: Editor }) {
   const chain = () => editor.chain().focus();
-  const btn = (label: ReactNode, title: string, active: boolean, action: () => void) => (
+  const btn = (
+    label: ReactNode,
+    title: string,
+    active: boolean,
+    action: () => void,
+  ) => (
     <button
       key={title}
       type="button"
@@ -82,7 +128,9 @@ function Toolbar({ editor }: { editor: Editor }) {
       onMouseDown={(e) => e.preventDefault()} // non perdere la selezione nel testo
       onClick={action}
       className={`h-8 min-w-8 rounded px-1.5 text-sm transition ${
-        active ? "bg-accent/25 text-accent" : "text-muted hover:bg-white/5 hover:text-foreground"
+        active
+          ? "bg-accent/25 text-accent"
+          : "text-muted hover:bg-white/5 hover:text-foreground"
       }`}
     >
       {label}
@@ -91,34 +139,80 @@ function Toolbar({ editor }: { editor: Editor }) {
 
   function link() {
     const previous = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("Indirizzo del link (vuoto per toglierlo)", previous ?? "https://");
+    const url = window.prompt(
+      "Indirizzo del link (vuoto per toglierlo)",
+      previous ?? "https://",
+    );
     if (url === null) return;
-    if (url.trim() === "" || url === "https://") chain().extendMarkRange("link").unsetLink().run();
+    if (url.trim() === "" || url === "https://")
+      chain().extendMarkRange("link").unsetLink().run();
     else chain().extendMarkRange("link").setLink({ href: url.trim() }).run();
   }
 
   return (
     <>
-      {btn(<b>G</b>, "Grassetto", editor.isActive("bold"), () => chain().toggleBold().run())}
-      {btn(<i>C</i>, "Corsivo", editor.isActive("italic"), () => chain().toggleItalic().run())}
-      {btn(<u>S</u>, "Sottolineato", editor.isActive("underline"), () => chain().toggleUnderline().run())}
+      {btn(<b>G</b>, "Grassetto", editor.isActive("bold"), () =>
+        chain().toggleBold().run(),
+      )}
+      {btn(<i>C</i>, "Corsivo", editor.isActive("italic"), () =>
+        chain().toggleItalic().run(),
+      )}
+      {btn(<u>S</u>, "Sottolineato", editor.isActive("underline"), () =>
+        chain().toggleUnderline().run(),
+      )}
       <ColorPicker editor={editor} />
+      <FontFamilySelect editor={editor} />
       <FontSizeSelect editor={editor} />
       <span className="mx-1 h-5 w-px bg-border" />
-      {btn("T1", "Titolo", editor.isActive("heading", { level: 2 }), () => chain().toggleHeading({ level: 2 }).run())}
-      {btn("T2", "Sottotitolo", editor.isActive("heading", { level: 3 }), () => chain().toggleHeading({ level: 3 }).run())}
+      {btn("T1", "Titolo", editor.isActive("heading", { level: 2 }), () =>
+        chain().toggleHeading({ level: 2 }).run(),
+      )}
+      {btn("T2", "Sottotitolo", editor.isActive("heading", { level: 3 }), () =>
+        chain().toggleHeading({ level: 3 }).run(),
+      )}
       <span className="mx-1 h-5 w-px bg-border" />
-      {btn(<AlignIcon kind="left" />, "Allinea a sinistra", editor.isActive({ textAlign: "left" }), () => chain().setTextAlign("left").run())}
-      {btn(<AlignIcon kind="center" />, "Centra", editor.isActive({ textAlign: "center" }), () => chain().setTextAlign("center").run())}
-      {btn(<AlignIcon kind="right" />, "Allinea a destra", editor.isActive({ textAlign: "right" }), () => chain().setTextAlign("right").run())}
-      {btn(<AlignIcon kind="justify" />, "Giustifica", editor.isActive({ textAlign: "justify" }), () => chain().setTextAlign("justify").run())}
+      {btn(
+        <AlignIcon kind="left" />,
+        "Allinea a sinistra",
+        editor.isActive({ textAlign: "left" }),
+        () => chain().setTextAlign("left").run(),
+      )}
+      {btn(
+        <AlignIcon kind="center" />,
+        "Centra",
+        editor.isActive({ textAlign: "center" }),
+        () => chain().setTextAlign("center").run(),
+      )}
+      {btn(
+        <AlignIcon kind="right" />,
+        "Allinea a destra",
+        editor.isActive({ textAlign: "right" }),
+        () => chain().setTextAlign("right").run(),
+      )}
+      {btn(
+        <AlignIcon kind="justify" />,
+        "Giustifica",
+        editor.isActive({ textAlign: "justify" }),
+        () => chain().setTextAlign("justify").run(),
+      )}
       <span className="mx-1 h-5 w-px bg-border" />
-      {btn("•", "Elenco puntato", editor.isActive("bulletList"), () => chain().toggleBulletList().run())}
-      {btn("1.", "Elenco numerato", editor.isActive("orderedList"), () => chain().toggleOrderedList().run())}
-      {btn("❝", "Riquadro esempio / citazione", editor.isActive("blockquote"), () => chain().toggleBlockquote().run())}
+      {btn("•", "Elenco puntato", editor.isActive("bulletList"), () =>
+        chain().toggleBulletList().run(),
+      )}
+      {btn("1.", "Elenco numerato", editor.isActive("orderedList"), () =>
+        chain().toggleOrderedList().run(),
+      )}
+      {btn(
+        "❝",
+        "Riquadro esempio / citazione",
+        editor.isActive("blockquote"),
+        () => chain().toggleBlockquote().run(),
+      )}
       {btn("🔗", "Link", editor.isActive("link"), link)}
       <ImageButton editor={editor} />
-      {btn("―", "Linea separatrice", false, () => chain().setHorizontalRule().run())}
+      {btn("―", "Linea separatrice", false, () =>
+        chain().setHorizontalRule().run(),
+      )}
       <span className="mx-1 h-5 w-px bg-border" />
       {btn("↶", "Annulla", false, () => chain().undo().run())}
       {btn("↷", "Ripeti", false, () => chain().redo().run())}
@@ -127,15 +221,49 @@ function Toolbar({ editor }: { editor: Editor }) {
 }
 
 // Icona delle righe di testo allineate
-function AlignIcon({ kind }: { kind: "left" | "center" | "right" | "justify" }) {
+function AlignIcon({
+  kind,
+}: {
+  kind: "left" | "center" | "right" | "justify";
+}) {
   const lines: Record<typeof kind, [number, number][]> = {
-    left: [[3, 21], [3, 15], [3, 21], [3, 13]],
-    center: [[3, 21], [6, 18], [3, 21], [7, 17]],
-    right: [[3, 21], [9, 21], [3, 21], [11, 21]],
-    justify: [[3, 21], [3, 21], [3, 21], [3, 21]],
+    left: [
+      [3, 21],
+      [3, 15],
+      [3, 21],
+      [3, 13],
+    ],
+    center: [
+      [3, 21],
+      [6, 18],
+      [3, 21],
+      [7, 17],
+    ],
+    right: [
+      [3, 21],
+      [9, 21],
+      [3, 21],
+      [11, 21],
+    ],
+    justify: [
+      [3, 21],
+      [3, 21],
+      [3, 21],
+      [3, 21],
+    ],
   };
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="mx-auto">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+      className="mx-auto"
+    >
       {lines[kind].map(([x1, x2], i) => (
         <path key={i} d={`M${x1} ${5 + i * 5}H${x2}`} />
       ))}
@@ -160,12 +288,14 @@ const PALETTE = [
 function ColorPicker({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
-  const current = (editor.getAttributes("textStyle").color as string | undefined) ?? null;
+  const current =
+    (editor.getAttributes("textStyle").color as string | undefined) ?? null;
 
   // Il menu si chiude cliccando altrove
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const close = (e: MouseEvent) =>
+      !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
@@ -188,7 +318,10 @@ function ColorPicker({ editor }: { editor: Editor }) {
         className="flex h-8 min-w-8 flex-col items-center justify-center rounded px-1.5 text-sm text-muted hover:bg-white/5 hover:text-foreground"
       >
         <span className="leading-none font-bold">A</span>
-        <span className="mt-0.5 h-1 w-4 rounded-sm" style={{ background: current ?? "var(--foreground)" }} />
+        <span
+          className="mt-0.5 h-1 w-4 rounded-sm"
+          style={{ background: current ?? "var(--foreground)" }}
+        />
       </button>
       {open && (
         <span className="absolute top-9 left-0 z-50 w-44 rounded-md border border-border bg-panel p-2 shadow-xl shadow-black">
@@ -211,12 +344,19 @@ function ColorPicker({ editor }: { editor: Editor }) {
               <input
                 type="color"
                 value={current ?? "#e4dfdb"}
-                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                onChange={(e) =>
+                  editor.chain().focus().setColor(e.target.value).run()
+                }
                 className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent"
               />
               Altro
             </label>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => apply(null)} className="hover:text-accent">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => apply(null)}
+              className="hover:text-accent"
+            >
               Togli colore
             </button>
           </span>
@@ -238,8 +378,52 @@ const SIZES = [
   { label: "Enorme", value: "36px" },
 ];
 
+// Caratteri: quelli del sito e alcuni classici che hanno tutti i computer
+const FONTS = [
+  { label: "Carattere", value: "" },
+  { label: "Cinzel (titoli)", value: "var(--font-title), serif" },
+  { label: "Open Sans (testo)", value: "var(--font-body), sans-serif" },
+  { label: "Lora", value: "var(--font-lora), serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Garamond", value: "Garamond, 'Times New Roman', serif" },
+  { label: "Times", value: "'Times New Roman', serif" },
+  { label: "Verdana", value: "Verdana, sans-serif" },
+  { label: "Arial", value: "Arial, sans-serif" },
+  { label: "Corsivo", value: "'Brush Script MT', 'Segoe Script', cursive" },
+  { label: "Macchina da scrivere", value: "'Courier New', monospace" },
+];
+
+function FontFamilySelect({ editor }: { editor: Editor }) {
+  const current =
+    (editor.getAttributes("textStyle").fontFamily as string | undefined) ?? "";
+  return (
+    <select
+      value={FONTS.some((f) => f.value === current) ? current : ""}
+      onChange={(e) => {
+        const font = e.target.value;
+        if (font) editor.chain().focus().setFontFamily(font).run();
+        else editor.chain().focus().unsetFontFamily().run();
+      }}
+      title="Carattere del testo"
+      aria-label="Carattere del testo"
+      className="h-8 max-w-32 rounded border border-border bg-background px-1.5 text-xs text-muted hover:text-foreground"
+    >
+      {FONTS.map((f) => (
+        <option
+          key={f.label}
+          value={f.value}
+          style={f.value ? { fontFamily: f.value } : undefined}
+        >
+          {f.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function FontSizeSelect({ editor }: { editor: Editor }) {
-  const current = (editor.getAttributes("textStyle").fontSize as string | undefined) ?? "";
+  const current =
+    (editor.getAttributes("textStyle").fontSize as string | undefined) ?? "";
   return (
     <select
       value={SIZES.some((s) => s.value === current) ? current : ""}
@@ -276,7 +460,8 @@ function ImageButton({ editor }: { editor: Editor }) {
   // Il riquadro si chiude cliccando altrove
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const close = (e: MouseEvent) =>
+      !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
@@ -291,11 +476,19 @@ function ImageButton({ editor }: { editor: Editor }) {
       form.set("image", file);
       const res = await uploadGuideImage(form);
       setBusy(false);
-      if (res.error || !res.url) return setError(res.error ?? "Caricamento non riuscito.");
+      if (res.error || !res.url)
+        return setError(res.error ?? "Caricamento non riuscito.");
       src = res.url;
     }
-    if (!src.toLowerCase().startsWith("https://")) return setError("Carica un file oppure incolla un indirizzo che inizia con https://");
-    editor.chain().focus().setImage({ src, alt: alt.trim() || undefined }).run();
+    if (!src.toLowerCase().startsWith("https://"))
+      return setError(
+        "Carica un file oppure incolla un indirizzo che inizia con https://",
+      );
+    editor
+      .chain()
+      .focus()
+      .setImage({ src, alt: alt.trim() || undefined })
+      .run();
     setOpen(false);
     setUrl("");
     setAlt("");
@@ -316,11 +509,11 @@ function ImageButton({ editor }: { editor: Editor }) {
         🖼
       </button>
       {open && (
-        <div
-          className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black"
-        >
+        <div className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black">
           <label className="block">
-            <span className="mb-1 block tracking-wider text-muted uppercase">Dal computer (max 2 MB)</span>
+            <span className="mb-1 block tracking-wider text-muted uppercase">
+              Dal computer (max 2 MB)
+            </span>
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
@@ -329,18 +522,54 @@ function ImageButton({ editor }: { editor: Editor }) {
             />
           </label>
           <label className="block">
-            <span className="mb-1 block tracking-wider text-muted uppercase">Oppure indirizzo web</span>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insert(); } }} disabled={!!file} placeholder="https://..." className="input py-1 text-xs" />
+            <span className="mb-1 block tracking-wider text-muted uppercase">
+              Oppure indirizzo web
+            </span>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  insert();
+                }
+              }}
+              disabled={!!file}
+              placeholder="https://..."
+              className="input py-1 text-xs"
+            />
           </label>
           <label className="block">
-            <span className="mb-1 block tracking-wider text-muted uppercase">Descrizione (facoltativa)</span>
-            <input value={alt} onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insert(); } }} maxLength={150} placeholder="Es. Mappa di Essos" className="input py-1 text-xs" />
+            <span className="mb-1 block tracking-wider text-muted uppercase">
+              Descrizione (facoltativa)
+            </span>
+            <input
+              value={alt}
+              onChange={(e) => setAlt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  insert();
+                }
+              }}
+              maxLength={150}
+              placeholder="Es. Mappa di Essos"
+              className="input py-1 text-xs"
+            />
           </label>
           {error && <p className="text-red-400">{error}</p>}
-          <button type="button" onClick={insert} className="btn w-full py-1.5 text-xs" disabled={busy || (!file && !url.trim())}>
+          <button
+            type="button"
+            onClick={insert}
+            className="btn w-full py-1.5 text-xs"
+            disabled={busy || (!file && !url.trim())}
+          >
             {busy ? "Caricamento..." : "Inserisci"}
           </button>
-          <p className="text-[0.625rem] leading-snug text-muted">Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine per ridimensionarla.</p>
+          <p className="text-[0.625rem] leading-snug text-muted">
+            Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine
+            per ridimensionarla.
+          </p>
         </div>
       )}
     </span>

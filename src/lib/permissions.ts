@@ -78,8 +78,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Forum e bacheca",
     description: "Forum, annunci e comunicazioni.",
     items: [
-      { key: "forum.moderare", label: "Moderare il forum", description: "Modificare ed eliminare post altrui", soon: true },
-      { key: "forum.sezioni", label: "Gestire le sezioni", description: "Creare ed eliminare sezioni del forum", soon: true },
+      { key: "forum.moderare", label: "Moderare il forum", description: "Modificare ed eliminare gli interventi di tutti, chiudere, fissare e rendere importanti le discussioni" },
+      { key: "forum.sezioni", label: "Gestire le sezioni", description: "Creare, modificare ed eliminare categorie e sezioni del forum" },
       { key: "notizie.on", label: "Notizie ON", description: "Scrivere, modificare ed eliminare le Notizie ON (dal mondo di gioco)" },
       { key: "annunci.globali", label: "Notizie OFF", description: "Scrivere, modificare ed eliminare le Notizie OFF" },
     ],

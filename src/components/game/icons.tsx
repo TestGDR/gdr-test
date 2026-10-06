@@ -200,3 +200,12 @@ export const MarketIcon = () => (
     <path d="M9.5 20v-5h5v5" />
   </svg>
 );
+
+// Forum: due fogli con le righe del testo (discussioni)
+export const ForumIcon = () => (
+  <svg {...base}>
+    <path d="M4 4.5h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3H4A1.5 1.5 0 0 1 2.5 13V6A1.5 1.5 0 0 1 4 4.5Z" />
+    <path d="M6 8h7M6 11h4.5" />
+    <path d="M19 9h.5A1.5 1.5 0 0 1 21 10.5v6a1.5 1.5 0 0 1-1.5 1.5H19v3l-3.5-3H12" />
+  </svg>
+);
