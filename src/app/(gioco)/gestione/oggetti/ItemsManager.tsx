@@ -64,7 +64,12 @@ export default function ItemsManager({
         ))}
       </div>
       {tab === "oggetti" && (
-        <ItemsTab slots={slots} categories={categories} items={items} />
+        <ItemsTab
+          slots={slots}
+          categories={categories}
+          qualities={qualities}
+          items={items}
+        />
       )}
       {tab === "assegna" && <GiveTab slots={slots} items={items} />}
       {tab === "categorie" && <CategoriesTab categories={categories} />}
@@ -86,15 +91,19 @@ const EMPTY: Omit<Item, "id"> = {
   category_id: null,
   price: null,
   in_shop: false,
+  at_signup: false,
+  quality_id: null,
 };
 
 function ItemsTab({
   slots,
   categories,
+  qualities,
   items,
 }: {
   slots: Slot[];
   categories: Category[];
+  qualities: Quality[];
   items: Item[];
 }) {
   const [selected, setSelected] = useState<string | "nuovo" | null>(
@@ -110,6 +119,7 @@ function ItemsTab({
   return (
     <div className="grid gap-5 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
       <div className="space-y-2">
+        <SignupMax />
         <button
           type="button"
           onClick={() => setSelected("nuovo")}
@@ -140,8 +150,11 @@ function ItemsTab({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-accent">{i.name}</span>
                   <span className="block text-xs text-muted">
-                    {itemPlace(i, slots)}
-                    {i.in_shop && i.price !== null && ` · negozio ${i.price}`}
+                    {qualities.find((q) => q.id === i.quality_id)?.name ??
+                      qualities[0]?.name}{" "}
+                    · {itemPlace(i, slots)}
+                    {i.in_shop && i.price !== null && ` · mercato ${i.price}`}
+                    {i.at_signup && " · iscrizione"}
                   </span>
                 </span>
               </button>
@@ -156,6 +169,7 @@ function ItemsTab({
         key={selected ?? "x"}
         slots={slots}
         categories={categories}
+        qualities={qualities}
         item={current ?? null}
         onCreated={(id) => setSelected(id)}
       />
@@ -166,11 +180,13 @@ function ItemsTab({
 function ItemForm({
   slots,
   categories,
+  qualities,
   item,
   onCreated,
 }: {
   slots: Slot[];
   categories: Category[];
+  qualities: Quality[];
   item: Item | null;
   onCreated: (id: string) => void;
 }) {
@@ -355,20 +371,51 @@ function ItemForm({
             className="input w-32! py-1.5"
           />
         </label>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+        <label className="block">
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Livello
+          </span>
+          <select
+            value={v.quality_id ?? qualities[0]?.id ?? ""}
+            onChange={(e) => set({ quality_id: e.target.value || null })}
+            className="input w-40! py-1.5"
+          >
+            {qualities.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={!!v.at_signup}
+            onChange={(e) => set({ at_signup: e.target.checked })}
+          />
+          Disponibile all&apos;iscrizione
+        </label>
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={v.in_shop}
             disabled={v.price === null}
             onChange={(e) => set({ in_shop: e.target.checked })}
           />
-          In vendita nel negozio
+          Presente al mercato
         </label>
       </div>
+      <p className="text-xs text-muted">
+        Il livello è la qualità con cui l&apos;oggetto arriva al PG: comprato al
+        mercato, scelto all&apos;iscrizione o assegnato dallo staff. Poi il
+        fabbro può migliorarlo.
+      </p>
       {v.price === null && (
         <p className="text-xs text-muted">
-          Senza prezzo l&apos;oggetto non si vende: lo può solo assegnare lo
-          staff.
+          Senza prezzo l&apos;oggetto non va al mercato: si può solo scegliere
+          all&apos;iscrizione o assegnare dallo staff.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
@@ -1134,6 +1181,74 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
         </button>
       </div>
       <Note msg={msg} />
+    </div>
+  );
+}
+
+// Quanti oggetti si scelgono all'iscrizione (tra quelli "disponibili all'iscrizione")
+function SignupMax() {
+  const supabase = useMemo(() => createClient(), []);
+  const [max, setMax] = useState<number | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
+  const [msg, setMsg] = useState<Msg>(null);
+
+  useEffect(() => {
+    supabase
+      .from("item_settings")
+      .select("signup_max")
+      .maybeSingle()
+      .then(({ data }) => {
+        const n = (data?.signup_max as number | undefined) ?? 3;
+        setMax(n);
+        setSaved(n);
+      });
+  }, [supabase]);
+
+  async function save() {
+    if (max === null) return;
+    const { error } = await supabase
+      .from("item_settings")
+      .update({ signup_max: max })
+      .eq("id", true);
+    setMsg(
+      error
+        ? { ok: false, text: "Non salvato." }
+        : { ok: true, text: "Salvato." },
+    );
+    if (!error) setSaved(max);
+  }
+
+  return (
+    <div className="space-y-1 border border-border/60 bg-black/30 p-2 text-xs">
+      <label className="flex items-center justify-between gap-2 text-muted">
+        Oggetti da scegliere all&apos;iscrizione
+        <input
+          type="number"
+          min={0}
+          max={20}
+          value={max ?? ""}
+          onChange={(e) =>
+            setMax(
+              Math.min(
+                20,
+                Math.max(0, Math.trunc(Number(e.target.value)) || 0),
+              ),
+            )
+          }
+          className="input w-16! py-1 text-sm"
+        />
+      </label>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={max === null || max === saved}
+          onClick={save}
+          className="btn px-2 py-1 text-xs"
+        >
+          Salva
+        </button>
+        <Note msg={msg} />
+      </div>
     </div>
   );
 }

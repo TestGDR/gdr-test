@@ -103,6 +103,7 @@ export default function MarketPanel({
           characterId={characterId}
           coins={coins}
           categories={categories}
+          qualities={qualities}
           slotName={slotName}
           onPaid={loadCoins}
         />
@@ -126,12 +127,14 @@ function Shop({
   characterId,
   coins,
   categories,
+  qualities,
   slotName,
   onPaid,
 }: {
   characterId: string;
   coins: number | null;
   categories: Category[];
+  qualities: Quality[];
   slotName: (i: Item) => string;
   onPaid: () => void;
 }) {
@@ -232,7 +235,13 @@ function Shop({
                 >
                   {it.name}
                 </span>
-                <span className="block text-xs text-muted">{slotName(it)}</span>
+                <span className="block text-xs text-muted">
+                  <span className="text-[#d8c39a]">
+                    {qualities.find((q) => q.id === it.quality_id)?.name ??
+                      qualities[0]?.name}
+                  </span>{" "}
+                  · {slotName(it)}
+                </span>
               </span>
               <span className="text-xs whitespace-nowrap text-accent">
                 {it.price} monete

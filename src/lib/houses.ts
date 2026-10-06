@@ -23,6 +23,7 @@ export type HouseRole = {
   min_age: number | null;
   max_age: number | null;
   can_build: boolean; // chi ha questo ruolo costruisce strutture nei feudi della casata
+  description?: string; // indicazioni sul BG e note OFF su come giocarlo
 };
 
 // Una riga di signup_house_roles(): ruolo che un PG puo' scegliere all'iscrizione

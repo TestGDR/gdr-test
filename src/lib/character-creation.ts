@@ -33,6 +33,7 @@ export const STEPS = [
   "Identità",
   "Caratteristiche",
   "Aspetto e storia",
+  "Equipaggiamento",
   "Riepilogo",
 ] as const;
 
@@ -42,6 +43,7 @@ export type CreationData = {
   attributes?: Record<string, number>;
   appearance?: string;
   story?: string;
+  items?: string[]; // oggetti di partenza scelti (disponibili all'iscrizione)
 };
 
 const ids = (list: readonly { id: string }[]) => list.map((x) => x.id);
@@ -77,6 +79,15 @@ export function sanitizeCreationData(raw: unknown): CreationData {
   if (typeof input.sex === "string" && ids(SEXES).includes(input.sex))
     out.sex = input.sex;
   if (Number.isInteger(input.age)) out.age = input.age as number;
+  if (Array.isArray(input.items))
+    out.items = [
+      ...new Set(
+        input.items.filter(
+          (x): x is string =>
+            typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x),
+        ),
+      ),
+    ].slice(0, 20);
   if (input.attributes && typeof input.attributes === "object") {
     const attrs = input.attributes as Record<string, unknown>;
     out.attributes = Object.fromEntries(

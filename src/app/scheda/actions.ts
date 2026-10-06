@@ -107,6 +107,30 @@ export async function finalizeCharacter(
   if (error) return { error: "Creazione non riuscita, riprova." };
   await admin.from("character_drafts").delete().eq("character_id", characterId);
 
+  // Equipaggiamento di partenza: solo oggetti davvero disponibili all'iscrizione,
+  // al massimo quanti ne permette lo staff (nascono del livello dell'oggetto)
+  if (data.items?.length) {
+    const [{ data: allowed }, { data: settings }] = await Promise.all([
+      admin
+        .from("items")
+        .select("id")
+        .eq("at_signup", true)
+        .in("id", data.items),
+      admin.from("item_settings").select("signup_max").maybeSingle(),
+    ]);
+    const max = (settings?.signup_max as number | undefined) ?? 3;
+    const ok = new Set((allowed ?? []).map((i) => i.id as string));
+    const rows = data.items
+      .filter((id) => ok.has(id))
+      .slice(0, max)
+      .map((item_id) => ({
+        character_id: characterId,
+        item_id,
+        source: "iscrizione",
+      }));
+    if (rows.length) await admin.from("character_items").insert(rows);
+  }
+
   revalidatePath("/", "layout");
   return {};
 }

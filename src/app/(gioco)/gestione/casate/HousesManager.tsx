@@ -581,6 +581,7 @@ function RoleRow({
     minAge: toInput(role?.min_age),
     maxAge: toInput(role?.max_age),
     build: role?.can_build ?? false,
+    description: role?.description ?? "",
   });
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -600,6 +601,7 @@ function RoleRow({
           min_age: fromInput(form.minAge),
           max_age: fromInput(form.maxAge),
           can_build: form.build,
+          description: form.description,
         }),
       role ? "Ruolo salvato." : "Ruolo aggiunto.",
     );
@@ -662,6 +664,21 @@ function RoleRow({
           </>
         )}
       </div>
+
+      {/* Descrizione: BG, note OFF su come giocarlo, dove e' collocato */}
+      <label className="mt-2 block">
+        <span className="mb-0.5 block text-[0.625rem] tracking-wider text-muted uppercase">
+          Descrizione (BG, note OFF su come giocarlo, dove è collocato)
+        </span>
+        <textarea
+          value={form.description}
+          onChange={(e) => set({ description: e.target.value })}
+          maxLength={4000}
+          rows={form.description ? 4 : 2}
+          placeholder="Es. Comandante della guardia di Approdo del Re. Gioca un uomo d'arme rigido e leale…"
+          className="input resize-y py-1.5 text-sm"
+        />
+      </label>
 
       {role && (
         <p className="mt-2 text-xs text-muted">

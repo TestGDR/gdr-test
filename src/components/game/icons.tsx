@@ -209,3 +209,12 @@ export const ForumIcon = () => (
     <path d="M19 9h.5A1.5 1.5 0 0 1 21 10.5v6a1.5 1.5 0 0 1-1.5 1.5H19v3l-3.5-3H12" />
   </svg>
 );
+
+// Voci e pettegolezzi: bocca che sussurra all'orecchio (onde del bisbiglio)
+export const GossipIcon = () => (
+  <svg {...base}>
+    <path d="M9 4.5a6.5 6.5 0 0 1 6.5 6.5c0 2.4-1.3 3.6-2.4 4.6-.9.8-1.6 1.5-1.6 2.9a2.5 2.5 0 0 1-5 0" />
+    <path d="M9 8.5a2.5 2.5 0 0 1 2.5 2.5c0 1-.6 1.6-1.2 2" />
+    <path d="M18.5 7.5c1 1 1.5 2.2 1.5 3.5s-.5 2.5-1.5 3.5M21 5c1.5 1.6 2.3 3.6 2.3 6s-.8 4.4-2.3 6" />
+  </svg>
+);

@@ -113,6 +113,7 @@ export default function HouseView({ house, roles, npcs, members, family, relatio
                         {r.signup_available && r.max_members !== null && ` · ${pgs.length + pngs.length}/${r.max_members} posti`}
                       </span>
                     </div>
+                    {r.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{r.description}</p>}
                     <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
                       {pgs.map((m) => (
                         <button key={m.id} type="button" onClick={() => setSheetId(m.id)} className="rounded-full border border-accent/50 px-2 py-0.5 text-accent hover:bg-accent/10">

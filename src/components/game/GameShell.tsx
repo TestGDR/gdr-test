@@ -31,6 +31,7 @@ import {
   FiefIcon,
   MarketIcon,
   ForumIcon,
+  GossipIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -56,6 +57,8 @@ import AbsencesPanel from "./AbsencesPanel";
 import TravelPanel from "./TravelPanel";
 import FiefsPanel from "@/components/houses/FiefsPanel";
 import MarketPanel from "./MarketPanel";
+import GossipPanel, { useGossipPending } from "./GossipPanel";
+import { useIdleLogout } from "./idle-logout";
 import Forum from "@/components/forum/Forum";
 import { ForumUnreadContext, useForumUnread } from "@/components/forum/forum-data";
 import { useNewsUnseen } from "./news-unseen";
@@ -107,11 +110,12 @@ type Props = {
   canChooseOrigin: boolean; // sceglie da dove parte un cartiglio
   canModerateForum: boolean; // modera il forum
   canManageForum: boolean; // categorie e sezioni del forum
+  canReviewGossip: boolean; // approva i pettegolezzi
   children: ReactNode;
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -121,6 +125,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   feudi: "Feudi e risorse della casata",
   mercato: "Mercato",
   forum: "Forum",
+  voci: "Voci e pettegolezzi",
 };
 
 export default function GameShell({
@@ -143,6 +148,7 @@ export default function GameShell({
   canChooseOrigin,
   canModerateForum,
   canManageForum,
+  canReviewGossip,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -195,7 +201,9 @@ export default function GameShell({
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
   const sheetActions = useMemo(() => ({ message: (kind: MessageKind, to: Contact) => openMessages(kind, to) }), []);
-  const forumUnread = useForumUnread(userId); // discussioni con interventi nuovi: l'icona del forum si accende
+  const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
+  const forumUnread = useForumUnread(userId);
+  const gossipPending = useGossipPending(canReviewGossip, panel === "voci"); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
@@ -226,6 +234,7 @@ export default function GameShell({
       <NewsUnseenContext.Provider value={news.unseen}>
       <TicketContext.Provider value={ticketCtx}>
       <ForumUnreadContext.Provider value={forumUnread.count}>
+      <GossipPendingContext.Provider value={gossipPending}>
       <SheetActionsContext.Provider value={sheetActions}>
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
@@ -424,6 +433,7 @@ export default function GameShell({
         )}
         {panel === "feudi" && character && <FiefsPanel key={panelSession} characterId={character.id} />}
         {panel === "mercato" && <MarketPanel key={panelSession} character={character} />}
+        {panel === "voci" && <GossipPanel key={panelSession} character={character} canReview={canReviewGossip} />}
         {panel === "forum" && (
           <Forum
             key={panelSession}
@@ -454,6 +464,24 @@ export default function GameShell({
         onMessageOff={(to) => openMessages("off", to)}
       />
       </SheetActionsContext.Provider>
+      {idle.minutesLeft !== null && (
+        <div
+          role="alert"
+          className="fixed bottom-4 left-1/2 z-[70] flex w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 flex-wrap items-center gap-3 border border-accent/60 bg-panel px-4 py-3 text-sm shadow-2xl shadow-black"
+        >
+          <span className="min-w-0 flex-1">
+            Nessuna attività da quasi un&apos;ora: tra{" "}
+            <strong className="text-accent">
+              {idle.minutesLeft} {idle.minutesLeft === 1 ? "minuto" : "minuti"}
+            </strong>{" "}
+            la sessione verrà chiusa.
+          </span>
+          <button type="button" onClick={idle.stay} className="btn px-3 py-1.5 text-xs">
+            Continua a giocare
+          </button>
+        </div>
+      )}
+      </GossipPendingContext.Provider>
       </ForumUnreadContext.Provider>
       </TicketContext.Provider>
       </NewsUnseenContext.Provider>
@@ -1089,12 +1117,18 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "feudi", icon: <FiefIcon /> },
   { id: "mercato", icon: <MarketIcon /> },
   { id: "forum", icon: <ForumIcon /> },
+  { id: "voci", icon: <GossipIcon /> },
 ];
 // Feudi: solo per chi appartiene a una casata
+// Pettegolezzi in attesa (per chi li approva): l'icona Voci si accende
+const GossipPendingContext = createContext(0);
+
 const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
 const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
   p === "forum" && newNews
     ? "Forum: interventi nuovi"
+    : p === "voci" && newNews
+    ? "Voci e pettegolezzi: da approvare"
     : p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
     : newNews
@@ -1119,8 +1153,12 @@ function PanelButton({
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
   const unseen = useContext(NewsUnseenContext);
   const forumNew = useContext(ForumUnreadContext);
+  const gossipNew = useContext(GossipPendingContext);
   const newNews =
-    (panel === "notizie-on" && unseen.on) || (panel === "notizie-off" && unseen.off) || (panel === "forum" && forumNew > 0); // dorata finche' non si apre
+    (panel === "notizie-on" && unseen.on) ||
+    (panel === "notizie-off" && unseen.off) ||
+    (panel === "forum" && forumNew > 0) ||
+    (panel === "voci" && gossipNew > 0); // dorata finche' non si apre
   return (
     <button
       type="button"
@@ -1135,6 +1173,11 @@ function PanelButton({
         </span>
       )}
       {/* Forum: quante discussioni hanno risposte nuove */}
+      {panel === "voci" && gossipNew > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
+          {gossipNew}
+        </span>
+      )}
       {panel === "forum" && forumNew > 0 && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
           {forumNew}

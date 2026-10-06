@@ -69,6 +69,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Gioco",
     description: "Pannelli dei giocatori.",
     items: [
+      { key: "pettegolezzi.gestire", label: "Voci e pettegolezzi", description: "Approvare, modificare o rifiutare i pettegolezzi di fine giocata; dado e soglia" },
       { key: "ricerca.moderare", label: "Moderare la ricerca gioco", description: "Togliere le ricerche gioco degli altri giocatori" },
       { key: "assenze.gestire", label: "Gestire le assenze", description: "Togliere le assenze segnate dagli altri giocatori" },
     ],

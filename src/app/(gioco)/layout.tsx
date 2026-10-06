@@ -52,6 +52,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canChooseOrigin={permissions.has("missive.parti_da")}
       canModerateForum={permissions.has("forum.moderare")}
       canManageForum={permissions.has("forum.sezioni")}
+      canReviewGossip={permissions.has("pettegolezzi.gestire")}
     >
       {children}
     </GameShell>

@@ -13,11 +13,19 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             Il link è scaduto o non è valido. Richiedine uno nuovo.
           </p>
         )}
+        {errore === "inattivita" && (
+          <p className="mb-4 rounded-md border border-accent/50 bg-accent/10 p-3 text-sm">
+            La sessione è stata chiusa dopo un&apos;ora di inattività. Accedi di
+            nuovo per tornare in gioco.
+          </p>
+        )}
         <h1 className="mb-4 font-serif text-2xl text-accent">Accedi</h1>
         <LoginPanel />
         <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted">
           Non hai ancora un personaggio?
-          <RegisterButton className="btn-ghost mt-3 w-full">Registrati</RegisterButton>
+          <RegisterButton className="btn-ghost mt-3 w-full">
+            Registrati
+          </RegisterButton>
         </div>
       </div>
     </section>

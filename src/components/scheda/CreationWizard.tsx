@@ -21,6 +21,7 @@ import {
   type CreationData,
 } from "@/lib/character-creation";
 import type { Character } from "@/lib/types";
+import StepItems, { ChosenItems } from "./StepItems";
 
 type Props = {
   character: Character;
@@ -137,7 +138,13 @@ export default function CreationWizard({
         {step === 0 && <StepIdentity data={data} update={update} />}
         {step === 1 && <StepAttributes data={data} update={update} />}
         {step === 2 && <StepStory data={data} update={update} />}
-        {step === 3 && <StepSummary name={character.name} data={data} />}
+        {step === 3 && (
+          <StepItems
+            chosen={data.items ?? []}
+            onChange={(items) => update({ items })}
+          />
+        )}
+        {step === 4 && <StepSummary name={character.name} data={data} />}
       </div>
 
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
@@ -374,6 +381,7 @@ function StepSummary({ name, data }: { name: string; data: CreationData }) {
       </div>
       <Item label="Aspetto" value={data.appearance ?? "—"} />
       <Item label="Storia" value={data.story ?? "—"} />
+      <ChosenItems chosen={data.items ?? []} />
     </div>
   );
 }

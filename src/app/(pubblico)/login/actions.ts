@@ -191,6 +191,16 @@ export async function updatePassword(_prev: AuthState, formData: FormData): Prom
   redirect("/mappa");
 }
 
+// Uscita automatica dopo un'ora di inattivita' (vedi idle-logout.ts):
+// come Esci, poi la pagina di accesso spiega il perche'
+export async function logoutIdle() {
+  const supabase = await createClient();
+  await supabase.rpc("leave_online");
+  await supabase.auth.signOut();
+  (await cookies()).delete(ACCESS_COOKIE);
+  redirect("/login?errore=inattivita");
+}
+
 export async function logout() {
   const supabase = await createClient();
   // si sparisce subito dall'elenco dei presenti

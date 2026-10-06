@@ -21,7 +21,9 @@ export type Item = {
   slot_group: string | null; // oppure un gruppo di nicchie (es. "Mano": destra o sinistra, a scelta)
   category_id: string | null;
   price: number | null;
-  in_shop: boolean;
+  in_shop: boolean; // presente al mercato
+  at_signup?: boolean; // disponibile all'iscrizione
+  quality_id?: string | null; // livello (qualita') con cui nasce
 };
 export type Quality = {
   id: string;
