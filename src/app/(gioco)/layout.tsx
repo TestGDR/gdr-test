@@ -26,6 +26,10 @@ export default async function GameLayout({ children }: { children: React.ReactNo
     cookies(),
   ]);
   const savedAvailability = cookieStore.get(AVAILABILITY_COOKIE)?.value;
+  // "Il mio drago" compare solo a chi cavalca un drago
+  const hasDragon = character
+    ? !!(await supabase.from("dragons").select("id").eq("rider_id", character.id).limit(1).maybeSingle()).data
+    : false;
 
   // L'admin e' staff anche senza un ruolo assegnato
   const staffRole =
@@ -53,6 +57,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canModerateForum={permissions.has("forum.moderare")}
       canManageForum={permissions.has("forum.sezioni")}
       canReviewGossip={permissions.has("pettegolezzi.gestire")}
+      hasDragon={hasDragon}
     >
       {children}
     </GameShell>

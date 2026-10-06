@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
+  Fragment,
   useCallback,
   useContext,
   useEffect,
@@ -111,6 +112,7 @@ type Props = {
   canModerateForum: boolean; // modera il forum
   canManageForum: boolean; // categorie e sezioni del forum
   canReviewGossip: boolean; // approva i pettegolezzi
+  hasDragon: boolean; // cavalca un drago: vede "Il mio drago"
   children: ReactNode;
 };
 
@@ -149,6 +151,7 @@ export default function GameShell({
   canModerateForum,
   canManageForum,
   canReviewGossip,
+  hasDragon,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -204,6 +207,14 @@ export default function GameShell({
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
   const forumUnread = useForumUnread(userId);
   const gossipPending = useGossipPending(canReviewGossip, panel === "voci"); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
+  // Avviso a schermo quando arriva una risposta a un ticket: resta finche' non lo si chiude
+  const [ticketSeenCount, setTicketSeenCount] = useState(tickets.count);
+  const [ticketToast, setTicketToast] = useState(false);
+  if (tickets.count !== ticketSeenCount) {
+    setTicketSeenCount(tickets.count);
+    if (tickets.count > ticketSeenCount) setTicketToast(true);
+    else if (tickets.count === 0) setTicketToast(false);
+  }
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
   const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
@@ -353,7 +364,7 @@ export default function GameShell({
                   canManage={canManage}
                   onlineCount={online.length}
                   onOpenOnline={() => setOnlineOpen(true)}
-                  onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
+                  onOpenDragon={character && hasDragon ? () => setDragonOpen((n) => n + 1) : null}
                   onOpenPanel={openPanel}
                   newRequests={playRequests.count}
                   inHouse={!!character?.house}
@@ -376,13 +387,13 @@ export default function GameShell({
             inert={!rightOpen}
             className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 ${
               rightOpen
-                ? "lg:w-24 lg:overflow-visible lg:border-border lg:opacity-100"
+                ? "lg:w-36 lg:overflow-visible lg:border-border lg:opacity-100"
                 : "lg:w-0 lg:overflow-hidden lg:border-transparent lg:opacity-0"
             }`}
           >
             <RightRail
               canManage={canManage}
-              onOpenDragon={character ? () => setDragonOpen((n) => n + 1) : null}
+              onOpenDragon={character && hasDragon ? () => setDragonOpen((n) => n + 1) : null}
               onOpenPanel={openPanel}
               newRequests={playRequests.count}
               inHouse={!!character?.house}
@@ -408,6 +419,35 @@ export default function GameShell({
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
       <SalaryCollector />
+      {ticketToast && (
+        <div
+          role="alert"
+          className="fixed top-16 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] lg:right-40 border border-accent/60 bg-panel px-4 py-3 shadow-2xl shadow-black"
+        >
+          <div className="flex items-start gap-3">
+            <span aria-hidden className="text-2xl">📜</span>
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-serif text-accent">Ticket</p>
+              <p className="text-muted">
+                {tickets.count === 1 ? "C'è un ticket con una risposta da leggere." : `Ci sono ${tickets.count} ticket con risposte da leggere.`}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setTicketToast(false);
+                  setTicketsOpen((n) => n + 1);
+                }}
+                className="btn mt-2 px-3 py-1 text-xs"
+              >
+                Apri i ticket
+              </button>
+            </div>
+            <button type="button" onClick={() => setTicketToast(false)} aria-label="Chiudi l'avviso" className="text-muted hover:text-accent">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       <Modal open={ticketsOpen > 0} onClose={() => setTicketsOpen(0)} title="Ticket" size="xl">
         {ticketsOpen > 0 && <Tickets key={ticketsOpen} me={character} isStaff={canManageTickets} isAdmin={canTicketCategories} onSeen={tickets.refresh} />}
       </Modal>
@@ -756,12 +796,9 @@ function MobileTools({
   inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
   return (
+    <div className="space-y-2">
     <div className="grid grid-cols-5 gap-2">
-      {canManage && (
-        <Link href="/gestione" className={`${drawerBtn} ${goldGear}`} aria-label="Gestione">
-          <GearIcon />
-        </Link>
-      )}
+      <ManageButton canManage={canManage} className={`${drawerBtn} ${goldGear}`} />
       <UtilityButton
         className={drawerBtn}
         trigger={
@@ -772,20 +809,34 @@ function MobileTools({
         }
       />
       <TicketButton className={drawerBtn} />
-      {onOpenDragon && (
-        <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
-          <DragonIcon />
-        </button>
-      )}
       <button type="button" onClick={onOpenOnline} className={drawerBtn} aria-label={`${onlineCount} presenti online: apri l'elenco`}>
         <UsersIcon />
         <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">
           {onlineCount}
         </span>
       </button>
-      {panelsFor(inHouse).map((p) => (
-        <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
+    </div>
+      {/* stesse categorie della barra di destra del computer */}
+      {panelGroups(inHouse).map((group, i) => (
+        <Fragment key={i}>
+          <RailRule />
+          <div className="grid grid-cols-5 gap-2">
+            {group.map((p) => (
+              <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
+            ))}
+          </div>
+        </Fragment>
       ))}
+      {onOpenDragon && (
+        <>
+          <RailRule />
+          <div className="grid grid-cols-5 gap-2">
+            <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
+              <DragonIcon />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1132,6 +1183,46 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
 const GossipPendingContext = createContext(0);
 
 const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
+
+// Le icone dei pannelli divise per categoria, separate da una riga dorata
+const PANEL_GROUPS: Panel[][] = [
+  ["notizie-on", "notizie-off", "voci"], // notizie e pettegolezzi
+  ["forum", "assenze", "ricerca"], // comunita'
+  ["viaggio", "feudi", "mercato"], // mondo
+];
+const panelGroups = (inHouse: boolean) => {
+  const icons = panelsFor(inHouse);
+  return PANEL_GROUPS.map((g) => g.flatMap((id) => icons.filter((p) => p.id === id))).filter((g) => g.length > 0);
+};
+
+// Riga dorata che sfuma ai lati, tra una categoria e l'altra
+function RailRule({ className = "" }: { className?: string }) {
+  return <div aria-hidden className={`col-span-full my-1 h-px w-full bg-gradient-to-r from-transparent via-[#c9a45c]/70 to-transparent ${className}`} />;
+}
+
+// Gestione: per moderatori e admin porta ai pannelli; agli altri dice che
+// non hanno i permessi
+function ManageButton({ canManage, className, tip = false }: { canManage: boolean; className: string; tip?: boolean }) {
+  const [denied, setDenied] = useState(false);
+  if (canManage)
+    return (
+      <Link href="/gestione" className={className} aria-label="Gestione">
+        <GearIcon />
+        {tip && <Tip>Gestione</Tip>}
+      </Link>
+    );
+  return (
+    <>
+      <button type="button" onClick={() => setDenied(true)} className={className} aria-label="Gestione">
+        <GearIcon />
+        {tip && <Tip>Gestione</Tip>}
+      </button>
+      <Modal open={denied} onClose={() => setDenied(false)} title="Gestione" size="md">
+        <p className="py-4 text-center font-serif text-lg text-[#d8c39a]">Non hai i permessi per accedere qui.</p>
+      </Modal>
+    </>
+  );
+}
 const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
   p === "forum" && newNews
     ? "Forum: interventi nuovi"
@@ -1219,7 +1310,10 @@ function RightRail({
 
   return (
     <>
-      <div className="contents lg:grid lg:grid-cols-2 lg:justify-items-center lg:gap-2">
+      <div className="contents lg:grid lg:grid-cols-3 lg:justify-items-center lg:gap-2 lg:px-2">
+        {/* titolo della barra (solo computer) */}
+        <p className="col-span-full mb-1 w-full text-center font-serif text-sm tracking-[0.25em] text-accent uppercase max-lg:hidden">Menu</p>
+        <RailRule className="max-lg:hidden" />
         {/* In chat: resta e aggiorna i messaggi. Altrove: torna alla mappa aggiornata */}
         <button
           type="button"
@@ -1237,32 +1331,35 @@ function RightRail({
           <MapIcon />
           <Tip>Mappa</Tip>
         </Link>
-        {/* Il mio drago (su cellulare sta nel menu dell'hamburger) */}
-        {onOpenDragon && (
-          <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
-            <DragonIcon />
-            <Tip>Il mio drago</Tip>
-          </button>
-        )}
-        {/* Pannelli di gestione: solo moderatori e admin (su cellulare stanno nel pannello) */}
-        {canManage && (
-          <Link href="/gestione" className={`${railBtn} ${goldGear} max-lg:hidden`} aria-label="Gestione">
-            <GearIcon />
-            <Tip>Gestione</Tip>
-          </Link>
-        )}
-        {/* Notizie, ricerca gioco e assenze (su cellulare stanno nel menu dell'hamburger) */}
-        {panelsFor(inHouse).map((p) => (
-          <PanelButton
-            key={p.id}
-            panel={p.id}
-            icon={p.icon}
-            newRequests={newRequests}
-            onOpen={onOpenPanel}
-            className={`${railBtn} max-lg:hidden`}
-            tip
-          />
+        {/* Gestione: chi non e' moderatore o admin legge che non ha i permessi */}
+        <ManageButton canManage={canManage} className={`${railBtn} ${goldGear} max-lg:hidden`} tip />
+        {/* Pannelli divisi per categoria (su cellulare stanno nel menu dell'hamburger) */}
+        {panelGroups(inHouse).map((group, i) => (
+          <Fragment key={i}>
+            <div aria-hidden className="col-span-full h-2 max-lg:hidden" />
+            {group.map((p) => (
+              <PanelButton
+                key={p.id}
+                panel={p.id}
+                icon={p.icon}
+                newRequests={newRequests}
+                onOpen={onOpenPanel}
+                className={`${railBtn} max-lg:hidden`}
+                tip
+              />
+            ))}
+          </Fragment>
         ))}
+        {/* Il mio drago: solo per chi cavalca un drago */}
+        {onOpenDragon && (
+          <>
+            <div aria-hidden className="col-span-full h-2 max-lg:hidden" />
+            <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
+              <DragonIcon />
+              <Tip>Il mio drago</Tip>
+            </button>
+          </>
+        )}
       </div>
       <form action={logout} className="lg:mt-auto">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">

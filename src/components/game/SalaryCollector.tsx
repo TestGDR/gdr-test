@@ -7,6 +7,7 @@ type Paid = { pg_name: string; collected: number };
 
 // Stipendio giornaliero: si ritira da solo entrando nel gioco.
 // Il database paga una sola volta al giorno, anche se la pagina si ricarica.
+// L'avviso "Stipendio ritirato" sparisce da solo dopo 6 secondi.
 export default function SalaryCollector() {
   const supabase = useMemo(() => createClient(), []);
   const [paid, setPaid] = useState<Paid[]>([]);
@@ -16,6 +17,13 @@ export default function SalaryCollector() {
       if (data?.length) setPaid(data as Paid[]);
     });
   }, [supabase]);
+
+  // l'avviso sparisce da solo dopo qualche secondo
+  useEffect(() => {
+    if (paid.length === 0) return;
+    const t = setTimeout(() => setPaid([]), 6000);
+    return () => clearTimeout(t);
+  }, [paid]);
 
   if (paid.length === 0) return null;
   return (
