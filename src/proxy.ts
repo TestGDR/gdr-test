@@ -62,7 +62,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
   matcher: [
-    // Tutto tranne file statici e immagini
-    "/((?!_next/static|_next/image|favicon.ico|maps/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Tutto tranne file statici, immagini e suoni
+    "/((?!_next/static|_next/image|favicon.ico|maps/|sounds/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp3|wav|ogg)$).*)",
   ],
 };

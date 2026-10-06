@@ -29,6 +29,7 @@ import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
 import Affections from "./Affections";
 import Equipment from "./Equipment";
+import SheetOptions from "./SheetOptions";
 import { cleanPlayerHtml } from "./player-html";
 import { useSheetActions } from "./sheet-actions";
 import SheetHtml, { SHEET_HTML_MAX } from "./SheetHtml";
@@ -163,7 +164,8 @@ type Tab =
   | "caratteristiche"
   | "aspetto"
   | "storia"
-  | "equipaggiamento";
+  | "equipaggiamento"
+  | "opzioni";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "principale", label: "Principale" },
@@ -174,6 +176,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "aspetto", label: "Aspetto" },
   { id: "storia", label: "Storia" },
   { id: "equipaggiamento", label: "Equipaggiamento" },
+  { id: "opzioni", label: "Opzioni" }, // solo sulla propria scheda
 ];
 
 type SheetInfo = {
@@ -220,7 +223,7 @@ function CharacterSheet({
   const [info, setInfo] = useState<SheetInfo | null>(null);
   const [otherSheet, setOtherSheet] = useState<string | null>(null); // scheda di un PG degli Affetti
   // finche' il PG non e' attivo c'e' solo la prima pagina
-  const tabs = active ? TABS : TABS.slice(0, 1);
+  const tabs = active ? TABS.filter((t) => t.id !== "opzioni" || isOwn) : TABS.slice(0, 1);
 
   useEffect(() => {
     if (!active) return;
@@ -328,6 +331,7 @@ function CharacterSheet({
             onSaved={onSaved}
           />
         )}
+        {active && isOwn && tab === "opzioni" && <SheetOptions />}
         {active && tab === "equipaggiamento" && (
           <Equipment characterId={character.id} isOwn={isOwn} />
         )}

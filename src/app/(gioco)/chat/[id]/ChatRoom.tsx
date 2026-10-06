@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
 
@@ -35,20 +36,26 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
     setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
   }
 
-  // Nuovi messaggi in tempo reale (chi e' presente lo mostra la colonna sinistra)
+  // Nuovi messaggi in tempo reale (chi e' presente lo mostra la colonna sinistra).
+  // Quelli degli altri suonano col suono scelto per la chat (Opzioni della scheda)
+  const mine = useMemo(() => new Set(characters.map((c) => c.id)), [characters]);
   useEffect(() => {
     const channel = supabase
       .channel(`room:${roomId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` },
-        (payload) => addMessage(payload.new as Message),
+        (payload) => {
+          const msg = payload.new as Message;
+          if (!mine.has(msg.character_id)) playEvent("chat");
+          addMessage(msg);
+        },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId]);
+  }, [supabase, roomId, mine]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -173,7 +180,10 @@ function MessageRow({ message }: { message: Message }) {
     <p className="leading-relaxed whitespace-pre-line">
       <span className="mr-2 text-xs text-muted">{time}</span>
       <strong className="font-serif text-accent">{message.character_name}</strong>{" "}
-      <FormattedText text={message.content} />
+      {/* colore dell'azione scelto nelle Opzioni della scheda */}
+      <span style={{ color: "var(--chat-action, inherit)" }}>
+        <FormattedText text={message.content} />
+      </span>
     </p>
   );
 }
@@ -186,7 +196,8 @@ function FormattedText({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <span key={i} className="font-semibold text-amber-200">
+          // colore del parlato scelto nelle Opzioni della scheda
+          <span key={i} className="font-semibold" style={{ color: "var(--chat-speech, #fde68a)" }}>
             {part}
           </span>
         ) : (

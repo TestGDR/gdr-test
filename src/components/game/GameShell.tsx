@@ -24,7 +24,8 @@ import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import { GAME_DATE } from "@/lib/game-config";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
-import { everyEvenInBackground, playMessageChime } from "@/lib/notify-sound";
+import { everyEvenInBackground, playEvent, playMessageChime } from "@/lib/notify-sound";
+import { applyPrefs, cachedPrefs, loadPrefs } from "@/lib/prefs";
 import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
@@ -204,6 +205,13 @@ export default function GameShell({
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
   const sheetActions = useMemo(() => ({ message: (kind: MessageKind, to: Contact) => openMessages(kind, to) }), []);
+  // Preferenze dell'account (suoni, grandezza del testo, colori della chat):
+  // subito quelle salvate nel browser, poi quelle del database
+  useEffect(() => {
+    const cached = cachedPrefs();
+    if (cached) applyPrefs(cached);
+    loadPrefs(supabase, userId).then(applyPrefs);
+  }, [supabase, userId]);
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
   const forumUnread = useForumUnread(userId);
   const gossipPending = useGossipPending(canReviewGossip, panel === "voci"); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
@@ -712,7 +720,7 @@ function LeftColumn({
                 onClick={() => p.characterId && onOpenSheet(p.characterId)}
                 disabled={!p.characterId}
                 title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
-                className={`font-name truncate text-left hover:underline disabled:no-underline ${p.userId === userId ? "text-accent" : ""}`}
+                className="font-name truncate text-left hover:underline disabled:no-underline"
               >
                 {p.name}
               </button>
@@ -1038,16 +1046,18 @@ function useUnread(characterId: string | null) {
     return () => clearTimeout(timer);
   }, [counts, deliveryTick, fetchCounts]);
 
-  // Avviso sonoro: subito quando arriva un messaggio, poi ogni 15 secondi finche' resta
-  // qualcosa da leggere. Suona anche con la scheda in secondo piano.
+  // Avviso sonoro: subito quando arriva un messaggio (il suono scelto per le missive
+  // o per gli OFF), poi ogni 15 secondi finche' resta qualcosa da leggere.
+  // Suona anche con la scheda in secondo piano.
   const total = counts.missiva + counts.off;
-  const previous = useRef(0);
+  const previous = useRef({ missiva: 0, off: 0 });
   useEffect(() => {
-    if (total > previous.current) playMessageChime();
-    previous.current = total;
-    if (total === 0) return;
-    return everyEvenInBackground(playMessageChime, 15_000);
-  }, [total]);
+    if (counts.missiva > previous.current.missiva) playEvent("missiva");
+    else if (counts.off > previous.current.off) playEvent("off");
+    previous.current = { missiva: counts.missiva, off: counts.off };
+    if (counts.missiva + counts.off === 0) return;
+    return everyEvenInBackground(() => playEvent(counts.missiva > 0 ? "missiva" : "off"), 15_000);
+  }, [counts.missiva, counts.off]);
 
   // Numero dei non letti nel titolo della scheda, es. "(2) Westeros GDR"
   useEffect(() => {

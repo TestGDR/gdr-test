@@ -409,14 +409,16 @@ body {
 
 /* Schermi grandi: tutto il sito cresce in proporzione (testi, icone, spazi,
    finestre e mappa sono misurati in rem, cioe' rispetto a questa base) */
+/* --text-scale: "Grandezza del testo" scelta nelle Opzioni della scheda (1 = normale) */
+html { font-size: calc(100% * var(--text-scale, 1)); }
 @media (min-width: 1800px) {
-  html { font-size: 112.5%; }
+  html { font-size: calc(112.5% * var(--text-scale, 1)); }
 }
 @media (min-width: 2300px) {
-  html { font-size: 125%; }
+  html { font-size: calc(125% * var(--text-scale, 1)); }
 }
 @media (min-width: 3200px) {
-  html { font-size: 150%; }
+  html { font-size: calc(150% * var(--text-scale, 1)); }
 }
 
 /* Campi e caselle di testo non si schiacciano: sotto questa larghezza la riga
