@@ -3,9 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AGE_MAX, AGE_MIN, ATTRIBUTES, SEXES } from "@/lib/character-creation";
+import { RULES } from "@/lib/rules/config";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
+import { CustomFieldsManage } from "./CustomFields";
 import MaritalManage from "./MaritalManage";
+import RulesManage from "./RulesManage";
 
 // Scheda -> Gestisci. L'admin modifica velocemente i campi principali del PG e
 // sblocca/blocca la scheda; con la scheda sbloccata il proprietario modifica
@@ -27,7 +30,10 @@ export default function SheetManage({
   const [age, setAge] = useState(String(character.age ?? ""));
   const [attrs, setAttrs] = useState<Record<string, number>>(
     Object.fromEntries(
-      ATTRIBUTES.map((a) => [a.id, character.attributes?.[a.id] ?? 0]),
+      ATTRIBUTES.map((a) => [
+        a.id,
+        Number(character.attributes?.[a.id]) || RULES.statMin,
+      ]),
     ),
   );
   const [faceClaim, setFaceClaim] = useState(character.face_claim ?? "");
@@ -220,7 +226,7 @@ export default function SheetManage({
 
       <div>
         <p className="mb-1 text-xs tracking-wider text-muted uppercase">
-          Caratteristiche (punti)
+          Statistiche ({RULES.statMin}-{RULES.statMax})
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {ATTRIBUTES.map((a) => (
@@ -228,18 +234,23 @@ export default function SheetManage({
               key={a.id}
               className="flex items-center justify-between gap-2 border border-border/60 bg-black/30 px-2 py-1.5 text-sm"
             >
-              {a.label}
+              <span title={a.description}>
+                {a.code} · {a.label}
+              </span>
               <input
                 type="number"
-                min={0}
-                max={20}
-                value={attrs[a.id] ?? 0}
+                min={RULES.statMin}
+                max={RULES.statMax}
+                value={attrs[a.id] ?? RULES.statMin}
                 onChange={(e) =>
                   setAttrs((x) => ({
                     ...x,
                     [a.id]: Math.min(
-                      20,
-                      Math.max(0, Math.trunc(Number(e.target.value)) || 0),
+                      RULES.statMax,
+                      Math.max(
+                        RULES.statMin,
+                        Math.trunc(Number(e.target.value)) || 0,
+                      ),
                     ),
                   }))
                 }
@@ -290,6 +301,8 @@ export default function SheetManage({
         )}
       </div>
 
+      {isAdmin && <RulesManage character={character} onSaved={onSaved} section="progress" />}
+      {isAdmin && <CustomFieldsManage character={character} onSaved={onSaved} />}
       {isAdmin && <MaritalManage character={character} onSaved={onSaved} />}
       {isAdmin && character.sex === "donna" && (
         <section className="space-y-2 border-t border-border pt-4">

@@ -43,14 +43,12 @@ export default function Modal({
   onClose,
   title,
   size = "md",
-  centerTitle = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   size?: ModalSize;
-  centerTitle?: boolean; // titolo al centro della barra (es. la scheda del PG)
   children: ReactNode;
 }) {
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
@@ -148,32 +146,25 @@ export default function Modal({
         onCancel={(e) => e.preventDefault()}
         onKeyDown={(e) => e.key === "Escape" && e.preventDefault()}
         style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-        className={`${SIZE_CLASS[size]} m-auto flex-col overflow-hidden rounded-lg border border-border bg-panel p-0 text-foreground shadow-2xl shadow-black backdrop:bg-black/70 open:flex`}
+        className={`${SIZE_CLASS[size]} painted-modal m-auto flex-col overflow-hidden p-0 text-foreground shadow-2xl shadow-black backdrop:bg-black/70 open:flex`}
       >
         <div
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={() => (drag.current = null)}
           onPointerCancel={() => (drag.current = null)}
-          className="bar relative flex shrink-0 cursor-grab touch-none items-center justify-between border-b px-4 py-3 select-none active:cursor-grabbing"
+          className="relative flex shrink-0 cursor-grab touch-none items-center justify-between gap-3 py-2 pr-3 pl-1 select-none active:cursor-grabbing"
         >
-          <h2
-            className={
-              centerTitle
-                ? "pointer-events-none absolute inset-x-28 truncate text-center text-xs font-bold tracking-[0.2em] text-muted uppercase"
-                : "text-xs font-bold tracking-[0.2em] text-muted uppercase"
-            }
-          >
-            {title}
-          </h2>
-          <div className="ml-auto flex items-center gap-3 text-muted">
+          {/* titolo su una pennellata chiara, in alto a sinistra */}
+          <h2 className="painted-title min-w-0 truncate">{title}</h2>
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-[#d9d3c4]">
             <GrabIcon />
             <button
               type="button"
               onClick={minimize}
               aria-label="Riduci a icona"
               title="Riduci a icona"
-              className="leading-none hover:text-accent"
+              className="leading-none hover:text-white"
             >
               <MinimizeIcon />
             </button>
@@ -181,10 +172,9 @@ export default function Modal({
               type="button"
               onClick={close}
               aria-label="Chiudi"
-              className="text-lg leading-none hover:text-accent"
-            >
-              ✕
-            </button>
+              title="Chiudi"
+              className="painted-close"
+            />
           </div>
         </div>
         <div

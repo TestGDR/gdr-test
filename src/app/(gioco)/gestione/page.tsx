@@ -66,6 +66,18 @@ const PANELS = [
     description: "Oggetti indossabili e negozio, parti del corpo, oggetti da assegnare ai PG.",
   },
   {
+    permission: "creazione.gestire",
+    href: "/gestione/creazione",
+    title: "Creazione personaggio",
+    description: "Passaggi della creazione del PG, cosa chiede ognuno (punti, testi, campi nuovi) e anteprima.",
+  },
+  {
+    permission: "regole.gestire",
+    href: "/gestione/regole",
+    title: "Abilità e tratti",
+    description: "Abilità del regolamento (con la statistica collegata), vantaggi e svantaggi con i loro effetti sui tiri.",
+  },
+  {
     permission: "viaggi.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",

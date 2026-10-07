@@ -58,7 +58,7 @@ export const SOUNDS: SoundDef[] = [
 
   // ---- Suoni registrati (public/sounds) ----
   // missive ON
-  { id: "file-corvo", label: "Corvo", group: "missiva", notes: [], file: "/sounds/raven.mp3" },
+  { id: "file-corvo", label: "Corvo", group: "missiva", notes: [], file: "/sounds/corvo.mp3" },
   { id: "file-campana", label: "Campana", group: "missiva", notes: [], file: "/sounds/campana.mp3" },
   { id: "file-porta", label: "Porta", group: "missiva", notes: [], file: "/sounds/porta.mp3" },
   // messaggi OFF e ticket

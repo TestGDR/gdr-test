@@ -87,6 +87,41 @@ body {
   @apply border-blood/60 bg-black/85 backdrop-blur-sm;
 }
 
+/* Modali "dipinte": fondo di pietra come la land, titolo su una pennellata
+   rossa come lo stendardo dei messaggi e X dipinta (grafica in public/images/ui) */
+.painted-modal {
+  /* stesso fondo della land: pietra scura in trasparenza sul nero */
+  background:
+    linear-gradient(rgb(13 11 11 / 0.45), rgb(13 11 11 / 0.45)),
+    url("/images/pietra.jpg") top left / 557px 605px repeat,
+    #0d0b0b;
+  border: 1px solid #2c2624;
+}
+.painted-title {
+  max-width: min(28rem, 100%);
+  padding: 0.55rem 2.4rem 0.55rem 1.4rem;
+  background: url("/images/ui/painted-title.png") center / 100% 100% no-repeat;
+  color: #f2e7c9;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.painted-close {
+  width: 1.5rem;
+  height: 1.5rem;
+  background: url("/images/ui/painted-close.png") center / contain no-repeat;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.painted-close:hover {
+  opacity: 1;
+  transform: rotate(8deg) scale(1.08);
+}
+
 /* Testi di Manuale e Ambientazione (Markdown) */
 .guide-content {
   @apply leading-relaxed;

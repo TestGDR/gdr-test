@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  STEPS,
   TEXT_MAX,
-  firstInvalidStep,
   sanitizeCreationData,
   type CreationData,
+  type CustomValue,
+  type TraitInfo,
 } from "@/lib/character-creation";
+import { allBlocks, cfg, firstInvalidFlowStep, hasBlock, loadFlow, PHYSICAL_FIELDS } from "@/lib/creation-flow";
+import { RULES, STAT_IDS, type StatId } from "@/lib/rules/config";
 import { VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
@@ -15,7 +17,7 @@ import { requireUser } from "@/lib/supabase/server";
 export type CreationResult = { error?: string; invalidStep?: number };
 
 // Salva le scelte fatte finora (nella bozza, che vede solo il proprietario)
-// e lo step raggiunto (avanti o indietro che sia)
+// e il passaggio raggiunto (avanti o indietro che sia)
 export async function saveCreationProgress(
   characterId: string,
   rawData: CreationData,
@@ -23,10 +25,7 @@ export async function saveCreationProgress(
 ): Promise<CreationResult> {
   const { supabase, user } = await requireUser();
   const data = sanitizeCreationData(rawData);
-  const safeStep = Math.min(
-    STEPS.length - 1,
-    Math.max(0, Math.trunc(step) || 0),
-  );
+  const safeStep = Math.min(100, Math.max(0, Math.trunc(step) || 0));
 
   // Solo il proprietario, solo finche' il PG e' in bozza
   const { data: character } = await supabase
@@ -55,62 +54,108 @@ export async function saveCreationProgress(
   return {};
 }
 
-// Conferma: rilegge le scelte salvate, le valida e attiva il personaggio.
-// La storia va nella tabella riservata allo staff e da li' non si modifica piu'
+// Conferma: rilegge le scelte salvate, le controlla con la creazione
+// configurata in Gestione e attiva il personaggio. La storia va nella
+// tabella riservata allo staff e da li' non si modifica piu'
 export async function finalizeCharacter(
   characterId: string,
 ): Promise<CreationResult> {
   const { supabase, user } = await requireUser();
 
-  const [{ data: character }, { data: draft }] = await Promise.all([
-    supabase
-      .from("characters")
-      .select("id, owner_id, status")
-      .eq("id", characterId)
-      .maybeSingle(),
-    supabase
-      .from("character_drafts")
-      .select("data")
-      .eq("character_id", characterId)
-      .maybeSingle(),
-  ]);
+  const [{ data: character }, { data: draft }, flow, { data: traitCatalog }, { data: activeSkills }] =
+    await Promise.all([
+      supabase.from("characters").select("id, owner_id, status").eq("id", characterId).maybeSingle(),
+      supabase.from("character_drafts").select("data").eq("character_id", characterId).maybeSingle(),
+      loadFlow(supabase),
+      supabase.from("traits").select("id, name, kind, cost, choice, unique_group, requires_master, active"),
+      supabase.from("skills").select("id").eq("active", true),
+    ]);
   if (!character || character.owner_id !== user.id)
     return { error: "Personaggio non trovato." };
   if (character.status !== "bozza")
     return { error: "Questo personaggio è già attivo." };
+  if (flow.length === 0)
+    return { error: "La creazione non è ancora configurata: avvisa lo staff." };
 
   const data = sanitizeCreationData(draft?.data);
-  const invalidStep = firstInvalidStep(data);
+  const catalog = (traitCatalog ?? []) as TraitInfo[];
+  const skillIds = new Set((activeSkills ?? []).map((s) => s.id as string));
+  const invalidStep = firstInvalidFlowStep(flow, data, { traits: catalog, skillIds });
   if (invalidStep !== null) {
-    return { error: `Completa lo step "${STEPS[invalidStep]}".`, invalidStep };
+    return { error: `Completa il passaggio "${flow[invalidStep].title}".`, invalidStep };
+  }
+  const traitsStep = flow.findIndex((s) => s.blocks.some((b) => b.kind === "tratti"));
+  if (hasBlock(flow, "tratti"))
+    for (const t of data.traits ?? []) {
+      const info = catalog.find((x) => x.id === t.id);
+      if (info?.choice === "abilita" && !skillIds.has(t.choice ?? ""))
+        return { error: `Per "${info.name}" scegli un'abilità valida.`, invalidStep: traitsStep };
+      if (info?.choice === "statistica" && !STAT_IDS.includes(t.choice as StatId))
+        return { error: `Per "${info.name}" scegli una statistica valida.`, invalidStep: traitsStep };
+    }
+
+  // Solo i dati dei blocchi presenti nella creazione
+  const has = (k: Parameters<typeof hasBlock>[1]) => hasBlock(flow, k);
+  const statsBlock = allBlocks(flow).find((b) => b.kind === "statistiche");
+  const physical = allBlocks(flow).find((b) => b.kind === "dati_fisici");
+  const physicalFields = physical ? (cfg(physical).fields ?? []) : [];
+  const publicFields: Record<string, CustomValue> = {};
+  const privateFields: Record<string, CustomValue> = {};
+  for (const b of allBlocks(flow).filter((x) => x.kind === "campo")) {
+    const c = cfg(b);
+    const v = data.custom?.[c.key ?? ""];
+    if (v === undefined || !c.key) continue;
+    if (c.visibility === "pubblico") publicFields[c.key] = v;
+    else privateFields[c.key] = v;
   }
 
   // Lo stato, la scheda definitiva e la storia li scrive solo il server (secret key)
   const admin = createAdminClient();
   if (!admin) return { error: "Configurazione del server incompleta." };
-  const { error: storyError } = await admin
-    .from("character_backgrounds")
-    .upsert({ character_id: characterId, body: data.story!.trim() });
-  if (storyError) return { error: "Creazione non riuscita, riprova." };
+  if (has("storia") && data.story?.trim()) {
+    const { error: storyError } = await admin
+      .from("character_backgrounds")
+      .upsert({ character_id: characterId, body: data.story.trim() });
+    if (storyError) return { error: "Creazione non riuscita, riprova." };
+  }
+  const update: Record<string, unknown> = {
+    status: "attivo",
+    sex: data.sex ?? null,
+    age: data.age ?? null,
+    attributes: statsBlock
+      ? Object.fromEntries(RULES.stats.map((s) => [s.id, data.attributes?.[s.id] ?? cfg(statsBlock).min]))
+      : Object.fromEntries(RULES.stats.map((s) => [s.id, RULES.statMin])),
+    honor: RULES.honor.start,
+    custom_fields: publicFields,
+    activated_at: new Date().toISOString(),
+  };
+  if (has("aspetto")) update.appearance = data.appearance?.trim() || null;
+  for (const f of PHYSICAL_FIELDS)
+    if (physicalFields.includes(f.id)) update[f.id] = data[f.id]?.trim().slice(0, f.max) || null;
   const { error } = await admin
     .from("characters")
-    .update({
-      status: "attivo",
-      sex: data.sex,
-      age: data.age,
-      attributes: data.attributes,
-      appearance: data.appearance!.trim(),
-      activated_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", characterId)
     .eq("owner_id", user.id)
     .eq("status", "bozza");
   if (error) return { error: "Creazione non riuscita, riprova." };
   await admin.from("character_drafts").delete().eq("character_id", characterId);
+  if (Object.keys(privateFields).length)
+    await admin.from("character_private_fields").upsert({ character_id: characterId, data: privateFields });
+
+  // Abilita' e tratti della creazione (i livelli presi ora non costano PX)
+  const skillRows = has("abilita")
+    ? Object.entries(data.skills ?? {}).map(([skill_id, level]) => ({ character_id: characterId, skill_id, level }))
+    : [];
+  if (skillRows.length) await admin.from("character_skills").upsert(skillRows);
+  const traitRows = has("tratti")
+    ? (data.traits ?? []).map((t) => ({ character_id: characterId, trait_id: t.id, choice: t.choice ?? null }))
+    : [];
+  if (traitRows.length) await admin.from("character_traits").upsert(traitRows);
 
   // Equipaggiamento di partenza: solo oggetti davvero disponibili all'iscrizione,
   // al massimo quanti ne permette lo staff (nascono del livello dell'oggetto)
-  if (data.items?.length) {
+  if (has("equipaggiamento") && data.items?.length) {
     const [{ data: allowed }, { data: settings }] = await Promise.all([
       admin
         .from("items")

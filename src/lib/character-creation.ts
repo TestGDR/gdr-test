@@ -1,7 +1,10 @@
+import { RULES } from "@/lib/rules/config";
+
 // =====================================================================
-// CONFIGURAZIONE DELLA CREAZIONE DEL PERSONAGGIO
-// Per cambiare caratteristiche o punti modifica solo questo file:
-// lo usano sia la procedura guidata (browser) sia la validazione sul server.
+// DATI DELLA CREAZIONE DEL PERSONAGGIO
+// I passaggi e cosa chiedono si decidono da Gestione -> Creazione personaggio
+// (vedi lib/creation-flow.ts). Qui ci sono le scelte salvate nella bozza e
+// i limiti di sicurezza dei valori che arrivano dal browser.
 // =====================================================================
 
 export const SEXES = [
@@ -12,30 +15,13 @@ export const SEXES = [
 export const AGE_MIN = 16;
 export const AGE_MAX = 80;
 
-export const ATTRIBUTES = [
-  { id: "forza", label: "Forza" },
-  { id: "destrezza", label: "Destrezza" },
-  { id: "costituzione", label: "Costituzione" },
-  { id: "intelligenza", label: "Intelligenza" },
-  { id: "percezione", label: "Percezione" },
-  { id: "carisma", label: "Carisma" },
-] as const;
+// Statistiche del regolamento (INT, REF, BODY, EMP, PRE, WILL): i numeri
+// stanno in lib/rules/config.ts
+export const ATTRIBUTES = RULES.stats;
 
-export const ATTRIBUTE_BASE = 3; // valore di partenza di ogni caratteristica
-export const ATTRIBUTE_MAX = 8; // valore massimo alla creazione
-export const ATTRIBUTE_POINTS = 12; // punti da distribuire
-
-export const APPEARANCE_MIN = 30;
-export const STORY_MIN = 100;
 export const TEXT_MAX = 4000;
 
-export const STEPS = [
-  "Identità",
-  "Caratteristiche",
-  "Aspetto e storia",
-  "Equipaggiamento",
-  "Riepilogo",
-] as const;
+export type CustomValue = string | number | boolean | string[];
 
 export type CreationData = {
   sex?: string;
@@ -44,6 +30,25 @@ export type CreationData = {
   appearance?: string;
   story?: string;
   items?: string[]; // oggetti di partenza scelti (disponibili all'iscrizione)
+  skills?: Record<string, number>; // id abilita' -> livello
+  traits?: { id: string; choice?: string }[]; // vantaggi e svantaggi scelti
+  height?: string;
+  eye_color?: string;
+  hair_color?: string;
+  visible_marks?: string;
+  custom?: Record<string, CustomValue>; // campi personalizzati (chiave -> valore)
+};
+
+// Catalogo dei tratti che serve per controllare i tratti scelti
+export type TraitInfo = {
+  id: string;
+  name: string;
+  kind: "vantaggio" | "svantaggio";
+  cost: number;
+  choice: "nessuna" | "abilita" | "statistica";
+  unique_group: string | null;
+  requires_master: boolean;
+  active: boolean;
 };
 
 const ids = (list: readonly { id: string }[]) => list.map((x) => x.id);
@@ -55,20 +60,13 @@ export function labelOf(
   return list.find((x) => x.id === id)?.label ?? "—";
 }
 
-export function defaultAttributes(): Record<string, number> {
-  return Object.fromEntries(ATTRIBUTES.map((a) => [a.id, ATTRIBUTE_BASE]));
-}
+const uuid = (x: unknown): x is string =>
+  typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x);
+const text = (x: unknown, max: number) =>
+  typeof x === "string" ? x.slice(0, max) : undefined;
 
-export function pointsSpent(
-  attributes: Record<string, number> = defaultAttributes(),
-) {
-  return ATTRIBUTES.reduce(
-    (sum, a) => sum + ((attributes[a.id] ?? ATTRIBUTE_BASE) - ATTRIBUTE_BASE),
-    0,
-  );
-}
-
-// Tiene solo campi noti e valori nel formato giusto (i dati arrivano dal browser)
+// Tiene solo campi noti e valori nel formato giusto (i dati arrivano dal browser).
+// I limiti veri (punti, minimi, massimi) li controlla la creazione configurata
 export function sanitizeCreationData(raw: unknown): CreationData {
   const input = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -80,14 +78,7 @@ export function sanitizeCreationData(raw: unknown): CreationData {
     out.sex = input.sex;
   if (Number.isInteger(input.age)) out.age = input.age as number;
   if (Array.isArray(input.items))
-    out.items = [
-      ...new Set(
-        input.items.filter(
-          (x): x is string =>
-            typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x),
-        ),
-      ),
-    ].slice(0, 20);
+    out.items = [...new Set(input.items.filter(uuid))].slice(0, 20);
   if (input.attributes && typeof input.attributes === "object") {
     const attrs = input.attributes as Record<string, unknown>;
     out.attributes = Object.fromEntries(
@@ -96,51 +87,61 @@ export function sanitizeCreationData(raw: unknown): CreationData {
         return [
           a.id,
           Number.isInteger(v)
-            ? Math.min(ATTRIBUTE_MAX, Math.max(ATTRIBUTE_BASE, v))
-            : ATTRIBUTE_BASE,
+            ? Math.min(RULES.statMax, Math.max(RULES.statMin, v))
+            : RULES.statMin,
         ];
       }),
     );
   }
-  if (typeof input.appearance === "string")
-    out.appearance = input.appearance.slice(0, TEXT_MAX);
-  if (typeof input.story === "string")
-    out.story = input.story.slice(0, TEXT_MAX);
-  return out;
-}
-
-// Errore dello step indicato, oppure null se lo step e' completo
-export function validateStep(step: number, data: CreationData): string | null {
-  switch (step) {
-    case 0:
-      if (!data.sex) return "Scegli il sesso del personaggio.";
-      if (!data.age || data.age < AGE_MIN || data.age > AGE_MAX) {
-        return `L'età deve essere tra ${AGE_MIN} e ${AGE_MAX} anni.`;
-      }
-      return null;
-    case 1: {
-      const left = ATTRIBUTE_POINTS - pointsSpent(data.attributes);
-      if (left > 0)
-        return `Devi ancora distribuire ${left} punt${left === 1 ? "o" : "i"}.`;
-      if (left < 0) return "Hai usato più punti di quelli disponibili.";
-      return null;
-    }
-    case 2:
-      if ((data.appearance?.trim().length ?? 0) < APPEARANCE_MIN) {
-        return `Descrivi l'aspetto con almeno ${APPEARANCE_MIN} caratteri.`;
-      }
-      if ((data.story?.trim().length ?? 0) < STORY_MIN) {
-        return `Scrivi una storia di almeno ${STORY_MIN} caratteri.`;
-      }
-      return null;
-    default:
-      return null;
+  if (input.skills && typeof input.skills === "object") {
+    out.skills = Object.fromEntries(
+      Object.entries(input.skills as Record<string, unknown>)
+        .filter(
+          ([id, v]) => uuid(id) && Number.isInteger(v) && (v as number) > 0,
+        )
+        .map(([id, v]) => [id, Math.min(RULES.skillMax, v as number)])
+        .slice(0, 60),
+    );
   }
-}
-
-// Primo step incompleto, oppure null se tutto e' pronto per la conferma
-export function firstInvalidStep(data: CreationData): number | null {
-  for (let i = 0; i < STEPS.length - 1; i++)
-    if (validateStep(i, data)) return i;
-  return null;
+  if (Array.isArray(input.traits)) {
+    const seen = new Set<string>();
+    out.traits = input.traits
+      .filter(
+        (t): t is { id: string; choice?: unknown } =>
+          !!t && typeof t === "object" && uuid((t as { id?: unknown }).id),
+      )
+      .filter((t) => !seen.has(t.id) && !!seen.add(t.id))
+      .slice(0, 10)
+      .map((t) =>
+        typeof t.choice === "string" && t.choice
+          ? { id: t.id, choice: t.choice.slice(0, 60) }
+          : { id: t.id },
+      );
+  }
+  out.appearance = text(input.appearance, TEXT_MAX);
+  out.story = text(input.story, TEXT_MAX);
+  out.height = text(input.height, 30);
+  out.eye_color = text(input.eye_color, 40);
+  out.hair_color = text(input.hair_color, 40);
+  out.visible_marks = text(input.visible_marks, 300);
+  if (input.custom && typeof input.custom === "object") {
+    const custom: Record<string, CustomValue> = {};
+    for (const [k, v] of Object.entries(
+      input.custom as Record<string, unknown>,
+    ).slice(0, 60)) {
+      if (!/^[a-z0-9_]{1,40}$/.test(k)) continue;
+      if (typeof v === "string") custom[k] = v.slice(0, TEXT_MAX);
+      else if (typeof v === "number" && Number.isFinite(v)) custom[k] = v;
+      else if (typeof v === "boolean") custom[k] = v;
+      else if (Array.isArray(v))
+        custom[k] = v
+          .filter((x): x is string => typeof x === "string")
+          .slice(0, 30)
+          .map((x) => x.slice(0, 100));
+    }
+    out.custom = custom;
+  }
+  for (const k of Object.keys(out) as (keyof CreationData)[])
+    if (out[k] === undefined) delete out[k];
+  return out;
 }

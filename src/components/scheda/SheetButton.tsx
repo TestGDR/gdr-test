@@ -16,12 +16,12 @@ import Modal from "@/components/ui/Modal";
 import ModalButton from "@/components/ui/ModalButton";
 import {
   ATTRIBUTES,
-  ATTRIBUTE_MAX,
   SEXES,
   TEXT_MAX,
   labelOf,
   type CreationData,
 } from "@/lib/character-creation";
+import { RULES } from "@/lib/rules/config";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
@@ -29,7 +29,9 @@ import Affections from "./Affections";
 import Equipment from "./Equipment";
 import { maritalLabel, VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { PaperRow, PaperSheet } from "./PaperSheet";
+import { CustomFieldRows } from "./CustomFields";
 import PregnancyRow from "./Pregnancy";
+import { DerivedPanel, SkillsPage, TraitsPage } from "./RulesPages";
 import SheetManage from "./SheetManage";
 import SheetOptions from "./SheetOptions";
 import { cleanPlayerHtml } from "./player-html";
@@ -55,7 +57,6 @@ export default function SheetButton({
       label={trigger}
       title={sheetTitle(name)}
       size="pg"
-      centerTitle
       className={className}
       onOpen={() => setOpenCount((c) => c + 1)}
     >
@@ -83,7 +84,6 @@ export function SheetModal({
       onClose={onClose}
       title={sheetTitle(name)}
       size="pg"
-      centerTitle
     >
       {characterId && (
         <SheetContent key={characterId} characterId={characterId} onName={setName} />
@@ -231,6 +231,12 @@ function CharacterSheet({
   // finche' il PG non e' attivo c'e' solo la prima pagina
   const tabs = active ? TABS : TABS.slice(0, 1);
   // Gestisci: l'admin sempre, il proprietario solo con la scheda sbloccata
+  // pennine di Abilita' e Tratti: admin e chi ha "schede.abilita" (es. moderatori)
+  const [canRules, setCanRules] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    supabase.rpc("can_manage_rules").then(({ data }) => setCanRules(data === true));
+  }, [supabase, active]);
   const canManage = active && (!!info?.is_admin || (isOwn && !!character.sheet_unlocks?.includes("scheda")));
   // l'admin modifica le sezioni degli altri come se la scheda fosse sua
   const canEdit = isOwn || (active && !!info?.is_admin);
@@ -354,12 +360,8 @@ function CharacterSheet({
         )}
         {active && isOwn && tab === "opzioni" && <SheetOptions />}
         {canManage && tab === "gestisci" && <SheetManage character={character} isAdmin={!!info?.is_admin} onSaved={onSaved} />}
-        {active && (tab === "abilita" || tab === "tratti") && (
-          <div className="p-6">
-            <PageTitle title={tab === "abilita" ? "Abilità" : "Tratti"} />
-            <p className="py-10 text-center text-muted italic">Pagina in preparazione.</p>
-          </div>
-        )}
+        {active && tab === "abilita" && <SkillsPage character={character} isOwn={isOwn} canEdit={canRules} onSaved={onSaved} />}
+        {active && tab === "tratti" && <TraitsPage character={character} canEdit={canRules} onSaved={onSaved} />}
         {active && tab === "equipaggiamento" && (
           <Equipment characterId={character.id} isOwn={canEdit} />
         )}
@@ -772,9 +774,10 @@ function DataPage({
           <PaperRow label="Colore occhi" value={character.eye_color || "—"} />
           <PaperRow label="Colore capelli" value={character.hair_color || "—"} />
           <DragonField character={character} isOwn={isOwn} />
+          {character.sex === "donna" && <PregnancyRow character={character} isOwn={isOwn} />}
         </div>
-        {character.sex === "donna" && <PregnancyRow character={character} isOwn={isOwn} />}
         <PaperRow label="Segni visibili" value={<span className="whitespace-normal">{character.visible_marks || "—"}</span>} />
+        <CustomFieldRows character={character} />
       </PaperSheet>
       {actions && !isOwn && (
         <div className="flex flex-wrap justify-center gap-3">
@@ -1273,20 +1276,21 @@ function DragonField({
 // Caratteristiche: ragnatela e barre
 // ---------------------------------------------------------------------
 function AttributesPage({ character }: { character: Character }) {
-  const values = ATTRIBUTES.map((a) => character.attributes?.[a.id] ?? 0);
-  const max = Math.max(ATTRIBUTE_MAX, ...values);
+  const values = ATTRIBUTES.map((a) => Number(character.attributes?.[a.id]) || 0);
+  const max = Math.max(RULES.statMax, ...values);
   return (
     <div className="flex flex-col items-center gap-6 p-6">
+      <h3 className="w-full border-b border-border pb-2 font-serif text-2xl text-accent">Caratteristiche</h3>
       <Radar
-        labels={ATTRIBUTES.map((a) => a.label)}
+        labels={ATTRIBUTES.map((a) => a.code)}
         values={values}
         max={max}
       />
       <ul className="w-full min-w-0 flex-1 space-y-3">
         {ATTRIBUTES.map((a, i) => (
           <li key={a.id}>
-            <p className="flex justify-between text-xs font-semibold tracking-[0.14em] text-muted uppercase">
-              {a.label}
+            <p className="flex justify-between text-xs font-semibold tracking-[0.14em] text-muted uppercase" title={a.description}>
+              {a.code} · {a.label}
               <span className="text-base text-accent">{values[i] || "—"}</span>
             </p>
             <div className="mt-1 h-2 bg-white/10">
@@ -1298,6 +1302,7 @@ function AttributesPage({ character }: { character: Character }) {
           </li>
         ))}
       </ul>
+      <DerivedPanel character={character} />
     </div>
   );
 }

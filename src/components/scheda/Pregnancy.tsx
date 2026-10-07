@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import { PaperRow } from "./PaperSheet";
@@ -68,6 +77,16 @@ export default function PregnancyRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  // vede tutto: proprietaria, admin e chi ha "schede.gravidanze" (moderatori);
+  // gli altri vedono la gravidanza solo dal 3° mese ON
+  const [full, setFull] = useState(isOwn);
+  useEffect(() => {
+    if (isOwn) return;
+    supabase
+      .rpc("pregnancy_full_view", { p_character: character.id })
+      .then(({ data }) => setFull(data === true));
+  }, [supabase, character.id, isOwn]);
 
   const load = useCallback(async () => {
     const [{ data: preg }, { data: attempts }, { data: list }] =
@@ -137,6 +156,8 @@ export default function PregnancyRow({
   if (active === undefined) return <PaperRow label="Gravidanza" value="..." />;
 
   const month = active ? monthOf(active.started_at) : 0;
+  // per chi non vede tutto: niente Si'/No prima del 3° mese ON
+  const shown = active && (full || month >= 3) ? active : null;
   const monthSymptoms = symptoms.filter((s) => s.month === month);
 
   return (
@@ -145,7 +166,7 @@ export default function PregnancyRow({
         label="Gravidanza"
         wrap
         value={
-          active ? (
+          shown ? (
             <span
               className="relative inline-block"
               onMouseEnter={() => setOpen(true)}
@@ -153,22 +174,20 @@ export default function PregnancyRow({
             >
               Sì ·{" "}
               <button
+                ref={setAnchor}
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 onBlur={() => setOpen(false)}
                 aria-expanded={open}
                 className="font-semibold text-[#7a1d16] underline decoration-dotted underline-offset-2"
               >
-                {month}° mese ON{active.twins ? " · gemellare" : ""}
+                {month}° mese ON{shown.twins ? " · gemellare" : ""}
               </button>
-              {open && (
-                <span
-                  role="tooltip"
-                  className="absolute top-full left-0 z-20 mt-1 block w-72 border border-[#3b2a1a]/50 bg-[#efe2c4] p-3 text-left text-xs leading-relaxed whitespace-normal text-[#2a1d12] shadow-xl shadow-black/50"
-                >
+              {open && anchor && (
+                <FloatingTip anchor={anchor}>
                   <span className="block font-serif text-sm font-semibold text-[#7a1d16]">
                     {month}° mese ON
-                    {active.twins ? " · gravidanza gemellare" : ""}
+                    {shown.twins ? " · gravidanza gemellare" : ""}
                   </span>
                   <span className="mt-1 block italic">{PHASES[month]}</span>
                   <span className="mt-2 block font-semibold">
@@ -181,23 +200,29 @@ export default function PregnancyRow({
                       </span>
                     ))}
                   </span>
-                  <span className="mt-2 block border-t border-[#3b2a1a]/25 pt-2">
-                    <strong>Oggi:</strong>{" "}
-                    {day
-                      ? day.symptom
+                  {full && (
+                    <span className="mt-2 block border-t border-[#3b2a1a]/25 pt-2">
+                      <strong>Oggi:</strong>{" "}
+                      {day
                         ? day.symptom
-                        : "nessun sintomo"
-                      : "controllo non ancora fatto"}
-                  </span>
+                          ? day.symptom
+                          : "nessun sintomo"
+                        : "controllo non ancora fatto"}
+                    </span>
+                  )}
                   <span className="mt-1 block">
-                    <strong>Parto:</strong> dal{" "}
-                    {addMonths(active.started_at, 4)}
+                    <strong>Parto:</strong> dal {addMonths(shown.started_at, 4)}
                   </span>
-                </span>
+                  <span className="mt-1 block text-[0.7rem] text-[#6b5640]">
+                    Al parto il sistema tira il D100 del parto (01-50 facile) e un D100 per ogni neonato (01-50 femmina, 51-100 maschio).
+                  </span>
+                </FloatingTip>
               )}
             </span>
-          ) : (
+          ) : full ? (
             "No"
+          ) : (
+            "—"
           )
         }
         right={
@@ -257,5 +282,47 @@ export default function PregnancyRow({
         </div>
       )}
     </div>
+  );
+}
+
+// Riquadro sopra tutta la scheda (dentro la finestra, quindi non lo taglia
+// niente), in alto rispetto alla voce: si legge senza scorrere
+function FloatingTip({
+  anchor,
+  children,
+}: {
+  anchor: HTMLElement;
+  children: ReactNode;
+}) {
+  const host = anchor.closest("dialog") ?? document.body;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fixed = host === document.body;
+    const h = fixed
+      ? new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+      : host.getBoundingClientRect();
+    const a = anchor.getBoundingClientRect();
+    const t = el.getBoundingClientRect();
+    const top = Math.max(8, a.top - h.top - t.height - 8);
+    const left = Math.max(8, Math.min(a.left - h.left, h.width - t.width - 8));
+    el.style.position = fixed ? "fixed" : "absolute";
+    el.style.top = `${top}px`;
+    el.style.left = `${left}px`;
+    el.style.visibility = "visible";
+  }, [anchor, host]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      role="tooltip"
+      style={{ position: "absolute", top: 0, left: 0, visibility: "hidden" }}
+      className="pointer-events-none z-50 block w-80 max-w-[calc(100%-1rem)] border border-[#3b2a1a]/50 bg-[#efe2c4] p-3 text-left text-xs leading-relaxed whitespace-normal text-[#2a1d12] shadow-xl shadow-black/60"
+    >
+      {children}
+    </div>,
+    host,
   );
 }
