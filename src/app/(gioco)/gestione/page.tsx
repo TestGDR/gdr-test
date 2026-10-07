@@ -85,6 +85,12 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
+    href: "/gestione/data",
+    title: "Data di gioco",
+    description: "Data ON che scorre da sola (1 giorno reale = 1 giorno ON): correzione dell'anno e dei giorni.",
+  },
+  {
+    permission: "mondo.gestire",
     href: "/gestione/mondo",
     title: "Gestione mondo",
     description: "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",

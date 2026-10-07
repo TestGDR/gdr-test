@@ -37,6 +37,8 @@ export type CreationData = {
   hair_color?: string;
   visible_marks?: string;
   face_claim?: string; // prestavolto (nome e cognome)
+  birth_day?: number; // giorno e luna di nascita (l'anno si ricava dall'eta')
+  birth_month?: number;
   house_role_id?: string; // ruolo di casata scelto (tra quelli aperti all'iscrizione)
   dragon_id?: string; // drago o uovo della casata reclamato
   custom?: Record<string, CustomValue>; // campi personalizzati (chiave -> valore)
@@ -129,6 +131,10 @@ export function sanitizeCreationData(raw: unknown): CreationData {
   out.visible_marks = text(input.visible_marks, 300);
   out.face_claim = text(input.face_claim, 80)?.replace(/\s+/g, " ");
   if (uuid(input.house_role_id)) out.house_role_id = input.house_role_id;
+  if (Number.isInteger(input.birth_day) && (input.birth_day as number) >= 1 && (input.birth_day as number) <= 31)
+    out.birth_day = input.birth_day as number;
+  if (Number.isInteger(input.birth_month) && (input.birth_month as number) >= 1 && (input.birth_month as number) <= 12)
+    out.birth_month = input.birth_month as number;
   if (uuid(input.dragon_id)) out.dragon_id = input.dragon_id;
   if (input.custom && typeof input.custom === "object") {
     const custom: Record<string, CustomValue> = {};

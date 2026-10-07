@@ -21,6 +21,7 @@ import {
   labelOf,
   type CreationData,
 } from "@/lib/character-creation";
+import { formatBirth, validBirth } from "@/lib/game-date";
 import { RULES } from "@/lib/rules/config";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
@@ -29,6 +30,7 @@ import Affections from "./Affections";
 import Equipment from "./Equipment";
 import { maritalLabel, VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { PaperRow, PaperSheet } from "./PaperSheet";
+import BirthPicker from "./BirthPicker";
 import { CustomFieldRows } from "./CustomFields";
 import PregnancyRow from "./Pregnancy";
 import { DerivedPanel, SkillsPage, TraitsPage } from "./RulesPages";
@@ -766,7 +768,14 @@ function DataPage({
       >
         <div className="grid gap-x-6 sm:grid-cols-2">
           <PaperRow label="Sesso" value={labelOf(SEXES, character.sex)} />
-          <PaperRow label="Età" value={character.age ? `${character.age} anni` : "—"} />
+          <PaperRow
+            label="Età"
+            value={
+              character.age
+                ? `${character.age} anni${character.birth_day && character.birth_month ? ` · nato il ${formatBirth(character.birth_day, character.birth_month, character.birth_year)}` : ""}`
+                : "—"
+            }
+          />
           <PaperRow label="Casata" value={character.house?.name ?? "—"} />
           <PaperRow label="Ruolo in casata" value={character.house_role?.name ?? "—"} />
           <PaperRow label="Stato civile" value={<MaritalValue character={character} />} />
@@ -844,8 +853,19 @@ function DataEditor({
   }, [supabase, locked, claim, character.id]);
   const checked = taken?.claim === claim ? taken : null;
 
-  function saveAll() {
+  // data di nascita: chi non l'ha ancora (PG creati prima) la indica una volta
+  const needsBirth = !character.birth_year && !!character.age;
+  const [birth, setBirth] = useState<{ day?: number; month?: number }>({});
+  const [birthError, setBirthError] = useState<string | null>(null);
+
+  async function saveAll() {
     if (!locked && claim && checked?.by) return;
+    setBirthError(null);
+    if (needsBirth && (birth.day || birth.month)) {
+      if (!validBirth(birth.day, birth.month)) return setBirthError("Scegli un giorno e una luna validi.");
+      const { error: e } = await supabase.rpc("set_birthday", { p_character: character.id, p_day: birth.day, p_month: birth.month });
+      if (e) return setBirthError(e.message.length < 140 ? e.message : "Data di nascita non salvata.");
+    }
     save(locked || !claim ? { avatarUrl: avatar, ...looks } : { faceClaim: claim, avatarUrl: avatar, ...looks });
   }
 
@@ -914,6 +934,16 @@ function DataEditor({
           {looks.visibleMarks.length} / {VISIBLE_MARKS_MAX} caratteri
         </span>
       </label>
+      {needsBirth && (
+        <div>
+          <p className="mb-1 text-xs tracking-wider text-muted uppercase">Data di nascita</p>
+          <BirthPicker value={birth} onChange={setBirth} />
+          <p className="mt-1 text-xs text-[#f0c75e]">
+            Giorno e luna di nascita: al compleanno l&apos;età cresce di un anno. Si indica una volta sola (poi la cambia
+            solo l&apos;admin).
+          </p>
+        </div>
+      )}
       <ImageField
         label="Immagine di chat"
         size="100 × 100"
@@ -922,7 +952,7 @@ function DataEditor({
         onChange={setAvatar}
         frame="aspect-square w-[100px]"
       />
-      <EditButtons busy={busy} error={error} onSave={saveAll} onCancel={onDone} />
+      <EditButtons busy={busy} error={birthError ?? error} onSave={saveAll} onCancel={onDone} />
     </div>
   );
 }

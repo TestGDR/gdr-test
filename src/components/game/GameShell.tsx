@@ -21,7 +21,7 @@ import ModalButton from "@/components/ui/ModalButton";
 import SheetButton, { SheetModal } from "@/components/scheda/SheetButton";
 import { SheetActionsContext } from "@/components/scheda/sheet-actions";
 import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
-import { GAME_DATE } from "@/lib/game-config";
+import GameDateLabel from "./GameDateLabel";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
 import { everyEvenInBackground, playEvent, playMessageChime } from "@/lib/notify-sound";
@@ -203,6 +203,7 @@ export default function GameShell({
   const tickId = character?.status === "attivo" ? character.id : null;
   useEffect(() => {
     if (tickId) supabase.rpc("pregnancy_tick", { p_character: tickId }).then(() => {});
+    supabase.rpc("refresh_ages").then(() => {}); // compleanni: eta' aggiornate
   }, [supabase, tickId]);
   const [panel, setPanel] = useState<Panel | null>(null);
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
@@ -653,7 +654,7 @@ function LeftColumn({
 
       {/* Data di gioco */}
       <div className="parchment mx-auto px-6 py-1.5 text-center [font-family:Verdana,Geneva,Tahoma,sans-serif] text-[0.625rem] font-bold tracking-[0.04em] whitespace-nowrap uppercase">
-        {GAME_DATE}
+        <GameDateLabel />
       </div>
 
       {/* Cellulare: gestione, utility, ticket e presenti (il personaggio e' nella barra in alto) */}

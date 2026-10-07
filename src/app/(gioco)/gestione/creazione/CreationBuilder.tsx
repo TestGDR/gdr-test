@@ -484,7 +484,7 @@ function blockSummary(b: CreationBlock) {
   const c = cfg(b);
   switch (b.kind) {
     case "eta":
-      return `da ${c.min} a ${c.max} anni`;
+      return `da ${c.min} a ${c.max} anni${c.birthday ? ", con giorno e luna di nascita" : ""}`;
     case "statistiche":
       return `${c.points} punti, da ${c.min} a ${c.max}`;
     case "abilita":
@@ -592,6 +592,10 @@ function BlockEditor({
         <div className="flex gap-3">
           {num("min", "Età minima", 1, 200)}
           {num("max", "Età massima", 1, 200)}
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input type="checkbox" checked={!!c.birthday} onChange={(e) => set({ birthday: e.target.checked })} />
+            Chiedi giorno e luna di nascita
+          </label>
         </div>
       )}
       {block.kind === "statistiche" && (

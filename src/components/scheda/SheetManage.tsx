@@ -7,6 +7,7 @@ import { RULES } from "@/lib/rules/config";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import { CustomFieldsManage } from "./CustomFields";
+import BirthPicker from "./BirthPicker";
 import MaritalManage from "./MaritalManage";
 import RulesManage from "./RulesManage";
 
@@ -28,6 +29,10 @@ export default function SheetManage({
   const [name, setName] = useState(character.name);
   const [sex, setSex] = useState(character.sex ?? "uomo");
   const [age, setAge] = useState(String(character.age ?? ""));
+  const [birth, setBirth] = useState<{ day?: number; month?: number }>({
+    day: character.birth_day ?? undefined,
+    month: character.birth_month ?? undefined,
+  });
   const [attrs, setAttrs] = useState<Record<string, number>>(
     Object.fromEntries(
       ATTRIBUTES.map((a) => [
@@ -72,12 +77,25 @@ export default function SheetManage({
       p_hair_color: looks.hair_color,
       p_visible_marks: looks.visible_marks,
     });
+    // data di nascita (solo admin): l'anno si ricalcola dall'eta' appena salvata
+    const birthError =
+      !error && isAdmin && birth.day && birth.month
+        ? (
+            await supabase.rpc("set_birthday", {
+              p_character: character.id,
+              p_day: birth.day,
+              p_month: birth.month,
+            })
+          ).error
+        : null;
     setBusy(false);
-    if (error)
+    if (error || birthError)
       return setMsg({
         ok: false,
         text:
-          error.message.length < 140 ? error.message : "Scheda non salvata.",
+          (error ?? birthError)!.message.length < 140
+            ? (error ?? birthError)!.message
+            : "Scheda non salvata.",
       });
     setMsg({ ok: true, text: "Scheda salvata." });
     onSaved();
@@ -171,6 +189,14 @@ export default function SheetManage({
             className="input w-24! py-1.5"
           />
         </label>
+        {isAdmin && (
+          <div>
+            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+              Nascita (giorno e luna)
+            </span>
+            <BirthPicker value={birth} onChange={setBirth} />
+          </div>
+        )}
       </div>
 
       <label className="block">
@@ -301,8 +327,16 @@ export default function SheetManage({
         )}
       </div>
 
-      {isAdmin && <RulesManage character={character} onSaved={onSaved} section="progress" />}
-      {isAdmin && <CustomFieldsManage character={character} onSaved={onSaved} />}
+      {isAdmin && (
+        <RulesManage
+          character={character}
+          onSaved={onSaved}
+          section="progress"
+        />
+      )}
+      {isAdmin && (
+        <CustomFieldsManage character={character} onSaved={onSaved} />
+      )}
       {isAdmin && <MaritalManage character={character} onSaved={onSaved} />}
       {isAdmin && character.sex === "donna" && (
         <section className="space-y-2 border-t border-border pt-4">

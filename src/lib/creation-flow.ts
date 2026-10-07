@@ -14,6 +14,7 @@ import {
   type CreationData,
   type TraitInfo,
 } from "@/lib/character-creation";
+import { validBirth } from "@/lib/game-date";
 import { RULES } from "@/lib/rules/config";
 import {
   skillLevelCap,
@@ -47,6 +48,8 @@ export type BlockConfig = {
   // eta
   min?: number;
   max?: number;
+  // eta: chiedere anche giorno e luna di nascita
+  birthday?: boolean;
   // abilita: punti da distribuire alla creazione = eta' + age_bonus
   age_bonus?: number;
   // statistiche / abilita
@@ -206,7 +209,7 @@ export function defaultConfig(kind: BlockKind): BlockConfig {
   const c = RULES.creation;
   switch (kind) {
     case "eta":
-      return { min: AGE_MIN, max: AGE_MAX };
+      return { min: AGE_MIN, max: AGE_MAX, birthday: true };
     case "statistiche":
       return { points: c.statPoints, min: c.statMin, max: c.statMax };
     case "abilita":
@@ -377,9 +380,11 @@ export function validateBlock(
         ? null
         : "Scegli il sesso del personaggio.";
     case "eta":
-      return data.age && data.age >= c.min! && data.age <= c.max!
-        ? null
-        : `L'età deve essere tra ${c.min} e ${c.max} anni.`;
+      if (!data.age || data.age < c.min! || data.age > c.max!)
+        return `L'età deve essere tra ${c.min} e ${c.max} anni.`;
+      if (c.birthday && !validBirth(data.birth_day, data.birth_month))
+        return "Scegli il giorno e la luna di nascita.";
+      return null;
     case "statistiche": {
       for (const s of RULES.stats) {
         const v = data.attributes?.[s.id] ?? c.min!;

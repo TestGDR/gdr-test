@@ -33,6 +33,9 @@ export type Character = {
   creation_step: number;
   sex: string | null;
   age: number | null;
+  birth_day?: number | null; // giorno e luna di nascita: l'eta' cresce al compleanno
+  birth_month?: number | null;
+  birth_year?: number | null;
   attributes: Record<string, number> | null;
   appearance: string | null;
   activated_at: string | null;

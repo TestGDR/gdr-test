@@ -29,6 +29,7 @@ import {
   type CreationBlock,
   type CreationStep,
 } from "@/lib/creation-flow";
+import { MOONS, MOON_DAYS, formatBirth } from "@/lib/game-date";
 import { loadCatalog, type Skill, type Trait } from "@/lib/rules/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
@@ -342,6 +343,60 @@ function BlockView({ block, data, update, skills, traits }: BlockProps) {
             }
             className="input w-32"
           />
+          {c.birthday && (
+            <div className="mt-3">
+              <span className="mb-1 block text-sm text-muted">
+                Giorno e luna di nascita (al compleanno l&apos;età cresce di un anno)
+              </span>
+              <div className="flex gap-2">
+                <select
+                  value={data.birth_day ?? ""}
+                  onChange={(e) =>
+                    update({
+                      birth_day: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    })
+                  }
+                  className="input w-24!"
+                  aria-label="Giorno di nascita"
+                >
+                  <option value="">Giorno</option>
+                  {Array.from(
+                    {
+                      length: data.birth_month
+                        ? MOON_DAYS[data.birth_month - 1]
+                        : 31,
+                    },
+                    (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ),
+                  )}
+                </select>
+                <select
+                  value={data.birth_month ?? ""}
+                  onChange={(e) =>
+                    update({
+                      birth_month: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    })
+                  }
+                  className="input w-52!"
+                  aria-label="Luna di nascita"
+                >
+                  <option value="">Luna</option>
+                  {MOONS.map((m, i) => (
+                    <option key={m} value={i + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </BlockFrame>
       );
     case "statistiche":
@@ -828,7 +883,11 @@ function Summary({
                 <Item
                   key={b.id}
                   label="Età"
-                  value={data.age ? `${data.age} anni` : "—"}
+                  value={
+                    data.age
+                      ? `${data.age} anni${data.birth_day && data.birth_month ? ` · nato il ${formatBirth(data.birth_day, data.birth_month)}` : ""}`
+                      : "—"
+                  }
                 />
               );
             case "statistiche":

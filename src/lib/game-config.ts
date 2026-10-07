@@ -1,8 +1,8 @@
 // Impostazioni generali del mondo di gioco.
-// Per ora la data di gioco si aggiorna a mano modificando queste righe.
+// La data di gioco scorre da sola (1 giorno reale = 1 giorno ON): vedi
+// lib/game-date.ts e Gestione -> Data di gioco.
+import { gameYearNow } from "./game-date";
 
-// Anno attuale del gioco (Dopo la Conquista): serve anche a calcolare l'eta' dei viventi
-export const GAME_YEAR = 363;
-
-// Data mostrata nella colonna sinistra
-export const GAME_DATE = `G. 1 - Decima Luna - ${GAME_YEAR} D.C.`;
+// Anno attuale del gioco (Dopo la Conquista): serve a calcolare l'eta' dei viventi
+// negli alberi genealogici
+export const GAME_YEAR = gameYearNow();

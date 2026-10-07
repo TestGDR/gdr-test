@@ -110,6 +110,18 @@ export async function finalizeCharacter(
     else privateFields[c.key] = v;
   }
 
+  // Data di nascita: giorno e luna scelti, l'anno si ricava dall'eta' e dalla data di gioco
+  let birth: Record<string, number> = {};
+  const ageBlock = allBlocks(flow).find((b) => b.kind === "eta");
+  if (ageBlock && cfg(ageBlock).birthday && data.age && data.birth_day && data.birth_month) {
+    const { data: year } = await supabase.rpc("birth_year_for", {
+      p_age: data.age,
+      p_day: data.birth_day,
+      p_month: data.birth_month,
+    });
+    if (typeof year === "number") birth = { birth_day: data.birth_day, birth_month: data.birth_month, birth_year: year };
+  }
+
   const stepOf = (k: Parameters<typeof hasBlock>[1]) => flow.findIndex((s) => s.blocks.some((b) => b.kind === k));
 
   // Casata e ruolo: devono essere ancora aperti all'iscrizione per sesso ed eta'
@@ -153,6 +165,7 @@ export async function finalizeCharacter(
     status: "attivo",
     sex: data.sex ?? null,
     age: data.age ?? null,
+    ...birth,
     attributes: statsBlock
       ? Object.fromEntries(RULES.stats.map((s) => [s.id, data.attributes?.[s.id] ?? cfg(statsBlock).min]))
       : Object.fromEntries(RULES.stats.map((s) => [s.id, RULES.statMin])),
