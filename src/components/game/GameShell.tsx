@@ -258,7 +258,7 @@ export default function GameShell({
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
-        <header className="relative z-30 flex h-14 shrink-0 items-center justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4">
+        <header className="relative z-30 flex min-h-14 shrink-0 items-center py-2.5 justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -294,8 +294,9 @@ export default function GameShell({
               }
             />
 
-            <h1 className="mx-1 hidden items-center gap-3 font-serif text-sm tracking-[0.1em] whitespace-nowrap text-accent uppercase drop-shadow-[0_0_10px_rgba(201,164,92,0.35)] sm:mx-3 sm:text-xl sm:tracking-[0.2em] lg:flex lg:text-2xl">
-              Westeros GDR
+            <h1 className="mx-3 hidden shrink-0 lg:block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/logo-westeros.webp" alt="Westeros GDR" width={200} height={30} className="block w-[200px] drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" />
             </h1>
 
             <span className="mx-2 lg:hidden">
