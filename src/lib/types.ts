@@ -11,9 +11,17 @@ export type Character = {
   sheet_unlocks?: string[]; // parti della scheda sbloccate dall'admin ("storia", "anagrafica")
   coins?: number; // monete sul conto
   fate_notes?: string | null; // Note del Fato (le scrive lo staff)
+  fate_notes_at?: string | null; // quando sono state scritte
   known_html?: string | null; // "Si sa che" (editor di testo del giocatore)
   affections_html?: string | null; // "Affetti"
   face_claim?: string | null; // prestavolto
+  height?: string | null; // altezza (testo libero, es. "1,80 m")
+  eye_color?: string | null; // colore degli occhi
+  hair_color?: string | null; // colore dei capelli
+  visible_marks?: string | null; // segni visibili (cicatrici, tatuaggi...)
+  marital_status?: string | null; // stato civile (vedi lib/marital), lo imposta l'admin
+  partner_character_id?: string | null; // sposato/fidanzato con un PG
+  partner_npc?: string | null; // ...oppure con un PNG
   created_at: string;
   status: "bozza" | "attivo";
   creation_step: number;

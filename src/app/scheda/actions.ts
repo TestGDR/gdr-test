@@ -8,6 +8,7 @@ import {
   sanitizeCreationData,
   type CreationData,
 } from "@/lib/character-creation";
+import { VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -146,6 +147,10 @@ export type SheetFields = {
   knownHtml?: string; // "Si sa che"
   affectionsHtml?: string; // "Affetti"
   appearance?: string; // Aspetto
+  height?: string; // Dati: altezza
+  eyeColor?: string; // Dati: colore occhi
+  hairColor?: string; // Dati: colore capelli
+  visibleMarks?: string; // Dati: segni visibili
 };
 
 const COLUMNS: Record<keyof SheetFields, string> = {
@@ -158,6 +163,10 @@ const COLUMNS: Record<keyof SheetFields, string> = {
   knownHtml: "known_html",
   affectionsHtml: "affections_html",
   appearance: "appearance",
+  height: "height",
+  eyeColor: "eye_color",
+  hairColor: "hair_color",
+  visibleMarks: "visible_marks",
 };
 const IMAGES: (keyof SheetFields)[] = [
   "avatarUrl",
@@ -176,6 +185,10 @@ const MAX: Partial<Record<keyof SheetFields, number>> = {
   knownHtml: 20000,
   affectionsHtml: 20000,
   appearance: TEXT_MAX,
+  height: 30,
+  eyeColor: 40,
+  hairColor: 40,
+  visibleMarks: VISIBLE_MARKS_MAX,
 };
 
 // Salva solo i campi passati (una sezione alla volta)
@@ -183,7 +196,7 @@ export async function saveSheetFields(
   characterId: string,
   fields: SheetFields,
 ): Promise<CreationResult> {
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const update: Record<string, string | null> = {};
   for (const [key, raw] of Object.entries(fields) as [
     keyof SheetFields,
@@ -211,8 +224,7 @@ export async function saveSheetFields(
   const { error } = await supabase
     .from("characters")
     .update(update)
-    .eq("id", characterId)
-    .eq("owner_id", user.id)
+    .eq("id", characterId) // proprietario o admin: lo decide il database (RLS)
     .eq("status", "attivo");
   if (error) {
     if (error.code === "23505")

@@ -9,6 +9,7 @@ export default function ModalButton({
   title,
   className = "btn",
   size = "md",
+  centerTitle,
   onOpen,
   children,
 }: {
@@ -16,6 +17,7 @@ export default function ModalButton({
   title: string;
   className?: string;
   size?: ModalSize;
+  centerTitle?: boolean;
   onOpen?: () => void;
   children: (close: () => void) => ReactNode;
 }) {
@@ -34,7 +36,7 @@ export default function ModalButton({
       >
         {label}
       </button>
-      <Modal open={open} onClose={close} title={title} size={size}>
+      <Modal open={open} onClose={close} title={title} size={size} centerTitle={centerTitle}>
         {children(close)}
       </Modal>
     </>

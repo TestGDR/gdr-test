@@ -1,0 +1,296 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { AGE_MAX, AGE_MIN, ATTRIBUTES, SEXES } from "@/lib/character-creation";
+import { createClient } from "@/lib/supabase/client";
+import type { Character } from "@/lib/types";
+import MaritalManage from "./MaritalManage";
+
+// Scheda -> Gestisci. L'admin modifica velocemente i campi principali del PG e
+// sblocca/blocca la scheda; con la scheda sbloccata il proprietario modifica
+// gli stessi campi (tranne lo sblocco)
+export default function SheetManage({
+  character,
+  isAdmin,
+  onSaved,
+}: {
+  character: Character;
+  isAdmin: boolean;
+  onSaved: () => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+  const unlocked = !!character.sheet_unlocks?.includes("scheda");
+  const [name, setName] = useState(character.name);
+  const [sex, setSex] = useState(character.sex ?? "uomo");
+  const [age, setAge] = useState(String(character.age ?? ""));
+  const [attrs, setAttrs] = useState<Record<string, number>>(
+    Object.fromEntries(
+      ATTRIBUTES.map((a) => [a.id, character.attributes?.[a.id] ?? 0]),
+    ),
+  );
+  const [faceClaim, setFaceClaim] = useState(character.face_claim ?? "");
+  const [looks, setLooks] = useState({
+    height: character.height ?? "",
+    eye_color: character.eye_color ?? "",
+    hair_color: character.hair_color ?? "",
+    visible_marks: character.visible_marks ?? "",
+  });
+  const [story, setStory] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("character_backgrounds")
+      .select("body")
+      .eq("character_id", character.id)
+      .maybeSingle()
+      .then(({ data }) => setStory((data?.body as string | undefined) ?? ""));
+  }, [supabase, character.id]);
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("sheet_manage_update", {
+      p_character: character.id,
+      p_name: name,
+      p_sex: sex,
+      p_age: Number(age),
+      p_attributes: attrs,
+      p_face_claim: faceClaim,
+      p_story: story ?? "",
+      p_height: looks.height,
+      p_eye_color: looks.eye_color,
+      p_hair_color: looks.hair_color,
+      p_visible_marks: looks.visible_marks,
+    });
+    setBusy(false);
+    if (error)
+      return setMsg({
+        ok: false,
+        text:
+          error.message.length < 140 ? error.message : "Scheda non salvata.",
+      });
+    setMsg({ ok: true, text: "Scheda salvata." });
+    onSaved();
+    router.refresh(); // il nome compare anche nella barra e nei presenti
+  }
+
+  async function toggleUnlock() {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("set_sheet_unlock", {
+      p_character: character.id,
+      p_section: "scheda",
+      p_on: !unlocked,
+    });
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: "Operazione non riuscita." });
+    onSaved();
+  }
+
+  return (
+    <div className="space-y-5 p-6">
+      <h3 className="border-b border-border pb-2 font-serif text-2xl text-accent">
+        {isAdmin ? "Gestisci la scheda" : "Modifica la scheda"}
+      </h3>
+
+      {isAdmin ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-accent/50 bg-black/40 px-3 py-2 text-sm">
+          <span className="text-muted">
+            {unlocked ? (
+              <span className="text-green-400">
+                Scheda sbloccata: il giocatore può modificare questi campi.
+              </span>
+            ) : (
+              "Scheda bloccata: questi campi li modifica solo l'admin."
+            )}
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={toggleUnlock}
+            className={`${unlocked ? "btn-ghost" : "btn"} px-3 py-1 text-xs tracking-[0.12em] uppercase`}
+          >
+            {unlocked ? "Blocca scheda" : "Sblocca scheda"}
+          </button>
+        </div>
+      ) : (
+        <p className="border border-[#d4a72c]/40 bg-[#d4a72c]/5 px-3 py-2 text-sm text-[#f0c75e]">
+          L&apos;admin ha sbloccato la tua scheda: puoi correggere questi campi
+          finché non la riblocca.
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-4">
+        <label className="block min-w-48 flex-1">
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Nome
+          </span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            className="input py-1.5"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Sesso
+          </span>
+          <select
+            value={sex}
+            onChange={(e) => setSex(e.target.value)}
+            className="input w-36! py-1.5"
+          >
+            {SEXES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Età
+          </span>
+          <input
+            type="number"
+            min={AGE_MIN}
+            max={AGE_MAX}
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            className="input w-24! py-1.5"
+          />
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+          Prestavolto
+        </span>
+        <input
+          value={faceClaim}
+          onChange={(e) => setFaceClaim(e.target.value)}
+          maxLength={80}
+          className="input py-1.5"
+        />
+      </label>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {(
+          [
+            ["height", "Altezza", 30],
+            ["eye_color", "Colore occhi", 40],
+            ["hair_color", "Colore capelli", 40],
+          ] as const
+        ).map(([key, label, max]) => (
+          <label key={key} className="block">
+            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+              {label}
+            </span>
+            <input
+              value={looks[key]}
+              onChange={(e) =>
+                setLooks((x) => ({ ...x, [key]: e.target.value }))
+              }
+              maxLength={max}
+              className="input py-1.5"
+            />
+          </label>
+        ))}
+      </div>
+
+      <label className="block">
+        <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+          Segni visibili
+        </span>
+        <textarea
+          value={looks.visible_marks}
+          onChange={(e) =>
+            setLooks((x) => ({ ...x, visible_marks: e.target.value }))
+          }
+          maxLength={300}
+          rows={2}
+          className="input resize-y text-sm"
+        />
+      </label>
+
+      <div>
+        <p className="mb-1 text-xs tracking-wider text-muted uppercase">
+          Caratteristiche (punti)
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {ATTRIBUTES.map((a) => (
+            <label
+              key={a.id}
+              className="flex items-center justify-between gap-2 border border-border/60 bg-black/30 px-2 py-1.5 text-sm"
+            >
+              {a.label}
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={attrs[a.id] ?? 0}
+                onChange={(e) =>
+                  setAttrs((x) => ({
+                    ...x,
+                    [a.id]: Math.min(
+                      20,
+                      Math.max(0, Math.trunc(Number(e.target.value)) || 0),
+                    ),
+                  }))
+                }
+                className="input w-16! py-1 text-center"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="block">
+        <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+          Storia (background)
+        </span>
+        {story === null ? (
+          <p className="text-sm text-muted">Caricamento...</p>
+        ) : (
+          <>
+            <textarea
+              value={story}
+              onChange={(e) => setStory(e.target.value)}
+              maxLength={4000}
+              rows={10}
+              className="input resize-y text-sm"
+            />
+            <span className="text-xs text-muted">
+              {story.length} / 4.000 caratteri
+            </span>
+          </>
+        )}
+      </label>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
+        <button
+          type="button"
+          disabled={busy || story === null}
+          onClick={save}
+          className="btn px-5 py-1.5 text-sm"
+        >
+          {busy ? "Salvataggio..." : "Salva"}
+        </button>
+        {msg && (
+          <span
+            className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}
+          >
+            {msg.text}
+          </span>
+        )}
+      </div>
+
+      {isAdmin && <MaritalManage character={character} onSaved={onSaved} />}
+    </div>
+  );
+}

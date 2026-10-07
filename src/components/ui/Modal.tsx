@@ -43,12 +43,14 @@ export default function Modal({
   onClose,
   title,
   size = "md",
+  centerTitle = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   size?: ModalSize;
+  centerTitle?: boolean; // titolo al centro della barra (es. la scheda del PG)
   children: ReactNode;
 }) {
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
@@ -153,12 +155,18 @@ export default function Modal({
           onPointerMove={onDragMove}
           onPointerUp={() => (drag.current = null)}
           onPointerCancel={() => (drag.current = null)}
-          className="bar flex shrink-0 cursor-grab touch-none items-center justify-between border-b px-4 py-3 select-none active:cursor-grabbing"
+          className="bar relative flex shrink-0 cursor-grab touch-none items-center justify-between border-b px-4 py-3 select-none active:cursor-grabbing"
         >
-          <h2 className="text-xs font-bold tracking-[0.2em] text-muted uppercase">
+          <h2
+            className={
+              centerTitle
+                ? "pointer-events-none absolute inset-x-28 truncate text-center text-xs font-bold tracking-[0.2em] text-muted uppercase"
+                : "text-xs font-bold tracking-[0.2em] text-muted uppercase"
+            }
+          >
             {title}
           </h2>
-          <div className="flex items-center gap-3 text-muted">
+          <div className="ml-auto flex items-center gap-3 text-muted">
             <GrabIcon />
             <button
               type="button"
