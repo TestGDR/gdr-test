@@ -29,6 +29,7 @@ import Affections from "./Affections";
 import Equipment from "./Equipment";
 import { maritalLabel, VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { PaperRow, PaperSheet } from "./PaperSheet";
+import PregnancyRow from "./Pregnancy";
 import SheetManage from "./SheetManage";
 import SheetOptions from "./SheetOptions";
 import { cleanPlayerHtml } from "./player-html";
@@ -772,6 +773,7 @@ function DataPage({
           <PaperRow label="Colore capelli" value={character.hair_color || "—"} />
           <DragonField character={character} isOwn={isOwn} />
         </div>
+        {character.sex === "donna" && <PregnancyRow character={character} isOwn={isOwn} />}
         <PaperRow label="Segni visibili" value={<span className="whitespace-normal">{character.visible_marks || "—"}</span>} />
       </PaperSheet>
       {actions && !isOwn && (

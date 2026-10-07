@@ -46,13 +46,23 @@ export function PaperSheet({
 }
 
 // Riga del foglio: rombo con la stella, titolo in grassetto e il valore sotto
-export function PaperRow({ label, value, right }: { label: string; value: ReactNode; right?: ReactNode }) {
+export function PaperRow({
+  label,
+  value,
+  right,
+  wrap,
+}: {
+  label: string;
+  value: ReactNode;
+  right?: ReactNode;
+  wrap?: boolean; // valore non troncato (es. con un riquadro che si apre)
+}) {
   return (
     <div className="flex items-center gap-3 border-b border-[#3b2a1a]/20 py-2 last:border-b-0">
       <DiamondStar />
       <div className="min-w-0 flex-1">
         <p className="font-serif text-[0.95rem] leading-tight font-semibold text-[#2a1d12]">{label}</p>
-        <div className="truncate text-sm text-[#4a3826]">{value}</div>
+        <div className={`${wrap ? "" : "truncate "}text-sm text-[#4a3826]`}>{value}</div>
       </div>
       {right && <span className="shrink-0 text-sm text-[#4a3826]">{right}</span>}
     </div>

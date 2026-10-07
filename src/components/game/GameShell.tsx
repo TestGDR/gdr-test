@@ -199,6 +199,11 @@ export default function GameShell({
   });
 
   const unread = useUnread(character?.id ?? null);
+  // Gravidanze: controllo giornaliero dei sintomi (e parto) al primo accesso del giorno
+  const tickId = character?.status === "attivo" ? character.id : null;
+  useEffect(() => {
+    if (tickId) supabase.rpc("pregnancy_tick", { p_character: tickId }).then(() => {});
+  }, [supabase, tickId]);
   const [panel, setPanel] = useState<Panel | null>(null);
   const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
   const tickets = useTicketUnread(userId);

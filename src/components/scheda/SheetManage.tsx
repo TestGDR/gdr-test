@@ -291,6 +291,37 @@ export default function SheetManage({
       </div>
 
       {isAdmin && <MaritalManage character={character} onSaved={onSaved} />}
+      {isAdmin && character.sex === "donna" && (
+        <section className="space-y-2 border-t border-border pt-4">
+          <h4 className="font-serif text-lg text-accent">Gravidanza</h4>
+          <p className="text-xs text-muted">
+            Interrompe la gravidanza in corso (per correzioni o decisioni
+            narrative). Non arriva nessun messaggio alla giocatrice.
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              if (!window.confirm("Interrompere la gravidanza in corso?"))
+                return;
+              setBusy(true);
+              const { error } = await supabase.rpc("pregnancy_admin_end", {
+                p_character: character.id,
+              });
+              setBusy(false);
+              setMsg(
+                error
+                  ? { ok: false, text: "Operazione non riuscita." }
+                  : { ok: true, text: "Gravidanza interrotta." },
+              );
+              if (!error) onSaved();
+            }}
+            className="btn-ghost px-3 py-1 text-xs tracking-[0.12em] uppercase"
+          >
+            Interrompi gravidanza
+          </button>
+        </section>
+      )}
     </div>
   );
 }
