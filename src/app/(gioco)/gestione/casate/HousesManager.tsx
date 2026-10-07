@@ -44,7 +44,7 @@ import {
 export type PgAssignment = {
   id: string;
   name: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   house_id: string | null;
   house_role_id: string | null;
 };

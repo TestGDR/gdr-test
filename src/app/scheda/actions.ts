@@ -13,6 +13,7 @@ import { RULES, STAT_IDS, type StatId } from "@/lib/rules/config";
 import { VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
+import { getStaffContext } from "@/lib/staff";
 
 export type CreationResult = { error?: string; invalidStep?: number };
 
@@ -54,26 +55,50 @@ export async function saveCreationProgress(
   return {};
 }
 
-// Conferma: rilegge le scelte salvate, le controlla con la creazione
-// configurata in Gestione e attiva il personaggio. La storia va nella
-// tabella riservata allo staff e da li' non si modifica piu'
-export async function finalizeCharacter(
-  characterId: string,
-): Promise<CreationResult> {
+// Fine della creazione: il giocatore invia il PG in approvazione (si apre un
+// ticket e il PG resta bloccato). Le scelte si controllano qui sul server
+export async function finalizeCharacter(characterId: string): Promise<CreationResult> {
+  return processCreation(characterId, "submit");
+}
+
+// Lo staff (permesso "schede.approvare") accetta il PG: ricontrolla le scelte
+// e le scrive sulla scheda, che diventa attiva
+export async function approveCharacter(characterId: string): Promise<CreationResult> {
+  return processCreation(characterId, "approve");
+}
+
+// Lo staff rimanda il PG in creazione, con una nota per il giocatore
+export async function sendBackCharacter(characterId: string, note: string): Promise<CreationResult> {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("review_send_back", { p_character: characterId, p_note: note.slice(0, 2000) });
+  if (error) return { error: error.message.length < 140 ? error.message : "Operazione non riuscita." };
+  revalidatePath("/", "layout");
+  return {};
+}
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+async function processCreation(characterId: string, mode: "submit" | "approve"): Promise<CreationResult> {
   const { supabase, user } = await requireUser();
 
   const [{ data: character }, { data: draft }, flow, { data: traitCatalog }, { data: activeSkills }] =
     await Promise.all([
-      supabase.from("characters").select("id, owner_id, status, coins").eq("id", characterId).maybeSingle(),
+      supabase.from("characters").select("id, owner_id, status, coins, name").eq("id", characterId).maybeSingle(),
       supabase.from("character_drafts").select("data").eq("character_id", characterId).maybeSingle(),
       loadFlow(supabase),
       supabase.from("traits").select("id, name, kind, cost, choice, unique_group, requires_master, active"),
       supabase.from("skills").select("id, stat").eq("active", true),
     ]);
-  if (!character || character.owner_id !== user.id)
-    return { error: "Personaggio non trovato." };
-  if (character.status !== "bozza")
-    return { error: "Questo personaggio è già attivo." };
+  if (!character) return { error: "Personaggio non trovato." };
+  if (mode === "submit") {
+    if (character.owner_id !== user.id) return { error: "Personaggio non trovato." };
+    if (character.status === "revisione") return { error: "Il personaggio è già in attesa di approvazione." };
+    if (character.status !== "bozza") return { error: "Questo personaggio è già attivo." };
+  } else {
+    const { data: can } = await supabase.rpc("can_approve_story");
+    if (can !== true) return { error: "Non hai il permesso di approvare i personaggi." };
+    if (character.status !== "revisione") return { error: "Il personaggio non è in attesa di approvazione." };
+  }
   if (flow.length === 0)
     return { error: "La creazione non è ancora configurata: avvisa lo staff." };
 
@@ -97,6 +122,7 @@ export async function finalizeCharacter(
 
   // Solo i dati dei blocchi presenti nella creazione
   const has = (k: Parameters<typeof hasBlock>[1]) => hasBlock(flow, k);
+  const stepOf = (k: Parameters<typeof hasBlock>[1]) => flow.findIndex((s) => s.blocks.some((b) => b.kind === k));
   const statsBlock = allBlocks(flow).find((b) => b.kind === "statistiche");
   const physical = allBlocks(flow).find((b) => b.kind === "dati_fisici");
   const physicalFields = physical ? (cfg(physical).fields ?? []) : [];
@@ -122,16 +148,45 @@ export async function finalizeCharacter(
     if (typeof year === "number") birth = { birth_day: data.birth_day, birth_month: data.birth_month, birth_year: year };
   }
 
-  const stepOf = (k: Parameters<typeof hasBlock>[1]) => flow.findIndex((s) => s.blocks.some((b) => b.kind === k));
-
   // Casata e ruolo: devono essere ancora aperti all'iscrizione per sesso ed eta'
   let houseId: string | null = null;
+  let roleLabel = "";
   if (has("casata") && data.house_role_id) {
     const { data: roles } = await supabase.rpc("signup_house_roles", { p_sex: data.sex ?? "", p_age: data.age ?? 0 });
-    const role = ((roles ?? []) as { role_id: string; house_id: string }[]).find((r) => r.role_id === data.house_role_id);
+    const role = ((roles ?? []) as { role_id: string; house_id: string; role_name: string; house_name: string }[]).find(
+      (r) => r.role_id === data.house_role_id,
+    );
     if (!role)
       return { error: "Il ruolo di casata scelto non è più disponibile: scegline un altro.", invalidStep: stepOf("casata") };
     houseId = role.house_id;
+    roleLabel = `${role.role_name} della Casata ${role.house_name}`;
+  }
+
+  // Drago: uno solo, libero e della casata scelta
+  let dragonLabel = "";
+  if (has("drago") && data.dragon_id) {
+    if (!houseId) return { error: "Per reclamare un drago scegli prima la casata.", invalidStep: stepOf("drago") };
+    const { data: d } = await supabase
+      .from("dragons")
+      .select("name, status, house_id, rider_id, npc_rider_id")
+      .eq("id", data.dragon_id)
+      .maybeSingle();
+    if (!d || d.house_id !== houseId || d.rider_id || d.npc_rider_id)
+      return { error: "Il drago scelto non è più libero: scegline un altro.", invalidStep: stepOf("drago") };
+    dragonLabel = d.status === "uovo" ? d.name || "Uovo di drago" : d.name || "Drago";
+  }
+
+  // Prestavolto: non deve essere gia' di un altro PG (lo controlla anche il database)
+  const claim = has("prestavolto") ? data.face_claim?.trim().replace(/\s+/g, " ") : undefined;
+  if (claim) {
+    const { data: same } = await supabase
+      .from("characters")
+      .select("id")
+      .ilike("face_claim", claim.replace(/[\\%_]/g, "\\$&"))
+      .neq("id", characterId)
+      .limit(1);
+    if (same?.length)
+      return { error: "Questo prestavolto è già usato da un altro personaggio.", invalidStep: stepOf("prestavolto") };
   }
 
   // Equipaggiamento: oggetti disponibili all'iscrizione, comprati con le monete della creazione
@@ -152,14 +207,42 @@ export async function finalizeCharacter(
       return { error: `Gli oggetti scelti costano ${spent} monete, ne hai ${budget}.`, invalidStep: stepOf("equipaggiamento") };
   }
 
-  // Lo stato, la scheda definitiva e la storia li scrive solo il server (secret key)
+  // ---- Invio in approvazione: ticket e PG bloccato ----
+  if (mode === "submit") {
+    const row = (k: string, v: string) => (v ? `<li><strong>${esc(k)}:</strong> ${esc(v)}</li>` : "");
+    const body =
+      `<p><strong>Richiesta di approvazione del personaggio ${esc(character.name)}.</strong></p><ul>` +
+      row("Sesso", data.sex ?? "") +
+      row("Età", data.age ? `${data.age} anni` : "") +
+      row("Casata e ruolo", roleLabel) +
+      row("Drago", dragonLabel) +
+      row("Prestavolto", claim ?? "") +
+      `</ul><p>Lo staff controlla tutte le scelte dalla scheda del personaggio (Anagrafica → ${esc(character.name)}) ` +
+      `e preme <strong>Sblocca e conferma</strong> oppure <strong>Rimanda</strong>.</p>`;
+    const { error } = await supabase.rpc("submit_character", { p_character: characterId, p_body: body });
+    if (error) return { error: error.message.length < 140 ? error.message : "Invio non riuscito, riprova." };
+    revalidatePath("/", "layout");
+    return {};
+  }
+
+  // ---- Approvazione: le scelte vanno sulla scheda (scrive solo il server) ----
   const admin = createAdminClient();
   if (!admin) return { error: "Configurazione del server incompleta." };
+  if (has("drago") && data.dragon_id) {
+    const { data: claimed, error: claimError } = await admin.rpc("claim_signup_dragon", {
+      p_character: characterId,
+      p_dragon: data.dragon_id,
+      p_house: houseId,
+    });
+    if (claimError) return { error: "Reclamo del drago non riuscito, riprova." };
+    if (!claimed) return { error: "Il drago scelto non è più libero: rimanda il PG perché ne scelga un altro." };
+  }
   if (has("storia") && data.story?.trim()) {
+    const now = new Date().toISOString();
     const { error: storyError } = await admin
       .from("character_backgrounds")
-      .upsert({ character_id: characterId, body: data.story.trim(), submitted_at: new Date().toISOString() }); // inviata in approvazione
-    if (storyError) return { error: "Creazione non riuscita, riprova." };
+      .upsert({ character_id: characterId, body: data.story.trim(), submitted_at: now, approved_at: now, approved_by: user.id });
+    if (storyError) return { error: "Approvazione non riuscita, riprova." };
   }
   const update: Record<string, unknown> = {
     status: "attivo",
@@ -180,43 +263,13 @@ export async function finalizeCharacter(
   }
   if (equipBlock && cfg(equipBlock).keep_change)
     update.coins = ((character.coins as number | null) ?? 0) + Math.max(0, budget - spent); // monete avanzate
-
-  // Drago: uno solo, libero e della casata scelta (lo prende chi conferma per primo)
-  if (has("drago") && data.dragon_id) {
-    if (!houseId) return { error: "Per reclamare un drago scegli prima la casata.", invalidStep: stepOf("drago") };
-    const { data: claimed, error: claimError } = await admin.rpc("claim_signup_dragon", {
-      p_character: characterId,
-      p_dragon: data.dragon_id,
-      p_house: houseId,
-    });
-    if (claimError) return { error: "Reclamo del drago non riuscito, riprova.", invalidStep: stepOf("drago") };
-    if (!claimed)
-      return { error: "Il drago scelto non è più libero: scegline un altro.", invalidStep: stepOf("drago") };
-  }
-  // Prestavolto: non deve essere gia' di un altro PG (lo controlla anche il database)
-  const claim = has("prestavolto") ? data.face_claim?.trim().replace(/\s+/g, " ") : undefined;
-  if (claim) {
-    const claimStep = flow.findIndex((s) => s.blocks.some((b) => b.kind === "prestavolto"));
-    const { data: same } = await admin
-      .from("characters")
-      .select("id")
-      .ilike("face_claim", claim.replace(/[\\%_]/g, "\\$&"))
-      .neq("id", characterId)
-      .limit(1);
-    if (same?.length) return { error: "Questo prestavolto è già usato da un altro personaggio.", invalidStep: claimStep };
-    update.face_claim = claim;
-  }
+  if (claim) update.face_claim = claim;
   for (const f of PHYSICAL_FIELDS)
     if (physicalFields.includes(f.id)) update[f.id] = data[f.id]?.trim().slice(0, f.max) || null;
-  const { error } = await admin
-    .from("characters")
-    .update(update)
-    .eq("id", characterId)
-    .eq("owner_id", user.id)
-    .eq("status", "bozza");
+  const { error } = await admin.from("characters").update(update).eq("id", characterId).eq("status", "revisione");
   if (error)
     return {
-      error: error.code === "23505" ? "Questo prestavolto è già usato da un altro personaggio." : "Creazione non riuscita, riprova.",
+      error: error.code === "23505" ? "Questo prestavolto è già usato da un altro personaggio." : "Approvazione non riuscita, riprova.",
     };
   await admin.from("character_drafts").delete().eq("character_id", characterId);
   if (Object.keys(privateFields).length)
@@ -238,6 +291,93 @@ export async function finalizeCharacter(
       .from("character_items")
       .insert(itemIds.map((item_id) => ({ character_id: characterId, item_id, source: "iscrizione" })));
 
+  // Risposta nel ticket (che si chiude) e messaggio di SISTEMA al giocatore
+  const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle();
+  const staffName = (profile?.username as string | undefined) ?? "Staff";
+  const { data: ch } = await admin.from("characters").select("review_ticket_id").eq("id", characterId).maybeSingle();
+  if (ch?.review_ticket_id) {
+    await admin.from("ticket_messages").insert({
+      ticket_id: ch.review_ticket_id,
+      author_id: user.id,
+      author_name: staffName,
+      from_staff: true,
+      body: "<p><strong>Personaggio approvato.</strong> Benvenuto in gioco!</p>",
+    });
+    await admin
+      .from("tickets")
+      .update({ status: "chiuso", last_message_at: new Date().toISOString(), last_author_name: staffName })
+      .eq("id", ch.review_ticket_id);
+  }
+  await admin.rpc("send_system_message", {
+    p_character: characterId,
+    p_body: "Il tuo personaggio è stato approvato: da adesso puoi giocare nelle chat. Buon gioco!",
+  });
+
+  revalidatePath("/", "layout");
+  return {};
+}
+
+// L'admin resetta un PG: torna in creazione da capo (bozza vuota), perde le
+// scelte della creazione e quello che ne derivava. Restano nome, immagini,
+// messaggi e cronologia
+export async function resetCharacter(characterId: string): Promise<CreationResult> {
+  const { isAdmin } = await getStaffContext();
+  if (!isAdmin) return { error: "Solo gli admin possono resettare un personaggio." };
+  const admin = createAdminClient();
+  if (!admin) return { error: "Configurazione del server incompleta." };
+
+  const { data: character } = await admin.from("characters").select("id").eq("id", characterId).maybeSingle();
+  if (!character) return { error: "Personaggio non trovato." };
+
+  // il drago torna libero per la casata
+  await admin.from("dragons").update({ rider_id: null }).eq("rider_id", characterId);
+  await Promise.all([
+    admin.from("character_drafts").delete().eq("character_id", characterId),
+    admin.from("character_skills").delete().eq("character_id", characterId),
+    admin.from("character_traits").delete().eq("character_id", characterId),
+    admin.from("character_items").delete().eq("character_id", characterId),
+    admin.from("character_backgrounds").delete().eq("character_id", characterId),
+    admin.from("character_private_fields").delete().eq("character_id", characterId),
+    admin.from("pregnancies").delete().eq("character_id", characterId),
+  ]);
+  const { error } = await admin
+    .from("characters")
+    .update({
+      status: "bozza",
+      creation_step: 0,
+      sex: null,
+      age: null,
+      birth_day: null,
+      birth_month: null,
+      birth_year: null,
+      attributes: null,
+      appearance: null,
+      face_claim: null,
+      height: null,
+      eye_color: null,
+      hair_color: null,
+      visible_marks: null,
+      custom_fields: {},
+      house_id: null,
+      house_role_id: null,
+      px: 0,
+      coins: 0,
+      resources: 0,
+      honor: RULES.honor.start,
+      hp_current: null,
+      stamina_current: null,
+      marital_status: null,
+      partner_character_id: null,
+      partner_npc: null,
+      activated_at: null,
+      sheet_unlocks: [],
+    })
+    .eq("id", characterId);
+  if (error) return { error: "Reset non riuscito: " + error.message.slice(0, 100) };
+  await admin.rpc("send_system_message", {
+    p_character: characterId,
+    p_body: "Il tuo personaggio è stato resettato dallo staff: rifai la creazione dalla scheda e inviala in approvazione.",
+  });
   revalidatePath("/", "layout");
   return {};
 }

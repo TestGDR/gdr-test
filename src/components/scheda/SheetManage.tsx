@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { resetCharacter } from "@/app/scheda/actions";
 import { AGE_MAX, AGE_MIN, ATTRIBUTES, SEXES } from "@/lib/character-creation";
 import { RULES } from "@/lib/rules/config";
 import { createClient } from "@/lib/supabase/client";
@@ -338,6 +339,7 @@ export default function SheetManage({
         <CustomFieldsManage character={character} onSaved={onSaved} />
       )}
       {isAdmin && <MaritalManage character={character} onSaved={onSaved} />}
+      {isAdmin && <ResetCharacter character={character} />}
       {isAdmin && character.sex === "donna" && (
         <section className="space-y-2 border-t border-border pt-4">
           <h4 className="font-serif text-lg text-accent">Gravidanza</h4>
@@ -370,5 +372,83 @@ export default function SheetManage({
         </section>
       )}
     </div>
+  );
+}
+
+// Admin: reset completo del PG, che torna in creazione da capo. Per
+// confermare si scrive il nome del personaggio (dentro la scheda, senza finestre del browser)
+function ResetCharacter({ character }: { character: Character }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function reset() {
+    if (typed.trim() !== character.name)
+      return setMsg("Il nome non corrisponde: reset annullato.");
+    startTransition(async () => {
+      const res = await resetCharacter(character.id);
+      if (res.error) return setMsg(res.error);
+      setMsg("Personaggio resettato.");
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="space-y-2 border-t border-red-900/60 pt-4">
+      <h4 className="font-serif text-lg text-red-400">
+        Resetta il personaggio
+      </h4>
+      <p className="text-xs text-muted">
+        Il PG torna in creazione da capo (va rifatta e rimandata in
+        approvazione). Perde statistiche, abilità, tratti, oggetti, storia,
+        casata, drago (torna libero), monete, PX e campi della creazione.
+        Restano nome, immagini e messaggi.
+      </p>
+      {open ? (
+        <div className="space-y-2 border border-red-900/70 bg-red-950/20 p-3">
+          <label className="block">
+            <span className="mb-1 block text-xs text-red-300">
+              Per confermare scrivi il nome del personaggio:{" "}
+              <strong>{character.name}</strong>
+            </span>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="input py-1.5"
+              autoFocus
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pending || typed.trim() !== character.name}
+              onClick={reset}
+              className="border border-red-800 bg-red-900/40 px-3 py-1 text-xs tracking-[0.12em] text-red-100 uppercase hover:bg-red-800/60 disabled:opacity-40"
+            >
+              {pending ? "..." : "Resetta definitivamente"}
+            </button>
+            <button
+              type="button"
+              onClick={() => (setOpen(false), setTyped(""), setMsg(null))}
+              className="btn-ghost px-3 py-1 text-xs"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="border border-red-800 px-3 py-1 text-xs tracking-[0.12em] text-red-300 uppercase hover:bg-red-950/40"
+        >
+          Resetta personaggio
+        </button>
+      )}
+      {msg && <p className="text-sm text-[#f0c75e]">{msg}</p>}
+    </section>
   );
 }

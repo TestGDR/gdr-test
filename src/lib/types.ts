@@ -29,7 +29,7 @@ export type Character = {
   partner_character_id?: string | null; // sposato/fidanzato con un PG
   partner_npc?: string | null; // ...oppure con un PNG
   created_at: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo"; // revisione = inviato in approvazione
   creation_step: number;
   sex: string | null;
   age: number | null;

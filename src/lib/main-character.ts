@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type MainCharacter = {
   id: string;
   name: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   avatar_url: string | null;
   house: { name: string; sigil_url: string | null } | null;
 };

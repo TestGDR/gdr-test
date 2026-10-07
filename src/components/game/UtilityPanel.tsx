@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 type Pg = {
   id: string;
   name: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   face_claim: string | null;
   avatar_url: string | null;
   house: { name: string; sigil_url: string | null } | null;

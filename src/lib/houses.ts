@@ -89,7 +89,7 @@ export type HouseNpc = {
 export type HouseMember = {
   id: string;
   name: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   house_id: string;
   house_role_id: string | null;
 };

@@ -33,6 +33,7 @@ import { PaperRow, PaperSheet } from "./PaperSheet";
 import BirthPicker from "./BirthPicker";
 import { CustomFieldRows } from "./CustomFields";
 import PregnancyRow from "./Pregnancy";
+import ReviewPanel from "./ReviewPanel";
 import { DerivedPanel, SkillsPage, TraitsPage } from "./RulesPages";
 import SheetManage from "./SheetManage";
 import SheetOptions from "./SheetOptions";
@@ -492,6 +493,13 @@ function CoverPage({
 }) {
   const active = character.status === "attivo";
   const [editing, setEditing] = useState(false);
+  // staff che approva i personaggi (permesso "schede.approvare")
+  const supabaseCover = useMemo(() => createClient(), []);
+  const [canApprove, setCanApprove] = useState(false);
+  useEffect(() => {
+    if (character.status !== "revisione") return;
+    supabaseCover.rpc("can_approve_story").then(({ data }) => setCanApprove(data === true));
+  }, [supabaseCover, character.status]);
   // computer: quella orizzontale; cellulare (sotto i 1024px): quella verticale.
   // Se ne manca una si usa l'altra
   const cover = active
@@ -499,11 +507,20 @@ function CoverPage({
     : null;
   const coverMobile = active ? character.cover_mobile_url : null;
 
+  if (!active && character.status === "revisione" && canApprove)
+    return <ReviewPanel character={character} onDone={onSaved} />;
+
   if (!active)
     return (
       <div className="flex h-full min-h-80 flex-col items-center justify-center p-8 text-center">
         <p className="font-serif text-3xl text-foreground">{character.name}</p>
-        {isOwn ? (
+        {character.status === "revisione" ? (
+          <p className="mt-4 max-w-sm text-muted">
+            {isOwn
+              ? "Il tuo personaggio è in attesa di approvazione: lo staff controlla le tue scelte e ti risponde nel ticket (Approvazione PG). Finché non viene confermato non si modifica."
+              : "Questo personaggio è in attesa di approvazione."}
+          </p>
+        ) : isOwn ? (
           <>
             <p className="mt-4 max-w-sm text-muted">
               Il tuo personaggio non è ancora stato creato: finché non lo

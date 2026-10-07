@@ -260,7 +260,7 @@ export default function CreationWizard({
             disabled={pending}
             className="btn tracking-widest uppercase"
           >
-            {pending ? "Creazione..." : "Conferma e crea PG"}
+            {pending ? "Invio..." : "Invia in approvazione"}
           </button>
         )}
       </div>
@@ -346,7 +346,8 @@ function BlockView({ block, data, update, skills, traits }: BlockProps) {
           {c.birthday && (
             <div className="mt-3">
               <span className="mb-1 block text-sm text-muted">
-                Giorno e luna di nascita (al compleanno l&apos;età cresce di un anno)
+                Giorno e luna di nascita (al compleanno l&apos;età cresce di un
+                anno)
               </span>
               <div className="flex gap-2">
                 <select
@@ -844,26 +845,31 @@ function Counter({ value, min }: { value: string; min: number }) {
 // ---------------------------------------------------------------------
 // Riepilogo: tutto quello che e' stato scelto, passaggio per passaggio
 // ---------------------------------------------------------------------
-function Summary({
+export function Summary({
   name,
   flow,
   data,
   skills,
   traits,
+  review = false, // vista dallo staff che approva
 }: {
   name: string;
   flow: CreationStep[];
   data: CreationData;
   skills: Skill[] | null;
   traits: Trait[] | null;
+  review?: boolean;
 }) {
   return (
     <div className="space-y-4 text-sm">
-      <p className="text-muted">
-        Controlla le tue scelte. Puoi tornare a qualsiasi passaggio per
-        modificarle. Dopo la conferma il personaggio diventa attivo e potrà
-        giocare nelle chat.
-      </p>
+      {!review && (
+        <p className="text-muted">
+          Controlla le tue scelte. Puoi tornare a qualsiasi passaggio per
+          modificarle. Poi invia il personaggio in approvazione: lo staff lo
+          controlla e lo conferma (diventa attivo e può giocare) oppure te lo
+          rimanda per le correzioni. Mentre è in approvazione non si modifica.
+        </p>
+      )}
       <Item label="Nome" value={name} />
       {flow
         .flatMap((s) => s.blocks)

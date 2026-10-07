@@ -15,7 +15,7 @@ type RentableRoom = {
   location: { name: string } | null;
 };
 type Rental = { room_id: string; ends_at: string; character_id: string; character: { name: string } | null };
-type Me = { id: string; name: string; coins: number; status: "bozza" | "attivo" };
+type Me = { id: string; name: string; coins: number; status: "bozza" | "revisione" | "attivo" };
 
 // Utility -> Prenota stanza: si sceglie la stanza e per quante ore affittarla
 export default function RoomBooking() {

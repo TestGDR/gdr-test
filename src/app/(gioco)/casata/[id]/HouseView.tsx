@@ -18,7 +18,7 @@ import {
 export type HouseMemberPg = {
   id: string;
   name: string;
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   avatar_url: string | null;
   house_role_id: string | null;
 };

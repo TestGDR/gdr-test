@@ -8,7 +8,7 @@ type Account = {
   name: string;
   coins: number; // conto in banca
   pocket: number; // in tasca
-  status: "bozza" | "attivo";
+  status: "bozza" | "revisione" | "attivo";
   last_salary_on: string | null;
   house_role: { name: string; daily_salary: number } | null;
 };
