@@ -15,7 +15,11 @@ import {
   type TraitInfo,
 } from "@/lib/character-creation";
 import { RULES } from "@/lib/rules/config";
-import { validateTraits, type TraitPick } from "@/lib/rules/engine";
+import {
+  skillLevelCap,
+  validateTraits,
+  type TraitPick,
+} from "@/lib/rules/engine";
 
 export type BlockKind =
   | "sesso"
@@ -27,6 +31,9 @@ export type BlockKind =
   | "storia"
   | "dati_fisici"
   | "equipaggiamento"
+  | "prestavolto"
+  | "casata"
+  | "drago"
   | "testo"
   | "campo";
 
@@ -40,6 +47,8 @@ export type BlockConfig = {
   // eta
   min?: number;
   max?: number;
+  // abilita: punti da distribuire alla creazione = eta' + age_bonus
+  age_bonus?: number;
   // statistiche / abilita
   points?: number;
   // tratti
@@ -55,6 +64,9 @@ export type BlockConfig = {
   required?: boolean;
   // testo informativo
   body?: string;
+  // equipaggiamento: monete per comprare gli oggetti di partenza
+  coins?: number;
+  keep_change?: boolean; // le monete avanzate restano al PG
   // campo personalizzato
   key?: string;
   type?: FieldType;
@@ -121,7 +133,7 @@ export const BLOCK_KINDS: Record<
   storia: {
     label: "Storia",
     description:
-      "Il background (va nella Storia, visibile solo alla proprietaria e allo staff).",
+      "Il background (va nella Storia, visibile solo alla proprietaria e allo staff; alla conferma va in approvazione e si blocca).",
     unique: true,
   },
   dati_fisici: {
@@ -132,7 +144,26 @@ export const BLOCK_KINDS: Record<
   },
   equipaggiamento: {
     label: "Equipaggiamento",
-    description: "Oggetti di partenza disponibili all'iscrizione.",
+    description:
+      "Oggetti di partenza disponibili all'iscrizione, comprati con le monete della creazione.",
+    unique: true,
+  },
+  casata: {
+    label: "Casata e ruolo",
+    description:
+      "La casata e il ruolo, tra quelli aperti all'iscrizione (con i posti liberi, il sesso e l'età richiesti). Va messo dopo Sesso ed Età.",
+    unique: true,
+  },
+  drago: {
+    label: "Drago",
+    description:
+      "Se la casata scelta ha draghi o uova liberi, il PG ne può reclamare uno solo. Va messo dopo Casata e ruolo.",
+    unique: true,
+  },
+  prestavolto: {
+    label: "Prestavolto",
+    description:
+      "Nome e cognome del prestavolto, con il controllo che non sia già usato. Dopo la creazione non si cambia più (solo l'admin).",
     unique: true,
   },
   testo: {
@@ -179,7 +210,7 @@ export function defaultConfig(kind: BlockKind): BlockConfig {
     case "statistiche":
       return { points: c.statPoints, min: c.statMin, max: c.statMax };
     case "abilita":
-      return { points: c.skillPoints, max: c.skillMax };
+      return { age_bonus: 10 };
     case "tratti":
       return {
         advantage_points: c.advantagePoints,
@@ -202,6 +233,12 @@ export function defaultConfig(kind: BlockKind): BlockConfig {
         fields: ["height", "eye_color", "hair_color", "visible_marks"],
         required: false,
       };
+    case "prestavolto":
+      return { required: true, placeholder: "Es. Emilia Clarke" };
+    case "equipaggiamento":
+      return { coins: 100, keep_change: true };
+    case "casata":
+      return { required: true };
     case "testo":
       return { body: "" };
     case "campo":
@@ -250,13 +287,29 @@ export async function loadFlow(
 
 export const allBlocks = (steps: CreationStep[]) =>
   steps.flatMap((s) => s.blocks);
+
 export const hasBlock = (steps: CreationStep[], kind: BlockKind) =>
   allBlocks(steps).some((b) => b.kind === kind);
 
 // ---------------------------------------------------------------------
 // Controlli
 // ---------------------------------------------------------------------
-export type FlowContext = { traits?: TraitInfo[]; skillIds?: Set<string> };
+export type FlowContext = {
+  traits?: TraitInfo[];
+  skillIds?: Set<string>;
+  skillStats?: Record<string, string>; // id abilita' -> statistica collegata
+};
+
+// Livello massimo di un'abilita' alla creazione: il valore della statistica
+// collegata, senza superare il massimo del blocco Abilita' (es. 8)
+export function skillCap(
+  data: CreationData,
+  c: BlockConfig,
+  stat: string | undefined,
+) {
+  const v = stat ? data.attributes?.[stat] : undefined;
+  return skillLevelCap(v ?? RULES.creation.skillMax, true);
+}
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
@@ -268,9 +321,14 @@ export function statPointsLeft(data: CreationData, c: BlockConfig) {
   return c.points! - used;
 }
 
+// Punti abilita' della creazione: eta' del personaggio + N (dal pannello)
+export function skillPoints(data: CreationData, c: BlockConfig) {
+  return data.age ? data.age + (c.age_bonus ?? 0) : 0;
+}
+
 export function skillPointsLeft(data: CreationData, c: BlockConfig) {
   return (
-    c.points! -
+    skillPoints(data, c) -
     Object.values(data.skills ?? {}).reduce((a, b) => a + (b || 0), 0)
   );
 }
@@ -336,13 +394,32 @@ export function validateBlock(
       return null;
     }
     case "abilita": {
-      if (Object.values(data.skills ?? {}).some((v) => v > c.max!))
-        return `Alla creazione un'abilità arriva al massimo a ${c.max}.`;
+      if (
+        Object.values(data.skills ?? {}).some(
+          (v) => v > RULES.creation.skillMax,
+        )
+      )
+        return `Alla creazione un'abilità arriva al massimo a ${RULES.creation.skillMax}.`;
+      if (ctx.skillStats)
+        for (const [id, v] of Object.entries(data.skills ?? {})) {
+          const stat = ctx.skillStats[id];
+          const cap = skillCap(data, c, stat);
+          if (v > cap) {
+            const s = RULES.stats.find((x) => x.id === stat);
+            return `Un'abilità di ${s?.label ?? "una statistica"} supera il massimo (${cap}, il valore di ${s?.code ?? "?"}): abbassala.`;
+          }
+        }
       if (
         ctx.skillIds &&
         Object.keys(data.skills ?? {}).some((id) => !ctx.skillIds!.has(id))
       )
         return "Una delle abilità scelte non esiste più: ricontrolla le abilità.";
+      if (!data.age)
+        return (
+          "Indica prima l'età: i punti abilità sono età + " +
+          (c.age_bonus ?? 0) +
+          "."
+        );
       const left = skillPointsLeft(data, c);
       if (left > 0)
         return `Devi ancora distribuire ${left} ${plural(left, "punto", "punti")} abilità.`;
@@ -359,6 +436,26 @@ export function validateBlock(
       return (data.story?.trim().length ?? 0) >= c.min_chars!
         ? null
         : `Scrivi una storia di almeno ${c.min_chars} caratteri.`;
+    case "casata":
+      if (!data.house_role_id) {
+        if (!c.required) return null;
+        return data.sex && data.age
+          ? "Scegli la casata e il ruolo."
+          : "Indica prima sesso ed età: i ruoli disponibili dipendono da questi.";
+      }
+      return null;
+    case "drago":
+      if (data.dragon_id && !data.house_role_id)
+        return "Scegli prima la casata.";
+      return null;
+    case "prestavolto": {
+      const v = data.face_claim?.trim() ?? "";
+      if (!v)
+        return c.required ? "Scrivi il prestavolto (nome e cognome)." : null;
+      if (v.length < 3) return "Il prestavolto è troppo corto.";
+      if (v.length > 80) return "Il prestavolto è troppo lungo.";
+      return null;
+    }
     case "dati_fisici":
       if (c.required)
         for (const f of PHYSICAL_FIELDS)

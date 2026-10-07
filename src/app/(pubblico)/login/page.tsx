@@ -1,33 +1,28 @@
-import LoginPanel from "@/components/auth/LoginPanel";
-import RegisterButton from "@/components/auth/RegisterModal";
+import { redirect } from "next/navigation";
+import HomeScreen from "@/components/HomeScreen";
+import { createClient } from "@/lib/supabase/server";
 
-// Pagina di riserva: ci si arriva quando si apre una pagina riservata senza essere loggati
+// Ci si arriva aprendo una pagina riservata senza essere loggati, da un link
+// scaduto o dopo la chiusura per inattivita': e' uguale alla home, con l'avviso
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { errore } = await searchParams;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) redirect("/mappa");
 
-  return (
-    <section className="mx-auto mt-10 max-w-md">
-      <div className="panel">
-        {errore === "link" && (
-          <p className="mb-4 rounded-md border border-blood/60 bg-blood/20 p-3 text-sm">
-            Il link è scaduto o non è valido. Richiedine uno nuovo.
-          </p>
-        )}
-        {errore === "inattivita" && (
-          <p className="mb-4 rounded-md border border-accent/50 bg-accent/10 p-3 text-sm">
-            La sessione è stata chiusa dopo un&apos;ora di inattività. Accedi di
-            nuovo per tornare in gioco.
-          </p>
-        )}
-        <h1 className="mb-4 font-serif text-2xl text-accent">Accedi</h1>
-        <LoginPanel />
-        <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted">
-          Non hai ancora un personaggio?
-          <RegisterButton className="btn-ghost mt-3 w-full">
-            Registrati
-          </RegisterButton>
-        </div>
-      </div>
-    </section>
-  );
+  const notice =
+    errore === "link" ? (
+      <p className="rounded-md border border-blood/60 bg-black/70 p-3 text-sm">
+        Il link è scaduto o non è valido. Richiedine uno nuovo.
+      </p>
+    ) : errore === "inattivita" ? (
+      <p className="rounded-md border border-accent/50 bg-black/70 p-3 text-sm">
+        La sessione è stata chiusa dopo un&apos;ora di inattività. Accedi di
+        nuovo per tornare in gioco.
+      </p>
+    ) : null;
+
+  return <HomeScreen notice={notice} />;
 }

@@ -9,6 +9,7 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import { skillLevelCap } from "@/lib/rules/engine";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 
@@ -156,6 +157,9 @@ export default function RulesManage({
   }
 
   const picked = traits.find((x) => x.id === addTrait);
+  // un'abilita' non supera mai il valore della sua statistica (e 10)
+  const capOf = (stat: string) =>
+    skillLevelCap(Number(character.attributes?.[stat]) || RULES.statMin);
 
   return (
     <section
@@ -209,7 +213,10 @@ export default function RulesManage({
 
       {section === "skills" && (
         <div>
-          <p className={label}>Abilità (livello 0-{RULES.skillMax})</p>
+          <p className={label}>
+            Abilità (livello 0-{RULES.skillMax}, mai oltre il valore della
+            statistica)
+          </p>
           {!levels ? (
             <p className="text-sm text-muted">Caricamento...</p>
           ) : (
@@ -237,13 +244,13 @@ export default function RulesManage({
                           <input
                             type="number"
                             min={0}
-                            max={RULES.skillMax}
+                            max={capOf(k.stat)}
                             value={levels[k.id] ?? 0}
                             onChange={(e) =>
                               setLevels((l) => ({
                                 ...l,
                                 [k.id]: Math.min(
-                                  RULES.skillMax,
+                                  capOf(k.stat),
                                   Math.max(
                                     0,
                                     Math.trunc(Number(e.target.value)) || 0,

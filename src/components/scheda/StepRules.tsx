@@ -1,7 +1,12 @@
 "use client";
 
 import type { CreationData } from "@/lib/character-creation";
-import { skillPointsLeft, type BlockConfig } from "@/lib/creation-flow";
+import {
+  skillCap,
+  skillPoints,
+  skillPointsLeft,
+  type BlockConfig,
+} from "@/lib/creation-flow";
 import {
   choiceLabel,
   statCode,
@@ -41,9 +46,25 @@ export function StepSkills({
   return (
     <div>
       <p className="mb-4 text-sm text-muted">
-        Distribuisci {c.points} punti tra le abilità, al massimo {c.max} per
-        abilità. I livelli presi ora sono gratuiti; in gioco si sale spendendo
-        PX.{" "}
+        {data.age ? (
+          <>
+            I punti abilità dipendono dall&apos;età: {data.age} anni +{" "}
+            {c.age_bonus ?? 0} ={" "}
+            <strong className="text-foreground">
+              {skillPoints(data, c)} punti
+            </strong>
+            .
+          </>
+        ) : (
+          <>
+            I punti abilità sono età + {c.age_bonus ?? 0}: indica prima
+            l&apos;età.
+          </>
+        )}{" "}
+        Ogni abilità arriva al massimo al valore della sua statistica, sempre
+        (anche in gioco); alla creazione comunque non oltre{" "}
+        {RULES.creation.skillMax}, in gioco fino a {RULES.skillMax}. I livelli
+        presi ora sono gratuiti; in gioco si sale spendendo PX.{" "}
         <strong className={left === 0 ? "text-green-400" : "text-accent"}>
           {left} punt{left === 1 ? "o" : "i"} rimast{left === 1 ? "o" : "i"}
         </strong>
@@ -63,13 +84,21 @@ export function StepSkills({
               <ul className="space-y-1">
                 {list.map((k) => {
                   const v = levels[k.id] ?? 0;
+                  const cap = skillCap(data, c, k.stat);
                   return (
                     <li
                       key={k.id}
                       className="flex items-center justify-between gap-2 text-sm"
                       title={k.description || undefined}
                     >
-                      <span className={v ? "" : "text-muted"}>{k.name}</span>
+                      <span
+                        className={
+                          v > cap ? "text-red-400" : v ? "" : "text-muted"
+                        }
+                      >
+                        {k.name}{" "}
+                        <span className="text-xs text-muted">(max {cap})</span>
+                      </span>
                       <span className="flex items-center gap-2">
                         <button
                           type="button"
@@ -86,7 +115,7 @@ export function StepSkills({
                         <button
                           type="button"
                           onClick={() => change(k.id, +1)}
-                          disabled={v >= c.max! || left <= 0}
+                          disabled={v >= cap || left <= 0}
                           aria-label={`Aggiungi un punto a ${k.name}`}
                           className="h-6 w-6 border border-border hover:border-accent disabled:opacity-30"
                         >

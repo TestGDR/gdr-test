@@ -9,6 +9,7 @@ import {
   pxCostForNext,
   rollD10,
   seededRng,
+  skillLevelCap,
   spendPX,
   validateCharacter,
   validateSkills,
@@ -64,9 +65,19 @@ test("Creazione: statistica a 8 -> errore (massimo 7)", () => {
   assert.ok(errors.some((e) => e.includes("massimo 7")));
 });
 
-test("Creazione: abilita' a 5 -> errore (massimo 4)", () => {
-  const errors = validateSkills({ a: 5 });
-  assert.ok(errors.some((e) => e.includes("massimo 4")));
+test("Creazione: abilita' a 9 -> errore (massimo 8)", () => {
+  const errors = validateSkills({ a: 9 });
+  assert.ok(errors.some((e) => e.includes("massimo 8")));
+});
+
+test("Limite abilita': statistica 5 -> massimo 5, sempre", () => {
+  assert.equal(skillLevelCap(5, true), 5);
+  assert.equal(skillLevelCap(5), 5);
+});
+
+test("Limite abilita': statistica 10 -> 8 alla creazione, 10 in gioco", () => {
+  assert.equal(skillLevelCap(10, true), 8);
+  assert.equal(skillLevelCap(10), 10);
 });
 
 test("Creazione valida: nessun errore", () => {

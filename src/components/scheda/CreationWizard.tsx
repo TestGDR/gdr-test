@@ -32,6 +32,12 @@ import {
 import { loadCatalog, type Skill, type Trait } from "@/lib/rules/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
+import {
+  DragonSummary,
+  HouseSummary,
+  StepDragon,
+  StepHouse,
+} from "./StepHouse";
 import StepItems, { ChosenItems } from "./StepItems";
 import {
   SkillsSummary,
@@ -82,7 +88,12 @@ export default function CreationWizard({
 
   const last = flow.length; // indice del riepilogo
   const current = Math.min(step, last);
-  const ctx = { traits: traits ?? undefined };
+  const ctx = {
+    traits: traits ?? undefined,
+    skillStats: skills
+      ? Object.fromEntries(skills.map((k) => [k.id, k.stat as string]))
+      : undefined,
+  };
   const check = (i: number) => validateFlowStep(flow[i], data, ctx);
   const canReach = (target: number) =>
     target <= current ||
@@ -379,8 +390,9 @@ function BlockView({ block, data, update, skills, traits }: BlockProps) {
           </label>
           {block.kind === "storia" && (
             <p className="mt-1 text-xs text-muted">
-              La storia la leggono solo la proprietaria e lo staff, e dopo la
-              creazione non si modifica.
+              La storia la leggono solo la proprietaria e lo staff. Con la
+              conferma del personaggio va in approvazione e non si modifica più,
+              a meno che lo staff non la sblocchi.
             </p>
           )}
         </BlockFrame>
@@ -429,13 +441,36 @@ function BlockView({ block, data, update, skills, traits }: BlockProps) {
           </div>
         </BlockFrame>
       );
+    case "prestavolto":
+      return (
+        <BlockFrame title={title} help={c.help}>
+          <FaceClaimBlock
+            data={data}
+            update={update}
+            placeholder={c.placeholder}
+          />
+        </BlockFrame>
+      );
     case "equipaggiamento":
       return (
         <BlockFrame title={title} help={c.help}>
           <StepItems
             chosen={data.items ?? []}
             onChange={(items) => update({ items })}
+            budget={c.coins ?? 0}
           />
+        </BlockFrame>
+      );
+    case "casata":
+      return (
+        <BlockFrame title={title} help={c.help}>
+          <StepHouse data={data} update={update} />
+        </BlockFrame>
+      );
+    case "drago":
+      return (
+        <BlockFrame title={title} help={c.help}>
+          <StepDragon data={data} update={update} />
         </BlockFrame>
       );
     case "testo":
@@ -658,6 +693,65 @@ function CustomField({
   );
 }
 
+// Prestavolto: mentre si scrive controlla che non sia gia' di un altro PG
+function FaceClaimBlock({
+  data,
+  update,
+  placeholder,
+}: {
+  data: CreationData;
+  update: BlockProps["update"];
+  placeholder?: string;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const claim = (data.face_claim ?? "").trim().replace(/\s+/g, " ");
+  const [taken, setTaken] = useState<{ claim: string; by: boolean } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (claim.length < 3) return;
+    const t = setTimeout(() => {
+      supabase
+        .from("characters")
+        .select("id")
+        .ilike("face_claim", claim.replace(/[\\%_]/g, "\\$&"))
+        .limit(1)
+        .then(({ data: rows }) =>
+          setTaken({ claim, by: (rows ?? []).length > 0 }),
+        );
+    }, 400);
+    return () => clearTimeout(t);
+  }, [supabase, claim]);
+  const checked = taken?.claim === claim ? taken : null;
+
+  return (
+    <div>
+      <input
+        value={data.face_claim ?? ""}
+        onChange={(e) => update({ face_claim: e.target.value })}
+        maxLength={80}
+        placeholder={placeholder}
+        className="input"
+      />
+      {claim.length >= 3 && (
+        <span
+          className={`mt-1 block text-xs ${!checked ? "text-muted" : checked.by ? "text-red-400" : "text-green-400"}`}
+        >
+          {!checked
+            ? "Controllo..."
+            : checked.by
+              ? "Questo prestavolto è già usato da un altro personaggio."
+              : "Prestavolto libero."}
+        </span>
+      )}
+      <span className="mt-1 block text-xs text-[#f0c75e]">
+        Dopo la creazione il prestavolto non si può più cambiare.
+      </span>
+    </div>
+  );
+}
+
 function Choice({
   selected,
   onClick,
@@ -796,8 +890,20 @@ function Summary({
                   )}
                 </div>
               );
+            case "prestavolto":
+              return (
+                <Item
+                  key={b.id}
+                  label="Prestavolto"
+                  value={data.face_claim || "—"}
+                />
+              );
             case "equipaggiamento":
               return <ChosenItems key={b.id} chosen={data.items ?? []} />;
+            case "casata":
+              return <HouseSummary key={b.id} data={data} />;
+            case "drago":
+              return <DragonSummary key={b.id} data={data} />;
             case "campo":
               return (
                 <Item

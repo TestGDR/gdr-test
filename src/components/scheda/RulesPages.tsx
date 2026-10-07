@@ -11,6 +11,7 @@ import {
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
 import {
+  skillLevelCap,
   capTraitModifiers,
   deriveStats,
   pxCostForNext,
@@ -321,13 +322,13 @@ export function SkillsPage({
                             type="button"
                             disabled={
                               busy !== null ||
-                              level >= RULES.skillMax ||
+                              level >= skillLevelCap(stats[k.stat]) ||
                               px < cost
                             }
                             onClick={() => raise(k, level)}
                             title={
-                              level >= RULES.skillMax
-                                ? "Livello massimo"
+                              level >= skillLevelCap(stats[k.stat])
+                                ? `Livello massimo (${skillLevelCap(stats[k.stat])}: non supera la statistica)`
                                 : `Sali al livello ${level + 1}: ${cost} PX`
                             }
                             className="h-6 w-6 border border-border text-xs hover:border-accent hover:text-accent disabled:opacity-30"

@@ -64,11 +64,11 @@ export async function finalizeCharacter(
 
   const [{ data: character }, { data: draft }, flow, { data: traitCatalog }, { data: activeSkills }] =
     await Promise.all([
-      supabase.from("characters").select("id, owner_id, status").eq("id", characterId).maybeSingle(),
+      supabase.from("characters").select("id, owner_id, status, coins").eq("id", characterId).maybeSingle(),
       supabase.from("character_drafts").select("data").eq("character_id", characterId).maybeSingle(),
       loadFlow(supabase),
       supabase.from("traits").select("id, name, kind, cost, choice, unique_group, requires_master, active"),
-      supabase.from("skills").select("id").eq("active", true),
+      supabase.from("skills").select("id, stat").eq("active", true),
     ]);
   if (!character || character.owner_id !== user.id)
     return { error: "Personaggio non trovato." };
@@ -80,7 +80,8 @@ export async function finalizeCharacter(
   const data = sanitizeCreationData(draft?.data);
   const catalog = (traitCatalog ?? []) as TraitInfo[];
   const skillIds = new Set((activeSkills ?? []).map((s) => s.id as string));
-  const invalidStep = firstInvalidFlowStep(flow, data, { traits: catalog, skillIds });
+  const skillStats = Object.fromEntries((activeSkills ?? []).map((s) => [s.id as string, s.stat as string]));
+  const invalidStep = firstInvalidFlowStep(flow, data, { traits: catalog, skillIds, skillStats });
   if (invalidStep !== null) {
     return { error: `Completa il passaggio "${flow[invalidStep].title}".`, invalidStep };
   }
@@ -109,13 +110,43 @@ export async function finalizeCharacter(
     else privateFields[c.key] = v;
   }
 
+  const stepOf = (k: Parameters<typeof hasBlock>[1]) => flow.findIndex((s) => s.blocks.some((b) => b.kind === k));
+
+  // Casata e ruolo: devono essere ancora aperti all'iscrizione per sesso ed eta'
+  let houseId: string | null = null;
+  if (has("casata") && data.house_role_id) {
+    const { data: roles } = await supabase.rpc("signup_house_roles", { p_sex: data.sex ?? "", p_age: data.age ?? 0 });
+    const role = ((roles ?? []) as { role_id: string; house_id: string }[]).find((r) => r.role_id === data.house_role_id);
+    if (!role)
+      return { error: "Il ruolo di casata scelto non è più disponibile: scegline un altro.", invalidStep: stepOf("casata") };
+    houseId = role.house_id;
+  }
+
+  // Equipaggiamento: oggetti disponibili all'iscrizione, comprati con le monete della creazione
+  const equipBlock = allBlocks(flow).find((b) => b.kind === "equipaggiamento");
+  const budget = equipBlock ? (cfg(equipBlock).coins ?? 0) : 0;
+  let itemIds: string[] = [];
+  let spent = 0;
+  if (equipBlock && data.items?.length) {
+    const { data: allowed } = await supabase
+      .from("items")
+      .select("id, price")
+      .eq("at_signup", true)
+      .in("id", data.items);
+    const list = (allowed ?? []) as { id: string; price: number | null }[];
+    itemIds = data.items.filter((id) => list.some((i) => i.id === id));
+    spent = list.filter((i) => itemIds.includes(i.id)).reduce((a, i) => a + (i.price ?? 0), 0);
+    if (spent > budget)
+      return { error: `Gli oggetti scelti costano ${spent} monete, ne hai ${budget}.`, invalidStep: stepOf("equipaggiamento") };
+  }
+
   // Lo stato, la scheda definitiva e la storia li scrive solo il server (secret key)
   const admin = createAdminClient();
   if (!admin) return { error: "Configurazione del server incompleta." };
   if (has("storia") && data.story?.trim()) {
     const { error: storyError } = await admin
       .from("character_backgrounds")
-      .upsert({ character_id: characterId, body: data.story.trim() });
+      .upsert({ character_id: characterId, body: data.story.trim(), submitted_at: new Date().toISOString() }); // inviata in approvazione
     if (storyError) return { error: "Creazione non riuscita, riprova." };
   }
   const update: Record<string, unknown> = {
@@ -130,6 +161,38 @@ export async function finalizeCharacter(
     activated_at: new Date().toISOString(),
   };
   if (has("aspetto")) update.appearance = data.appearance?.trim() || null;
+  if (houseId) {
+    update.house_id = houseId;
+    update.house_role_id = data.house_role_id;
+  }
+  if (equipBlock && cfg(equipBlock).keep_change)
+    update.coins = ((character.coins as number | null) ?? 0) + Math.max(0, budget - spent); // monete avanzate
+
+  // Drago: uno solo, libero e della casata scelta (lo prende chi conferma per primo)
+  if (has("drago") && data.dragon_id) {
+    if (!houseId) return { error: "Per reclamare un drago scegli prima la casata.", invalidStep: stepOf("drago") };
+    const { data: claimed, error: claimError } = await admin.rpc("claim_signup_dragon", {
+      p_character: characterId,
+      p_dragon: data.dragon_id,
+      p_house: houseId,
+    });
+    if (claimError) return { error: "Reclamo del drago non riuscito, riprova.", invalidStep: stepOf("drago") };
+    if (!claimed)
+      return { error: "Il drago scelto non è più libero: scegline un altro.", invalidStep: stepOf("drago") };
+  }
+  // Prestavolto: non deve essere gia' di un altro PG (lo controlla anche il database)
+  const claim = has("prestavolto") ? data.face_claim?.trim().replace(/\s+/g, " ") : undefined;
+  if (claim) {
+    const claimStep = flow.findIndex((s) => s.blocks.some((b) => b.kind === "prestavolto"));
+    const { data: same } = await admin
+      .from("characters")
+      .select("id")
+      .ilike("face_claim", claim.replace(/[\\%_]/g, "\\$&"))
+      .neq("id", characterId)
+      .limit(1);
+    if (same?.length) return { error: "Questo prestavolto è già usato da un altro personaggio.", invalidStep: claimStep };
+    update.face_claim = claim;
+  }
   for (const f of PHYSICAL_FIELDS)
     if (physicalFields.includes(f.id)) update[f.id] = data[f.id]?.trim().slice(0, f.max) || null;
   const { error } = await admin
@@ -138,7 +201,10 @@ export async function finalizeCharacter(
     .eq("id", characterId)
     .eq("owner_id", user.id)
     .eq("status", "bozza");
-  if (error) return { error: "Creazione non riuscita, riprova." };
+  if (error)
+    return {
+      error: error.code === "23505" ? "Questo prestavolto è già usato da un altro personaggio." : "Creazione non riuscita, riprova.",
+    };
   await admin.from("character_drafts").delete().eq("character_id", characterId);
   if (Object.keys(privateFields).length)
     await admin.from("character_private_fields").upsert({ character_id: characterId, data: privateFields });
@@ -153,29 +219,11 @@ export async function finalizeCharacter(
     : [];
   if (traitRows.length) await admin.from("character_traits").upsert(traitRows);
 
-  // Equipaggiamento di partenza: solo oggetti davvero disponibili all'iscrizione,
-  // al massimo quanti ne permette lo staff (nascono del livello dell'oggetto)
-  if (has("equipaggiamento") && data.items?.length) {
-    const [{ data: allowed }, { data: settings }] = await Promise.all([
-      admin
-        .from("items")
-        .select("id")
-        .eq("at_signup", true)
-        .in("id", data.items),
-      admin.from("item_settings").select("signup_max").maybeSingle(),
-    ]);
-    const max = (settings?.signup_max as number | undefined) ?? 3;
-    const ok = new Set((allowed ?? []).map((i) => i.id as string));
-    const rows = data.items
-      .filter((id) => ok.has(id))
-      .slice(0, max)
-      .map((item_id) => ({
-        character_id: characterId,
-        item_id,
-        source: "iscrizione",
-      }));
-    if (rows.length) await admin.from("character_items").insert(rows);
-  }
+  // Equipaggiamento di partenza (nasce del livello dell'oggetto)
+  if (itemIds.length)
+    await admin
+      .from("character_items")
+      .insert(itemIds.map((item_id) => ({ character_id: characterId, item_id, source: "iscrizione" })));
 
   revalidatePath("/", "layout");
   return {};

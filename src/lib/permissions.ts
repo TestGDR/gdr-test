@@ -36,7 +36,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Schede PG",
     description: "Cosa può fare sulle schede degli altri.",
     items: [
-      { key: "schede.approvare", label: "Approvare e rimandare", description: "Approvare le schede in revisione", soon: true },
+      { key: "schede.approvare", label: "Approvare le storie", description: "Approvare la Storia dei PG inviata in approvazione, oppure sbloccarla perché il giocatore la corregga" },
       { key: "schede.correggere", label: "Correggere una scheda", description: "Ritoccare anagrafica e caratteristiche altrui", soon: true },
       { key: "schede.background", label: "Correggere un background", description: "Riscrivere la storia di un PG", soon: true },
       { key: "schede.storia", label: "Leggere la Storia", description: "Leggere la Storia (background) dei personaggi, nascosta ai giocatori" },

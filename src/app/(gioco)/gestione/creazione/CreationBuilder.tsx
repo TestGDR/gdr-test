@@ -70,12 +70,10 @@ export default function CreationBuilder({ steps }: { steps: CreationStep[] }) {
   const addStep = () =>
     run(
       () =>
-        supabase
-          .from("creation_steps")
-          .insert({
-            title: "Nuovo passaggio",
-            sort_order: (steps.at(-1)?.sort_order ?? 0) + 1,
-          }),
+        supabase.from("creation_steps").insert({
+          title: "Nuovo passaggio",
+          sort_order: (steps.at(-1)?.sort_order ?? 0) + 1,
+        }),
       "Passaggio aggiunto in fondo.",
     );
 
@@ -490,12 +488,19 @@ function blockSummary(b: CreationBlock) {
     case "statistiche":
       return `${c.points} punti, da ${c.min} a ${c.max}`;
     case "abilita":
-      return `${c.points} punti, massimo ${c.max} per abilità`;
+      return `punti = età + ${c.age_bonus ?? 0}; ogni abilità fino al valore della sua statistica (massimo 8 alla creazione)`;
     case "tratti":
       return `${c.advantage_points} punti vantaggi, max ${c.flaws_max} svantaggi (${c.flaw_value_max} punti), max ${c.advantages_max} vantaggi`;
     case "aspetto":
     case "storia":
       return `almeno ${c.min_chars} caratteri`;
+    case "prestavolto":
+    case "casata":
+      return c.required ? "obbligatorio" : "facoltativo";
+    case "drago":
+      return "facoltativo, uno solo";
+    case "equipaggiamento":
+      return `${c.coins ?? 0} monete${c.keep_change ? ", le avanzate restano al PG" : ", le avanzate si perdono"}`;
     case "dati_fisici":
       return `${
         PHYSICAL_FIELDS.filter((f) => c.fields?.includes(f.id))
@@ -534,17 +539,20 @@ function BlockEditor({
         min={min}
         max={max}
         value={(c[k] as number | undefined) ?? ""}
+        // mentre si scrive il numero resta com'e' (per scrivere 33 si passa da 3);
+        // i limiti si applicano quando si esce dal campo
         onChange={(e) =>
           set({
             [k]:
               e.target.value === ""
                 ? undefined
-                : Math.min(
-                    max,
-                    Math.max(min, Math.trunc(Number(e.target.value)) || 0),
-                  ),
+                : Math.trunc(Number(e.target.value)) || 0,
           })
         }
+        onBlur={() => {
+          const v = c[k] as number | undefined;
+          if (v !== undefined) set({ [k]: Math.min(max, Math.max(min, v)) });
+        }}
         className="input w-28! py-1"
       />
     </label>
@@ -595,8 +603,7 @@ function BlockEditor({
       )}
       {block.kind === "abilita" && (
         <div className="flex gap-3">
-          {num("points", "Punti da distribuire", 0, 300)}
-          {num("max", "Massimo per abilità", 1, 10)}
+          {num("age_bonus", "Punti = età + ...", 0, 300)}
         </div>
       )}
       {block.kind === "tratti" && (
@@ -618,6 +625,55 @@ function BlockEditor({
               onChange={(e) => set({ placeholder: e.target.value })}
               className="input py-1"
             />
+          </label>
+        </div>
+      )}
+      {block.kind === "casata" && (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={!!c.required}
+            onChange={(e) => set({ required: e.target.checked })}
+          />
+          Obbligatorio (senza, il PG può nascere senza casata)
+        </label>
+      )}
+      {block.kind === "equipaggiamento" && (
+        <div className="flex flex-wrap items-end gap-4 text-sm">
+          {num("coins", "Monete per comprare l'equipaggiamento", 0, 100000)}
+          <label className="flex items-center gap-2 pb-2">
+            <input
+              type="checkbox"
+              checked={!!c.keep_change}
+              onChange={(e) => set({ keep_change: e.target.checked })}
+            />
+            Le monete avanzate restano al PG
+          </label>
+          <p className="w-full text-xs text-muted">
+            Gli oggetti e i loro prezzi si decidono in Gestione → Oggetti
+            (&quot;disponibile all&apos;iscrizione&quot;); senza prezzo un
+            oggetto è gratis.
+          </p>
+        </div>
+      )}
+      {block.kind === "prestavolto" && (
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="block min-w-64 flex-1">
+            <span className={lbl}>Testo di esempio nel riquadro</span>
+            <input
+              value={c.placeholder ?? ""}
+              maxLength={200}
+              onChange={(e) => set({ placeholder: e.target.value })}
+              className="input py-1"
+            />
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2">
+            <input
+              type="checkbox"
+              checked={!!c.required}
+              onChange={(e) => set({ required: e.target.checked })}
+            />
+            Obbligatorio
           </label>
         </div>
       )}

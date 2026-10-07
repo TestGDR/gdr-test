@@ -206,6 +206,12 @@ export function validateCharacter(stats: Partial<Stats>, skills: Record<string, 
 // ---------------------------------------------------------------------
 // 5. Esperienza: per salire al livello N servono N x 10 PX
 // ---------------------------------------------------------------------
+// Livello massimo di un'abilita': mai oltre il valore della sua statistica;
+// in gioco al massimo 10, alla creazione al massimo 8
+export function skillLevelCap(statValue: number, creation = false) {
+  return Math.min(statValue, creation ? RULES.creation.skillMax : RULES.skillMax);
+}
+
 export function pxCostForNext(level: number) {
   return RULES.px.costPerLevel * (level + 1);
 }

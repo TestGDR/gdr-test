@@ -1163,22 +1163,80 @@ function AppearancePage({
 // ---------------------------------------------------------------------
 function StoryPage({ character, info, isOwn }: { character: Character; info: SheetInfo | null; isOwn: boolean }) {
   const supabase = useMemo(() => createClient(), []);
-  const [story, setStory] = useState<string | null>(null);
+  const [story, setStory] = useState<{ body: string; submitted_at: string | null; approved_at: string | null } | null>(null);
+  const [canApprove, setCanApprove] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const canRead = !!info?.can_read_story || isOwn;
+
+  const load = useCallback(
+    () =>
+      supabase
+        .from("character_backgrounds")
+        .select("body, submitted_at, approved_at")
+        .eq("character_id", character.id)
+        .maybeSingle()
+        .then(({ data }) =>
+          setStory({
+            body: (data?.body as string | undefined) ?? "",
+            submitted_at: (data?.submitted_at as string | null) ?? null,
+            approved_at: (data?.approved_at as string | null) ?? null,
+          }),
+        ),
+    [supabase, character.id],
+  );
 
   useEffect(() => {
     if (!canRead) return;
-    supabase
-      .from("character_backgrounds")
-      .select("body")
-      .eq("character_id", character.id)
-      .maybeSingle()
-      .then(({ data }) => setStory((data?.body as string | undefined) ?? ""));
-  }, [supabase, character.id, canRead]);
+    load();
+    supabase.rpc("can_approve_story").then(({ data }) => setCanApprove(data === true));
+  }, [supabase, canRead, load]);
+
+  const approved = !!story?.approved_at;
+  const submitted = !!story?.submitted_at; // inviata: la proprietaria non la modifica piu'
+  const canEdit = isOwn && !submitted;
+
+  async function submit() {
+    if (!window.confirm("Mandare la storia in approvazione? Dopo non potrai più modificarla, a meno che lo staff non la sblocchi.")) return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("submit_my_story", { p_character: character.id });
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Invio non riuscito." });
+    setMsg({ ok: true, text: "Storia inviata in approvazione." });
+    load();
+  }
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("save_my_story", { p_character: character.id, p_body: text });
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Storia non salvata." });
+    setEditing(false);
+    setMsg({ ok: true, text: "Storia salvata." });
+    load();
+  }
+
+  async function approve(on: boolean) {
+    if (!window.confirm(on ? "Approvare la storia?" : "Sbloccare la storia? Torna in bozza e il giocatore può correggerla.")) return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("approve_story", { p_character: character.id, p_on: on });
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Operazione non riuscita." });
+    setMsg({ ok: true, text: on ? "Storia approvata." : "Storia sbloccata." });
+    load();
+  }
 
   return (
     <div className="p-6">
-      <PageTitle title="Storia" />
+      <PageTitle
+        title="Storia"
+        onEdit={canEdit && !editing ? () => (setText(story?.body ?? ""), setEditing(true)) : undefined}
+      />
       {info === null && !isOwn ? (
         <p className="text-muted">Caricamento...</p>
       ) : !canRead ? (
@@ -1189,10 +1247,64 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
         <p className="text-muted">Caricamento...</p>
       ) : (
         <>
-          <p className="leading-relaxed whitespace-pre-line">{story || "—"}</p>
-          <p className="mt-4 text-xs text-muted">
-            Background scritto alla creazione del personaggio. La leggono solo il proprietario e lo staff, e non si modifica.
+          <p
+            className={`mb-4 border px-3 py-2 text-sm ${
+              approved
+                ? "border-green-700/50 bg-green-900/15 text-green-300"
+                : submitted
+                  ? "border-sky-700/50 bg-sky-900/15 text-sky-300"
+                  : "border-[#d4a72c]/40 bg-[#d4a72c]/5 text-[#f0c75e]"
+            }`}
+          >
+            {approved
+              ? `Storia approvata il ${new Date(story.approved_at!).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" })}.`
+              : submitted
+                ? isOwn
+                  ? "Inviata in approvazione: non puoi più modificarla. Per correggerla chiedi allo staff di sbloccarla."
+                  : "Inviata in approvazione."
+                : isOwn
+                  ? "Bozza: scrivila e correggila con la pennina, poi mandala in approvazione. Dopo l'invio non si modifica più."
+                  : "Bozza: non ancora inviata in approvazione."}
           </p>
+          {editing ? (
+            <div className="space-y-2">
+              <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} rows={14} className="input resize-y text-sm" />
+              <p className="text-xs text-muted">{text.length} / 4.000 caratteri</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={busy} onClick={save} className="btn px-4 py-1.5 text-sm">
+                  {busy ? "Salvataggio..." : "Salva"}
+                </button>
+                <button type="button" onClick={() => setEditing(false)} className="btn-ghost px-4 py-1.5 text-sm">
+                  Annulla
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="leading-relaxed whitespace-pre-line">
+              {story.body || <span className="text-muted italic">{isOwn ? "Non hai ancora scritto la storia: usa la pennina." : "Storia non ancora scritta."}</span>}
+            </p>
+          )}
+          {canEdit && !editing && story.body.trim() && (
+            <div className="mt-5 border-t border-border pt-3">
+              <button type="button" disabled={busy} onClick={submit} className="btn px-4 py-1.5 text-sm">
+                Manda in approvazione
+              </button>
+            </div>
+          )}
+          {canApprove && !editing && submitted && (
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-3">
+              {!approved && (
+                <button type="button" disabled={busy} onClick={() => approve(true)} className="btn px-4 py-1.5 text-sm">
+                  Approva la storia
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={() => approve(false)} className="btn-ghost px-4 py-1.5 text-sm">
+                Sblocca la storia
+              </button>
+            </div>
+          )}
+          {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
+          <p className="mt-4 text-xs text-muted">La storia la leggono solo il proprietario e lo staff.</p>
         </>
       )}
     </div>

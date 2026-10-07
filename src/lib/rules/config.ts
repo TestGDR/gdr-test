@@ -39,7 +39,7 @@ export const RULES = {
     statMin: 2,
     statMax: 7,
     skillPoints: 40,
-    skillMax: 4,
+    skillMax: 8, // livello massimo di un'abilita' alla creazione (in gioco 10)
     advantagePoints: 3, // piu' il valore degli svantaggi presi
     flawsMax: 2,
     flawValueMax: 4,
