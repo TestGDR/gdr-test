@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { resetCharacter } from "@/app/scheda/actions";
-import { AGE_MAX, AGE_MIN, ATTRIBUTES, SEXES } from "@/lib/character-creation";
+import { AGE_MAX, AGE_MIN, SEXES } from "@/lib/character-creation";
+import { useStats } from "@/lib/rules/useStats";
 import { RULES } from "@/lib/rules/config";
+import { DEFAULT_STATS } from "@/lib/rules/stats";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import { CustomFieldsManage } from "./CustomFields";
@@ -26,6 +28,7 @@ export default function SheetManage({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const stats = useStats(); // statistiche attive (Gestione -> Abilita' e tratti)
   const unlocked = !!character.sheet_unlocks?.includes("scheda");
   const [name, setName] = useState(character.name);
   const [sex, setSex] = useState(character.sex ?? "uomo");
@@ -36,7 +39,7 @@ export default function SheetManage({
   });
   const [attrs, setAttrs] = useState<Record<string, number>>(
     Object.fromEntries(
-      ATTRIBUTES.map((a) => [
+      DEFAULT_STATS.map((a) => [
         a.id,
         Number(character.attributes?.[a.id]) || RULES.statMin,
       ]),
@@ -70,7 +73,14 @@ export default function SheetManage({
       p_name: name,
       p_sex: sex,
       p_age: Number(age),
-      p_attributes: attrs,
+      // tutte le statistiche attive (anche quelle aggiunte dopo l'apertura)
+      p_attributes: Object.fromEntries(
+        stats.map((a) => [
+          a.id,
+          attrs[a.id] ??
+            (Number(character.attributes?.[a.id]) || RULES.statMin),
+        ]),
+      ),
       p_face_claim: faceClaim,
       p_story: story ?? "",
       p_height: looks.height,
@@ -256,7 +266,7 @@ export default function SheetManage({
           Statistiche ({RULES.statMin}-{RULES.statMax})
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {ATTRIBUTES.map((a) => (
+          {stats.map((a) => (
             <label
               key={a.id}
               className="flex items-center justify-between gap-2 border border-border/60 bg-black/30 px-2 py-1.5 text-sm"
@@ -268,7 +278,10 @@ export default function SheetManage({
                 type="number"
                 min={RULES.statMin}
                 max={RULES.statMax}
-                value={attrs[a.id] ?? RULES.statMin}
+                value={
+                  attrs[a.id] ??
+                  (Number(character.attributes?.[a.id]) || RULES.statMin)
+                }
                 onChange={(e) =>
                   setAttrs((x) => ({
                     ...x,

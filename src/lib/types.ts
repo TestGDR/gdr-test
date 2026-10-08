@@ -94,7 +94,7 @@ export type RoomGroup = {
   sort_order: number;
 };
 
-export type MessageKind = "azione" | "fuori_gioco" | "master";
+export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado"; // dado: lo scrive solo il server
 
 export type Message = {
   id: number;
@@ -105,4 +105,5 @@ export type Message = {
   kind: MessageKind;
   content: string;
   created_at: string;
+  roll_data?: unknown; // dettagli del tiro (messaggi "dado")
 };

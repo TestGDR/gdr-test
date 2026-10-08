@@ -86,16 +86,12 @@ export function sanitizeCreationData(raw: unknown): CreationData {
     out.items = [...new Set(input.items.filter(uuid))].slice(0, 20);
   if (input.attributes && typeof input.attributes === "object") {
     const attrs = input.attributes as Record<string, unknown>;
+    // statistiche gestite dal pannello: chiavi semplici, valori interi 1-10
     out.attributes = Object.fromEntries(
-      ATTRIBUTES.map((a) => {
-        const v = Number(attrs[a.id]);
-        return [
-          a.id,
-          Number.isInteger(v)
-            ? Math.min(RULES.statMax, Math.max(RULES.statMin, v))
-            : RULES.statMin,
-        ];
-      }),
+      Object.entries(attrs)
+        .filter(([k, v]) => /^[a-z][a-z0-9_]{0,19}$/.test(k) && Number.isInteger(v))
+        .slice(0, 30)
+        .map(([k, v]) => [k, Math.min(RULES.statMax, Math.max(RULES.statMin, v as number))]),
     );
   }
   if (input.skills && typeof input.skills === "object") {

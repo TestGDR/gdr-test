@@ -11,7 +11,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { finalizeCharacter, saveCreationProgress } from "@/app/scheda/actions";
 import {
-  ATTRIBUTES,
   SEXES,
   TEXT_MAX,
   labelOf,
@@ -31,6 +30,7 @@ import {
 } from "@/lib/creation-flow";
 import { MOONS, MOON_DAYS, formatBirth } from "@/lib/game-date";
 import { loadCatalog, type Skill, type Trait } from "@/lib/rules/catalog";
+import { useStats } from "@/lib/rules/useStats";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import {
@@ -75,6 +75,7 @@ export default function CreationWizard({
   const [step, setStep] = useState(character.creation_step);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const stats = useStats();
 
   useEffect(() => {
     if (!preview) loadFlow(supabase).then(setFlow);
@@ -90,6 +91,7 @@ export default function CreationWizard({
   const last = flow.length; // indice del riepilogo
   const current = Math.min(step, last);
   const ctx = {
+    stats,
     traits: traits ?? undefined,
     skillStats: skills
       ? Object.fromEntries(skills.map((k) => [k.id, k.stat as string]))
@@ -554,10 +556,10 @@ function StatsBlock({
   block: CreationBlock;
 }) {
   const c = cfg(block);
+  const stats = useStats();
   const attributes =
-    data.attributes ??
-    Object.fromEntries(ATTRIBUTES.map((a) => [a.id, c.min!]));
-  const left = statPointsLeft({ ...data, attributes }, c);
+    data.attributes ?? Object.fromEntries(stats.map((a) => [a.id, c.min!]));
+  const left = statPointsLeft({ ...data, attributes }, c, stats);
   const change = (id: string, delta: number) =>
     update({
       attributes: { ...attributes, [id]: (attributes[id] ?? c.min!) + delta },
@@ -573,7 +575,7 @@ function StatsBlock({
         </strong>
       </p>
       <ul className="space-y-2">
-        {ATTRIBUTES.map((a) => {
+        {stats.map((a) => {
           const value = attributes[a.id] ?? c.min!;
           return (
             <li
@@ -860,6 +862,7 @@ export function Summary({
   traits: Trait[] | null;
   review?: boolean;
 }) {
+  const stats = useStats();
   return (
     <div className="space-y-4 text-sm">
       {!review && (
@@ -899,7 +902,7 @@ export function Summary({
             case "statistiche":
               return (
                 <div key={b.id} className="flex flex-wrap gap-2">
-                  {ATTRIBUTES.map((a) => (
+                  {stats.map((a) => (
                     <span
                       key={a.id}
                       className="rounded border border-border px-2 py-1"

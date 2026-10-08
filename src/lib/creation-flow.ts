@@ -301,6 +301,7 @@ export type FlowContext = {
   traits?: TraitInfo[];
   skillIds?: Set<string>;
   skillStats?: Record<string, string>; // id abilita' -> statistica collegata
+  stats?: readonly { id: string; code: string; label: string }[]; // statistiche attive (pannello)
 };
 
 // Livello massimo di un'abilita' alla creazione: il valore della statistica
@@ -316,8 +317,12 @@ export function skillCap(
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-export function statPointsLeft(data: CreationData, c: BlockConfig) {
-  const used = RULES.stats.reduce(
+export function statPointsLeft(
+  data: CreationData,
+  c: BlockConfig,
+  stats: readonly { id: string }[] = RULES.stats,
+) {
+  const used = stats.reduce(
     (s, x) => s + (data.attributes?.[x.id] ?? c.min!),
     0,
   );
@@ -386,12 +391,12 @@ export function validateBlock(
         return "Scegli il giorno e la luna di nascita.";
       return null;
     case "statistiche": {
-      for (const s of RULES.stats) {
+      for (const s of ctx.stats ?? RULES.stats) {
         const v = data.attributes?.[s.id] ?? c.min!;
         if (v < c.min! || v > c.max!)
           return `${s.label}: da ${c.min} a ${c.max}.`;
       }
-      const left = statPointsLeft(data, c);
+      const left = statPointsLeft(data, c, ctx.stats ?? RULES.stats);
       if (left > 0)
         return `Devi ancora distribuire ${left} ${plural(left, "punto", "punti")} statistica.`;
       if (left < 0)
@@ -410,7 +415,7 @@ export function validateBlock(
           const stat = ctx.skillStats[id];
           const cap = skillCap(data, c, stat);
           if (v > cap) {
-            const s = RULES.stats.find((x) => x.id === stat);
+            const s = (ctx.stats ?? RULES.stats).find((x) => x.id === stat);
             return `Un'abilità di ${s?.label ?? "una statistica"} supera il massimo (${cap}, il valore di ${s?.code ?? "?"}): abbassala.`;
           }
         }

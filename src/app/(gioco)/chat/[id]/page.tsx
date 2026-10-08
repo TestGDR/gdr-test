@@ -23,15 +23,33 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
 
   const back = `/mappa?id=${room.location.map_id}&luogo=${room.location.id}`;
   // meteo: quello della regione della mappa a cui appartiene la chat
-  const { data: mapInfo } = await supabase.from("maps").select("weather_region_id").eq("id", room.location.map_id).maybeSingle();
+  const { data: mapInfo } = await supabase
+    .from("maps")
+    .select("weather_region_id")
+    .eq("id", room.location.map_id)
+    .maybeSingle();
   const weatherRegionId = (mapInfo?.weather_region_id as string | null) ?? null;
   const image = room.image_url ?? room.location.image_url;
   const isPrivate = room.access !== "pubblica";
 
-  const [{ data: canEnter }, { data: controller }, { data: house }, { data: rental }, { data: guests }] = await Promise.all([
+  const [
+    { data: canEnter },
+    { data: controller },
+    { data: house },
+    { data: rental },
+    { data: guests },
+  ] = await Promise.all([
     supabase.rpc("can_enter_room", { r: id }),
-    isPrivate ? supabase.rpc("room_controller", { r: id }) : Promise.resolve({ data: null }),
-    room.house_id ? supabase.from("houses").select("name").eq("id", room.house_id).maybeSingle() : Promise.resolve({ data: null }),
+    isPrivate
+      ? supabase.rpc("room_controller", { r: id })
+      : Promise.resolve({ data: null }),
+    room.house_id
+      ? supabase
+          .from("houses")
+          .select("name")
+          .eq("id", room.house_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     room.access === "affitto"
       ? supabase
           .from("room_rentals")
@@ -40,10 +58,17 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           .gt("ends_at", new Date().toISOString())
           .order("ends_at", { ascending: false })
           .limit(1)
-          .maybeSingle<{ ends_at: string; character: { name: string } | null }>()
+          .maybeSingle<{
+            ends_at: string;
+            character: { name: string } | null;
+          }>()
       : Promise.resolve({ data: null }),
     isPrivate
-      ? supabase.from("room_guests").select("character:characters(id, name)").eq("room_id", id).order("created_at")
+      ? supabase
+          .from("room_guests")
+          .select("character:characters(id, name)")
+          .eq("room_id", id)
+          .order("created_at")
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -56,16 +81,25 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
         {isPrivate && <span title="Chat privata">🔒 </span>}
         {room.name}
       </h1>
-      {room.description && <p className="text-sm text-muted">{room.description}</p>}
+      {room.description && (
+        <p className="text-sm text-muted">{room.description}</p>
+      )}
     </div>
   );
 
   if (!canEnter) {
     // viaggi: in viaggio si gioca solo nelle chat di viaggio, e viceversa
-    const { data: travelBlock } = await supabase.rpc("room_travel_block", { r: id });
+    const { data: travelBlock } = await supabase.rpc("room_travel_block", {
+      r: id,
+    });
     return (
       <div className="mx-auto mt-6 max-w-xl text-center">
-        <GameArea title={room.name} image={image} description={room.description} weatherRegionId={weatherRegionId} />
+        <GameArea
+          title={room.name}
+          image={image}
+          description={room.description}
+          weatherRegionId={weatherRegionId}
+        />
         {header}
         <p className="panel text-muted">
           {travelBlock === "in_viaggio"
@@ -75,24 +109,39 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
               : travelBlock === "viaggio_diverso"
                 ? "Questa chat di viaggio non è sul tuo percorso (o è per chi viaggia con un altro mezzo): le tue sono nel pannello Viaggio."
                 : room.access === "casata"
-            ? `Questa è una chat privata della casata ${house?.name ?? ""}: entrano solo i suoi membri e chi viene invitato.`
-            : rental
-              ? "Questa stanza è affittata da un altro personaggio: entra solo chi viene invitato."
-              : "Questa stanza è libera: puoi affittarla da Utility → Prenota stanza."}
+                  ? `Questa è una chat privata della casata ${house?.name ?? ""}: entrano solo i suoi membri e chi viene invitato.`
+                  : rental
+                    ? "Questa stanza è affittata da un altro personaggio: entra solo chi viene invitato."
+                    : "Questa stanza è libera: puoi affittarla da Utility → Prenota stanza."}
         </p>
       </div>
     );
   }
 
   const [{ data: messages }, { data: characters }] = await Promise.all([
-    supabase.from("messages").select("*").eq("room_id", id).order("created_at", { ascending: false }).limit(HISTORY_SIZE),
+    supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", id)
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_SIZE),
     // Solo i personaggi attivi possono giocare (lo impone anche il database)
-    supabase.from("characters").select("*").eq("owner_id", user.id).eq("status", "attivo").order("created_at"),
+    supabase
+      .from("characters")
+      .select("*")
+      .eq("owner_id", user.id)
+      .eq("status", "attivo")
+      .order("created_at"),
   ]);
 
   return (
     <div className="flex h-full min-h-[24rem] flex-col">
-      <GameArea title={room.name} image={image} description={room.description} weatherRegionId={weatherRegionId} />
+      <GameArea
+        title={room.name}
+        image={image}
+        description={room.description}
+        weatherRegionId={weatherRegionId}
+      />
       {header}
       {isPrivate && (
         <RoomAccessBar
@@ -106,7 +155,9 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           }
           endsAt={rental?.ends_at ?? null}
           canManage={!!controller || permissions.has("chat.moderare")}
-          guests={((guests ?? []) as unknown as { character: Guest | null }[]).flatMap((g) => (g.character ? [g.character] : []))}
+          guests={(
+            (guests ?? []) as unknown as { character: Guest | null }[]
+          ).flatMap((g) => (g.character ? [g.character] : []))}
         />
       )}
       {characters?.length ? (

@@ -5,7 +5,9 @@
 // Abilita' e tratti invece si gestiscono dal pannello Gestione -> Abilita' e tratti.
 // =====================================================================
 
-export type StatId = "int" | "ref" | "body" | "emp" | "pre" | "will";
+// Codice interno di una statistica: le 6 di base sono "int", "ref", "body",
+// "emp", "pre", "will"; le altre si creano dal pannello (tabella "stats")
+export type StatId = string;
 
 export const RULES = {
   // Le 6 statistiche (sezione 1)

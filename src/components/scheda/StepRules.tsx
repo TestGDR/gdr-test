@@ -14,6 +14,7 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import { useStats } from "@/lib/rules/useStats";
 import { traitBudget } from "@/lib/rules/engine";
 
 type Props = {
@@ -31,6 +32,7 @@ export function StepSkills({
   c,
   skills,
 }: Props & { skills: Skill[] | null }) {
+  const statList = useStats();
   const levels = data.skills ?? {};
   const left = skillPointsLeft(data, c);
   const stats = data.attributes ?? {};
@@ -70,7 +72,7 @@ export function StepSkills({
         </strong>
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {RULES.stats.map((s) => {
+        {statList.map((s) => {
           const list = skills.filter((k) => k.stat === s.id && k.active);
           if (!list.length) return null;
           return (
@@ -144,6 +146,7 @@ export function StepTraits({
   traits,
   skills,
 }: Props & { traits: Trait[] | null; skills: Skill[] }) {
+  const stats = useStats();
   if (!traits) return <p className="text-muted">Caricamento...</p>;
   const chosen = data.traits ?? [];
   const limits = {
@@ -245,10 +248,10 @@ export function StepTraits({
                                 .filter((k) => k.active)
                                 .map((k) => (
                                   <option key={k.id} value={k.id}>
-                                    {k.name} ({statCode(k.stat)})
+                                    {k.name} ({statCode(k.stat, stats)})
                                   </option>
                                 ))
-                            : RULES.stats.map((s) => (
+                            : stats.map((s) => (
                                 <option key={s.id} value={s.id}>
                                   {s.label}
                                 </option>

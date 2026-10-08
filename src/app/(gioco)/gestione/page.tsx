@@ -72,10 +72,16 @@ const PANELS = [
     description: "Passaggi della creazione del PG, cosa chiede ognuno (punti, testi, campi nuovi) e anteprima.",
   },
   {
+    permission: "dadi.gestire",
+    href: "/gestione/dadi",
+    title: "Dadi",
+    description: "Tiri usabili in chat: formule (es. STAT + ABILITA + 1d10, 2d5), regole condizionali ed esiti.",
+  },
+  {
     permission: "regole.gestire",
     href: "/gestione/regole",
-    title: "Abilità e tratti",
-    description: "Abilità del regolamento (con la statistica collegata), vantaggi e svantaggi con i loro effetti sui tiri.",
+    title: "Statistiche, abilità e tratti",
+    description: "Statistiche del personaggio (sigle usate anche nei dadi), abilità con la statistica collegata, vantaggi e svantaggi con i loro effetti sui tiri.",
   },
   {
     permission: "viaggi.gestire",

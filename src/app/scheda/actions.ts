@@ -9,7 +9,8 @@ import {
   type TraitInfo,
 } from "@/lib/character-creation";
 import { allBlocks, cfg, firstInvalidFlowStep, hasBlock, loadFlow, PHYSICAL_FIELDS } from "@/lib/creation-flow";
-import { RULES, STAT_IDS, type StatId } from "@/lib/rules/config";
+import { RULES } from "@/lib/rules/config";
+import { loadStats } from "@/lib/rules/stats";
 import { VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
@@ -106,7 +107,8 @@ async function processCreation(characterId: string, mode: "submit" | "approve"):
   const catalog = (traitCatalog ?? []) as TraitInfo[];
   const skillIds = new Set((activeSkills ?? []).map((s) => s.id as string));
   const skillStats = Object.fromEntries((activeSkills ?? []).map((s) => [s.id as string, s.stat as string]));
-  const invalidStep = firstInvalidFlowStep(flow, data, { traits: catalog, skillIds, skillStats });
+  const statList = await loadStats(supabase);
+  const invalidStep = firstInvalidFlowStep(flow, data, { traits: catalog, skillIds, skillStats, stats: statList });
   if (invalidStep !== null) {
     return { error: `Completa il passaggio "${flow[invalidStep].title}".`, invalidStep };
   }
@@ -116,7 +118,7 @@ async function processCreation(characterId: string, mode: "submit" | "approve"):
       const info = catalog.find((x) => x.id === t.id);
       if (info?.choice === "abilita" && !skillIds.has(t.choice ?? ""))
         return { error: `Per "${info.name}" scegli un'abilità valida.`, invalidStep: traitsStep };
-      if (info?.choice === "statistica" && !STAT_IDS.includes(t.choice as StatId))
+      if (info?.choice === "statistica" && !statList.some((s) => s.id === t.choice))
         return { error: `Per "${info.name}" scegli una statistica valida.`, invalidStep: traitsStep };
     }
 
@@ -250,8 +252,8 @@ async function processCreation(characterId: string, mode: "submit" | "approve"):
     age: data.age ?? null,
     ...birth,
     attributes: statsBlock
-      ? Object.fromEntries(RULES.stats.map((s) => [s.id, data.attributes?.[s.id] ?? cfg(statsBlock).min]))
-      : Object.fromEntries(RULES.stats.map((s) => [s.id, RULES.statMin])),
+      ? Object.fromEntries(statList.map((s) => [s.id, data.attributes?.[s.id] ?? cfg(statsBlock).min]))
+      : Object.fromEntries(statList.map((s) => [s.id, RULES.statMin])),
     honor: RULES.honor.start,
     custom_fields: publicFields,
     activated_at: new Date().toISOString(),

@@ -9,6 +9,7 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import { useStats } from "@/lib/rules/useStats";
 import { skillLevelCap } from "@/lib/rules/engine";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
@@ -30,6 +31,7 @@ export default function RulesManage({
   section: "progress" | "skills" | "traits";
   onDone?: () => void; // torna alla lettura
 }) {
+  const stats = useStats();
   const supabase = useMemo(() => createClient(), []);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [traits, setTraits] = useState<Trait[]>([]);
@@ -222,7 +224,7 @@ export default function RulesManage({
           ) : (
             <>
               <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                {RULES.stats.map((s) => (
+                {stats.map((s) => (
                   <div key={s.id} className="space-y-1">
                     <p className="mt-2 text-xs font-semibold text-accent">
                       {s.label}
@@ -375,7 +377,7 @@ export default function RulesManage({
                         {k.name}
                       </option>
                     ))
-                  : RULES.stats.map((s) => (
+                  : stats.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
                       </option>

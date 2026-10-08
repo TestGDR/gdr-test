@@ -35,8 +35,11 @@ export type Trait = {
 
 export type CharacterTrait = { trait_id: string; choice: string | null };
 
-export const statLabel = (id: string) => RULES.stats.find((s) => s.id === id)?.label ?? id;
-export const statCode = (id: string) => RULES.stats.find((s) => s.id === id)?.code ?? id.toUpperCase();
+type StatName = { id: string; code: string; label: string };
+export const statLabel = (id: string, list: readonly StatName[] = RULES.stats) =>
+  list.find((s) => s.id === id)?.label ?? id;
+export const statCode = (id: string, list: readonly StatName[] = RULES.stats) =>
+  list.find((s) => s.id === id)?.code ?? id.toUpperCase();
 
 export async function loadCatalog(supabase: SupabaseClient) {
   const [{ data: skills }, { data: traits }] = await Promise.all([

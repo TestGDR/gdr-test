@@ -93,6 +93,7 @@ const EMPTY: Omit<Item, "id"> = {
   in_shop: false,
   at_signup: false,
   quality_id: null,
+  damage: null,
 };
 
 function ItemsTab({
@@ -212,7 +213,12 @@ function ItemForm({
       description: v.description.trim(),
       image_url: image,
       in_shop: v.in_shop && v.price !== null,
+      damage: v.damage?.trim().toLowerCase().replace(/s+/g, "") || null,
     };
+    if (row.damage && !/^(d*dd+([+-]d+)*|d+)$/.test(row.damage)) {
+      setBusy(false);
+      return setMsg({ ok: false, text: "Danno non valido: scrivilo come 2d5, 1d10+2 o un numero." });
+    }
     const res = item
       ? await supabase
           .from("items")
@@ -369,6 +375,18 @@ function ItemForm({
               })
             }
             className="input w-32! py-1.5"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Danno (es. 2d5+1)
+          </span>
+          <input
+            value={v.damage ?? ""}
+            maxLength={20}
+            placeholder="nessuno"
+            onChange={(e) => set({ damage: e.target.value || null })}
+            className="input w-32! py-1.5 font-mono"
           />
         </label>
         <label className="block">

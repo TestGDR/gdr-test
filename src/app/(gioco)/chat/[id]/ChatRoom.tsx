@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
+import DicePanel from "./DicePanel";
 
 type Props = {
   roomId: string;
@@ -12,7 +13,12 @@ type Props = {
   initialMessages: Message[];
 };
 
-export default function ChatRoom({ roomId, canNarrate, characters, initialMessages }: Props) {
+export default function ChatRoom({
+  roomId,
+  canNarrate,
+  characters,
+  initialMessages,
+}: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   // Dopo "Aggiorna" arrivano dal server i messaggi aggiornati: li unisco a quelli
@@ -22,7 +28,9 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
     setLastInitial(initialMessages);
     setMessages((prev) => {
       const byId = new Map([...prev, ...initialMessages].map((m) => [m.id, m]));
-      return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      return [...byId.values()].sort((a, b) =>
+        a.created_at.localeCompare(b.created_at),
+      );
     });
   }
   const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
@@ -30,21 +38,32 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diceOpen, setDiceOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function addMessage(msg: Message) {
-    setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    setMessages((prev) =>
+      prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
+    );
   }
 
   // Nuovi messaggi in tempo reale (chi e' presente lo mostra la colonna sinistra).
   // Quelli degli altri suonano col suono scelto per la chat (Opzioni della scheda)
-  const mine = useMemo(() => new Set(characters.map((c) => c.id)), [characters]);
+  const mine = useMemo(
+    () => new Set(characters.map((c) => c.id)),
+    [characters],
+  );
   useEffect(() => {
     const channel = supabase
       .channel(`room:${roomId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `room_id=eq.${roomId}`,
+        },
         (payload) => {
           const msg = payload.new as Message;
           if (!mine.has(msg.character_id)) playEvent("chat");
@@ -74,7 +93,11 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
     setSending(false);
     if (error) {
       // Regole del database: chat privata senza accesso (affitto scaduto, espulsione...)
-      setError(error.code === "42501" ? "Non puoi scrivere in questa chat: non hai (più) accesso." : error.message);
+      setError(
+        error.code === "42501"
+          ? "Non puoi scrivere in questa chat: non hai (più) accesso."
+          : error.message,
+      );
       return;
     }
     addMessage(data);
@@ -86,7 +109,9 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
       <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-panel">
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {messages.length === 0 && (
-            <p className="text-center text-muted">La lista è silenziosa... inizia tu la giocata.</p>
+            <p className="text-center text-muted">
+              La lista è silenziosa... inizia tu la giocata.
+            </p>
           )}
           {messages.map((m) => (
             <MessageRow key={m.id} message={m} />
@@ -138,14 +163,32 @@ export default function ChatRoom({ roomId, canNarrate, characters, initialMessag
               placeholder='Descrivi le azioni del personaggio. Il parlato va tra «caporali» o "virgolette". Invio per inviare, Maiusc+Invio per andare a capo.'
               className="input flex-1 resize-none"
             />
-            <button className="btn self-end" disabled={sending || !text.trim()}>
-              Invia
-            </button>
+            <div className="flex flex-col gap-2 self-end">
+              <button
+                type="button"
+                onClick={() => setDiceOpen((o) => !o)}
+                aria-pressed={diceOpen}
+                className="btn-ghost px-3"
+                title="Tira i dadi"
+              >
+                🎲 Dadi
+              </button>
+              <button className="btn" disabled={sending || !text.trim()}>
+                Invia
+              </button>
+            </div>
           </div>
+          {diceOpen && characterId && (
+            <DicePanel
+              roomId={roomId}
+              characterId={characterId}
+              canNarrate={canNarrate}
+              onClose={() => setDiceOpen(false)}
+            />
+          )}
           {error && <p className="text-sm text-red-400">{error}</p>}
         </form>
       </div>
-
     </div>
   );
 }
@@ -155,6 +198,23 @@ function MessageRow({ message }: { message: Message }) {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  if (message.kind === "dado") {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-[#c9a45c]/40 bg-[#c9a45c]/10 px-3 py-2 text-sm">
+        <span aria-hidden className="text-lg leading-none">
+          🎲
+        </span>
+        <p className="min-w-0 flex-1">
+          <span className="mr-2 text-xs text-muted">{time}</span>
+          <strong className="font-serif text-accent">
+            {message.character_name}
+          </strong>{" "}
+          tira {message.content}
+        </p>
+      </div>
+    );
+  }
 
   if (message.kind === "master") {
     return (
@@ -170,8 +230,8 @@ function MessageRow({ message }: { message: Message }) {
   if (message.kind === "fuori_gioco") {
     return (
       <p className="text-sm text-muted">
-        <span className="text-xs">{time}</span> [OFF] <strong>{message.character_name}</strong>:{" "}
-        {message.content}
+        <span className="text-xs">{time}</span> [OFF]{" "}
+        <strong>{message.character_name}</strong>: {message.content}
       </p>
     );
   }
@@ -179,7 +239,9 @@ function MessageRow({ message }: { message: Message }) {
   return (
     <p className="leading-relaxed whitespace-pre-line">
       <span className="mr-2 text-xs text-muted">{time}</span>
-      <strong className="font-serif text-accent">{message.character_name}</strong>{" "}
+      <strong className="font-serif text-accent">
+        {message.character_name}
+      </strong>{" "}
       {/* colore dell'azione scelto nelle Opzioni della scheda */}
       <span style={{ color: "var(--chat-action, inherit)" }}>
         <FormattedText text={message.content} />
@@ -197,7 +259,11 @@ function FormattedText({ text }: { text: string }) {
       {parts.map((part, i) =>
         i % 2 === 1 ? (
           // colore del parlato scelto nelle Opzioni della scheda
-          <span key={i} className="font-semibold" style={{ color: "var(--chat-speech, #fde68a)" }}>
+          <span
+            key={i}
+            className="font-semibold"
+            style={{ color: "var(--chat-speech, #fde68a)" }}
+          >
             {part}
           </span>
         ) : (

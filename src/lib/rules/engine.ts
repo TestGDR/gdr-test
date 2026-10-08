@@ -139,8 +139,8 @@ export function deriveStats(stats: Stats, hpBonus = 0): Derived {
 // ---------------------------------------------------------------------
 export type TraitPick = { kind: "vantaggio" | "svantaggio"; cost: number; name: string; uniqueGroup?: string | null };
 
-export function statPointsUsed(stats: Partial<Stats>) {
-  return STAT_IDS.reduce((sum, id) => sum + (stats[id] ?? 0), 0);
+export function statPointsUsed(stats: Partial<Stats>, ids: string[] = STAT_IDS) {
+  return ids.reduce((sum, id) => sum + (stats[id] ?? 0), 0);
 }
 export function skillPointsUsed(skills: Record<string, number>) {
   return Object.values(skills).reduce((a, b) => a + (b || 0), 0);
@@ -155,16 +155,19 @@ export function traitBudget(traits: TraitPick[], c: TraitLimits = RULES.creation
   return { available: c.advantagePoints + Math.min(flawValue, c.flawValueMax), spent, flawValue };
 }
 
-export function validateStats(stats: Partial<Stats>): string[] {
+export function validateStats(
+  stats: Partial<Stats>,
+  list: readonly { id: string; label: string }[] = RULES.stats,
+): string[] {
   const c = RULES.creation;
   const errors: string[] = [];
-  for (const s of RULES.stats) {
+  for (const s of list) {
     const v = stats[s.id];
     if (v === undefined || !Number.isInteger(v)) errors.push(`${s.label}: valore mancante.`);
     else if (v < c.statMin) errors.push(`${s.label}: minimo ${c.statMin}.`);
     else if (v > c.statMax) errors.push(`${s.label}: massimo ${c.statMax}.`);
   }
-  const used = statPointsUsed(stats);
+  const used = statPointsUsed(stats, list.map((s) => s.id));
   if (used !== c.statPoints) errors.push(`Le statistiche devono sommare ${c.statPoints} punti (ora ${used}).`);
   return errors;
 }

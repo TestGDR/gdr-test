@@ -10,6 +10,7 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import { useStats } from "@/lib/rules/useStats";
 import {
   skillLevelCap,
   capTraitModifiers,
@@ -22,9 +23,12 @@ import type { Character } from "@/lib/types";
 import RulesManage from "./RulesManage";
 
 // Statistiche del PG (1-10); quelle mancanti valgono il minimo
-export function statsOf(character: Character): Stats {
+export function statsOf(
+  character: Character,
+  list: readonly { id: string }[] = RULES.stats,
+): Stats {
   return Object.fromEntries(
-    RULES.stats.map((s) => [
+    list.map((s) => [
       s.id,
       Number(character.attributes?.[s.id]) || RULES.statMin,
     ]),
@@ -193,11 +197,12 @@ export function SkillsPage({
   canEdit: boolean; // admin e moderatori: pennina per cambiare i livelli
   onSaved: () => void;
 }) {
+  const statList = useStats();
   const { data, reload, supabase } = useRulesData(character.id);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const stats = statsOf(character);
+  const stats = statsOf(character, statList);
   const px = character.px ?? 0;
 
   async function raise(skill: Skill, level: number) {
@@ -268,7 +273,7 @@ export function SkillsPage({
         <p className="text-muted">Caricamento...</p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          {RULES.stats.map((s) => {
+          {statList.map((s) => {
             const list = data.skills.filter(
               (k) => k.stat === s.id && (k.active || data.levels[k.id]),
             );

@@ -15,7 +15,6 @@ import RichEditor from "@/components/guide/RichEditor";
 import Modal from "@/components/ui/Modal";
 import ModalButton from "@/components/ui/ModalButton";
 import {
-  ATTRIBUTES,
   SEXES,
   TEXT_MAX,
   labelOf,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/character-creation";
 import { formatBirth, validBirth } from "@/lib/game-date";
 import { RULES } from "@/lib/rules/config";
+import { useStats } from "@/lib/rules/useStats";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
@@ -1435,18 +1435,19 @@ function DragonField({
 // Caratteristiche: ragnatela e barre
 // ---------------------------------------------------------------------
 function AttributesPage({ character }: { character: Character }) {
-  const values = ATTRIBUTES.map((a) => Number(character.attributes?.[a.id]) || 0);
+  const stats = useStats();
+  const values = stats.map((a) => Number(character.attributes?.[a.id]) || 0);
   const max = Math.max(RULES.statMax, ...values);
   return (
     <div className="flex flex-col items-center gap-6 p-6">
       <h3 className="w-full border-b border-border pb-2 font-serif text-2xl text-accent">Caratteristiche</h3>
       <Radar
-        labels={ATTRIBUTES.map((a) => a.code)}
+        labels={stats.map((a) => a.code)}
         values={values}
         max={max}
       />
       <ul className="w-full min-w-0 flex-1 space-y-3">
-        {ATTRIBUTES.map((a, i) => (
+        {stats.map((a, i) => (
           <li key={a.id}>
             <p className="flex justify-between text-xs font-semibold tracking-[0.14em] text-muted uppercase" title={a.description}>
               {a.code} · {a.label}

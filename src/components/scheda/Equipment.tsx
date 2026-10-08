@@ -24,6 +24,7 @@ export type Item = {
   in_shop: boolean; // presente al mercato
   at_signup?: boolean; // disponibile all'iscrizione
   quality_id?: string | null; // livello (qualita') con cui nasce
+  damage?: string | null; // danno (es. "2d5+1"), per i tiri con ARMA
 };
 export type Quality = {
   id: string;

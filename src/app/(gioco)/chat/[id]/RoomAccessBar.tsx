@@ -25,7 +25,11 @@ export default function RoomAccessBar({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const inBrowser = useSyncExternalStore(noop, () => true, () => false);
+  const inBrowser = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,20 +49,34 @@ export default function RoomAccessBar({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="text-foreground">
           {info}
-          {endsAt && inBrowser && <span className="text-muted"> · {untilLabel(endsAt)}</span>}
+          {endsAt && inBrowser && (
+            <span className="text-muted"> · {untilLabel(endsAt)}</span>
+          )}
         </span>
 
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted">Invitati:</span>
-          {guests.length === 0 && <span className="text-xs text-muted italic">nessuno</span>}
+          {guests.length === 0 && (
+            <span className="text-xs text-muted italic">nessuno</span>
+          )}
           {guests.map((g) => (
-            <span key={g.id} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs">
+            <span
+              key={g.id}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs"
+            >
               {g.name}
               {canManage && (
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => run(supabase.rpc("expel_from_room", { p_room: roomId, p_character: g.id }))}
+                  onClick={() =>
+                    run(
+                      supabase.rpc("expel_from_room", {
+                        p_room: roomId,
+                        p_character: g.id,
+                      }),
+                    )
+                  }
                   aria-label={`Caccia ${g.name}`}
                   title={`Caccia ${g.name}`}
                   className="text-muted hover:text-red-400"
@@ -74,7 +92,13 @@ export default function RoomAccessBar({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (name.trim()) run(supabase.rpc("invite_to_room", { p_room: roomId, p_name: name }));
+              if (name.trim())
+                run(
+                  supabase.rpc("invite_to_room", {
+                    p_room: roomId,
+                    p_name: name,
+                  }),
+                );
             }}
             className="ml-auto flex items-center gap-2"
           >
@@ -85,7 +109,10 @@ export default function RoomAccessBar({
               aria-label="Personaggio da invitare"
               className="input w-44 py-1 text-xs"
             />
-            <button className="btn px-3 py-1 text-xs" disabled={busy || !name.trim()}>
+            <button
+              className="btn px-3 py-1 text-xs"
+              disabled={busy || !name.trim()}
+            >
               Invita
             </button>
           </form>
