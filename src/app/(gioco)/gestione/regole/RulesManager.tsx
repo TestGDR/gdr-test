@@ -82,7 +82,9 @@ function useSaver() {
           text:
             error.code === "23505"
               ? "Esiste già un elemento con questo nome."
-              : error.message.length < 140
+              : error.code === "23503"
+                ? "Scegli una statistica valida (oppure l'elemento è ancora collegato ad altro)."
+                : error.message.length < 140
                 ? error.message
                 : "Salvataggio non riuscito.",
         }),
@@ -236,10 +238,11 @@ function SkillsEditor({
               className="input resize-y text-sm"
             />
           </label>
+          {!edit.stat && <p className="text-xs text-[#f0c75e]">Scegli la statistica collegata all&apos;abilità.</p>}
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={busy || edit.name.trim().length < 2}
+              disabled={busy || edit.name.trim().length < 2 || !edit.stat}
               onClick={save}
               className="btn px-4 py-1.5 text-sm"
             >

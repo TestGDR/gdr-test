@@ -106,4 +106,5 @@ export type Message = {
   content: string;
   created_at: string;
   roll_data?: unknown; // dettagli del tiro (messaggi "dado")
+  recipient?: string | null; // a chi e' rivolta l'azione ("→ Nome")
 };

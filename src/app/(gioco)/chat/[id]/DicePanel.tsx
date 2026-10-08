@@ -22,6 +22,18 @@ type ItemOpt = {
   item: { name: string; damage: string | null } | null;
 };
 
+export type DiceCategory = "abilita" | "statistiche" | "oggetti" | "liberi";
+
+// Gruppo di un tiro in base a cosa usa la formula
+export function diceCategory(formula: string, codes: string[]): DiceCategory {
+  const v = formulaVars(formula, codes);
+  if (v.has("ABILITA") || v.has("DABILITA")) return "abilita";
+  if (v.has("ARMA")) return "oggetti";
+  if (v.has("STAT") || v.has("DSTAT") || codes.some((c) => v.has(c)))
+    return "statistiche";
+  return "liberi";
+}
+
 // Riquadro dei dadi della chat: si sceglie il tiro (Gestione -> Dadi) e
 // quello che chiede (statistica, abilita', oggetto, modificatore, DV).
 // Il tiro lo fa il server e compare in chat per tutti
@@ -29,12 +41,16 @@ export default function DicePanel({
   roomId,
   characterId,
   canNarrate,
+  category,
   onClose,
+  onRolled,
 }: {
   roomId: string;
   characterId: string;
   canNarrate: boolean;
-  onClose: () => void;
+  category?: DiceCategory; // solo i tiri di questo gruppo
+  onClose?: () => void;
+  onRolled?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [types, setTypes] = useState<DiceType[] | null>(null);
@@ -121,7 +137,11 @@ export default function DicePanel({
       );
   }, [supabase, characterId]);
 
-  const dice = types?.find((t) => t.id === diceId);
+  const codes = stats.map((s) => s.code);
+  const visible = (types ?? []).filter(
+    (t) => !category || diceCategory(t.formula, codes) === category,
+  );
+  const dice = visible.find((t) => t.id === diceId) ?? visible[0];
   const vars = dice
     ? formulaVars(
         dice.formula,
@@ -144,6 +164,7 @@ export default function DicePanel({
         target: dice.ask_target && target !== "" ? Number(target) : null,
       });
       if (res.error) setError(res.error);
+      else onRolled?.();
     });
   }
 
@@ -151,21 +172,23 @@ export default function DicePanel({
 
   return (
     <div className="space-y-2 border border-accent/40 bg-black/40 p-3">
-      <div className="flex items-center justify-between">
-        <span className="font-serif text-accent">Dadi</span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-xs text-muted hover:text-accent"
-        >
-          Chiudi
-        </button>
-      </div>
+      {onClose && (
+        <div className="flex items-center justify-between">
+          <span className="font-serif text-accent">Dadi</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-muted hover:text-accent"
+          >
+            Chiudi
+          </button>
+        </div>
+      )}
       {!types ? (
         <p className="text-sm text-muted">Caricamento...</p>
-      ) : types.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p className="text-sm text-muted">
-          Nessun tiro disponibile: lo staff li crea in Gestione → Dadi.
+          Nessun tiro di questo tipo: lo staff li crea in Gestione → Dadi.
         </p>
       ) : (
         <>
@@ -173,11 +196,11 @@ export default function DicePanel({
             <label className="block">
               <span className={field}>Tiro</span>
               <select
-                value={diceId}
+                value={dice?.id ?? ""}
                 onChange={(e) => setDiceId(e.target.value)}
                 className="input w-48! py-1 text-sm"
               >
-                {types.map((t) => (
+                {visible.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>

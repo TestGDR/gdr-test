@@ -162,7 +162,15 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       )}
       {characters?.length ? (
         <ChatRoom
-          roomId={room.id}
+          room={{
+            id: room.id,
+            name: room.name,
+            description: room.description,
+            image_url: image,
+            access: room.access,
+            location_id: room.location.id,
+            location_name: room.location.name,
+          }}
           canNarrate={permissions.has("chat.narrazione")}
           characters={characters as Character[]}
           initialMessages={((messages ?? []) as Message[]).reverse()}

@@ -235,3 +235,171 @@ export async function rollDice(
     };
   return {};
 }
+
+// ---------------------------------------------------------------------
+// Dadi liberi: il giocatore scrive la formula (es. 3d6+1)
+// ---------------------------------------------------------------------
+export async function rollFreeDice(
+  roomId: string,
+  characterId: string,
+  formula: string,
+): Promise<{ error?: string }> {
+  const { supabase, user } = await getStaffContext();
+  const { data: character } = await supabase
+    .from("characters")
+    .select("id, owner_id, status")
+    .eq("id", characterId)
+    .maybeSingle();
+  if (
+    !character ||
+    character.owner_id !== user.id ||
+    character.status !== "attivo"
+  )
+    return { error: "Personaggio non valido." };
+  const f = formula.trim().slice(0, 40);
+  const result = rollFormula(f, [], { vars: {} }, secureRng, []);
+  if ("error" in result) return { error: result.error };
+  return postRoll(user.id, roomId, characterId, `dadi liberi: ${result.text}`, {
+    dice: "libero",
+    formula: f,
+    ...result,
+  });
+}
+
+// ---------------------------------------------------------------------
+// Raggira: prova contrapposta (regolamento, "Ingannare"):
+// EMP + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
+// A parita' vince chi difende
+// ---------------------------------------------------------------------
+const PROVA_RULES: DiceRule[] = [
+  {
+    when: "naturale",
+    op: "=",
+    value: 10,
+    action: "aggiungi",
+    formula: "1d10",
+    repeat: true,
+    label: "esplode +1d10",
+  },
+  {
+    when: "naturale",
+    op: "=",
+    value: 1,
+    action: "sottrai",
+    formula: "1d10",
+    label: "fallimento −1d10",
+  },
+];
+
+export async function rollRaggira(
+  roomId: string,
+  characterId: string,
+  targetId: string,
+): Promise<{ error?: string }> {
+  const { supabase, user } = await getStaffContext();
+  if (characterId === targetId)
+    return { error: "Scegli un altro personaggio." };
+  const [{ data: me }, { data: target }, { data: skills }] = await Promise.all([
+    supabase
+      .from("characters")
+      .select("id, name, owner_id, status, attributes")
+      .eq("id", characterId)
+      .maybeSingle(),
+    supabase
+      .from("characters")
+      .select("id, name, status, attributes")
+      .eq("id", targetId)
+      .maybeSingle(),
+    supabase
+      .from("skills")
+      .select("id, name")
+      .in("name", ["Dissimulare", "Percepire Intenzioni"]),
+  ]);
+  if (!me || me.owner_id !== user.id || me.status !== "attivo")
+    return { error: "Personaggio non valido." };
+  if (!target || target.status !== "attivo")
+    return { error: "Il bersaglio non è un personaggio attivo." };
+
+  const skillId = (name: string) =>
+    (skills ?? []).find((s) => s.name === name)?.id as string | undefined;
+  const levelOf = async (charId: string, name: string) => {
+    const id = skillId(name);
+    if (!id) return 0;
+    const { data } = await supabase
+      .from("character_skills")
+      .select("level")
+      .eq("character_id", charId)
+      .eq("skill_id", id)
+      .maybeSingle();
+    return (data?.level as number | undefined) ?? 0;
+  };
+  const emp = (c: { attributes: unknown }) =>
+    Number((c.attributes as Record<string, number> | null)?.emp) ||
+    RULES.statMin;
+
+  const def = rollFormula(
+    "EMP + ABILITA + 1d10",
+    PROVA_RULES,
+    {
+      vars: {
+        EMP: emp(target),
+        ABILITA: await levelOf(targetId, "Percepire Intenzioni"),
+      },
+      varLabels: { ABILITA: "Percepire Intenzioni" },
+    },
+    secureRng,
+    ["EMP"],
+  );
+  if ("error" in def) return { error: def.error };
+  const att = rollFormula(
+    "EMP + ABILITA + 1d10",
+    PROVA_RULES,
+    {
+      vars: {
+        EMP: emp(me),
+        ABILITA: await levelOf(characterId, "Dissimulare"),
+      },
+      varLabels: { ABILITA: "Dissimulare" },
+      target: def.total,
+    },
+    secureRng,
+    ["EMP"],
+  );
+  if ("error" in att) return { error: att.error };
+  const won = att.total > def.total; // a parita' vince chi difende
+  const margin = att.total - def.total;
+  const content =
+    `Raggira ${target.name}: ${att.text.replace(/ contro DV.*$/, "")} contro ` +
+    `${def.text} — ${won ? "riuscito" : "fallito"} (margine ${margin >= 0 ? "+" : ""}${margin})`;
+  return postRoll(user.id, roomId, characterId, content, {
+    dice: "raggira",
+    target: target.name,
+    attack: att,
+    defense: def,
+    success: won,
+    margin,
+  });
+}
+
+async function postRoll(
+  userId: string,
+  roomId: string,
+  characterId: string,
+  content: string,
+  data: unknown,
+) {
+  const admin = createAdminClient();
+  if (!admin) return { error: "Configurazione del server incompleta." };
+  const { error } = await admin.rpc("post_dice_roll", {
+    p_user: userId,
+    p_room: roomId,
+    p_character: characterId,
+    p_content: content,
+    p_data: data,
+  });
+  if (error)
+    return {
+      error: error.message.length < 140 ? error.message : "Tiro non riuscito.",
+    };
+  return {};
+}
