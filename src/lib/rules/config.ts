@@ -28,11 +28,11 @@ export const RULES = {
 
   // Difficolta' (DV)
   difficulties: [
-    { id: "facile", label: "Facile", dv: 9, example: "Cavalcare al trotto su terreno battuto" },
-    { id: "normale", label: "Normale", dv: 12, example: "Seguire tracce fresche, calmare un cavallo spaventato" },
-    { id: "difficile", label: "Difficile", dv: 15, example: "Convincere un lord ostile, medicare una ferita grave" },
-    { id: "molto_difficile", label: "Molto difficile", dv: 18, example: "Decifrare un codice di corte, sfondare una porta rinforzata" },
-    { id: "eroica", label: "Eroica", dv: 21, example: "Imprese da leggenda" },
+    { id: "facile", label: "Facile", dv: 10, example: "Cavalcare al trotto su terreno battuto" },
+    { id: "normale", label: "Normale", dv: 15, example: "Seguire tracce fresche, calmare un cavallo spaventato" },
+    { id: "difficile", label: "Difficile", dv: 20, example: "Convincere un lord ostile, medicare una ferita grave" },
+    { id: "molto_difficile", label: "Molto difficile", dv: 25, example: "Decifrare un codice di corte, sfondare una porta rinforzata" },
+    { id: "eroica", label: "Eroica", dv: 30, example: "Imprese da leggenda" },
   ],
 
   // Creazione del personaggio (sezione 2)

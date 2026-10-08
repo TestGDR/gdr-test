@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Modal from "@/components/ui/Modal";
+import { isFresh } from "@/lib/chat-ttl";
 import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
@@ -82,6 +83,19 @@ export default function ChatRoom({
       supabase.removeChannel(channel);
     };
   }, [supabase, roomId, mine]);
+
+  // Dopo un'ora dall'invio l'azione sparisce dalla chat (resta nel database)
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      setMessages((prev) =>
+        prev.every((m) => isFresh(m.created_at, now))
+          ? prev
+          : prev.filter((m) => isFresh(m.created_at, now)),
+      );
+    }, 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -338,7 +352,9 @@ function MessageRow({ message }: { message: Message }) {
           <strong className="font-serif text-accent">
             {message.character_name}
           </strong>{" "}
-          tira {message.content}
+          {/* i tiri vecchi non avevano il verbo nel testo */}
+          {/^(tira|effettua) /.test(message.content) ? "" : "tira "}
+          {message.content}
         </p>
       </div>
     );

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logoutIdle } from "@/app/(pubblico)/login/actions";
+import { createClient } from "@/lib/supabase/client";
 
 // Uscita automatica dopo 60 minuti di inattivita'.
 // Conta come attivita': muovere il mouse, cliccare, scrivere, usare la rotellina,
@@ -55,12 +56,20 @@ export function useIdleLogout() {
 
   useEffect(() => {
     // All'apertura: se l'ultima attivita' nel browser e' di oltre un'ora fa,
-    // la sessione era gia' scaduta
+    // la sessione era gia' scaduta. Ma se nel frattempo si e' rifatto l'accesso,
+    // quell'orario e' di una sessione vecchia: si riparte da adesso
     const stored = readLast();
     if (stored && Date.now() - stored >= IDLE_MS) {
-      leaving.current = true;
-      logoutIdle();
-      return;
+      createClient()
+        .auth.getSession()
+        .then(({ data }) => {
+          const signIn = Date.parse(data.session?.user.last_sign_in_at ?? "");
+          if (signIn > stored) writeLast(Date.now());
+          else {
+            leaving.current = true;
+            logoutIdle();
+          }
+        });
     }
     const mark = touch.current;
     mark();

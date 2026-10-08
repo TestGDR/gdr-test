@@ -148,6 +148,8 @@ export default function DicePanel({
         stats.map((s) => s.code),
       )
     : new Set<string>();
+  const statCode = (id: string) =>
+    stats.find((s) => s.id === id)?.code ?? id.toUpperCase();
   const weapons = items?.char === characterId ? items.list : [];
 
   function roll() {
@@ -214,22 +216,20 @@ export default function DicePanel({
                   value={skillId}
                   onChange={(e) => {
                     setSkillId(e.target.value);
-                    // la statistica dell'abilita' (si puo' cambiare)
-                    const s = skills.find((k) => k.id === e.target.value);
-                    if (s) setStat(s.stat);
                   }}
                   className="input w-52! py-1 text-sm"
                 >
                   <option value="">Scegli...</option>
                   {skills.map((k) => (
                     <option key={k.id} value={k.id}>
-                      {k.name}
+                      {k.name} ({statCode(k.stat)})
                     </option>
                   ))}
                 </select>
               </label>
             )}
-            {vars.has("STAT") && (
+            {/* con un'abilita' la statistica e' la sua: non si sceglie */}
+            {vars.has("STAT") && !vars.has("ABILITA") && (
               <label className="block">
                 <span className={field}>Statistica</span>
                 <select

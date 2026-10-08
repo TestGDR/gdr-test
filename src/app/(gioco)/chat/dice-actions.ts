@@ -89,9 +89,12 @@ export async function rollDice(
     }
     if (needed.has("ABILITA") && !skill) return { error: "Scegli l'abilità." };
   }
-  let stat: StatId | null = statList.some((s) => s.id === choice.stat)
-    ? choice.stat!
-    : (skill?.stat ?? null);
+  // Con un'abilita' la statistica e' sempre la sua (non si sceglie)
+  let stat: StatId | null = skill
+    ? skill.stat
+    : statList.some((s) => s.id === choice.stat)
+      ? choice.stat!
+      : null;
   if (needed.has("STAT")) {
     if (!stat) return { error: "Scegli la statistica." };
     vars.STAT = Number(attrs[stat]) || RULES.statMin;
@@ -226,7 +229,15 @@ export async function rollDice(
     p_user: user.id,
     p_room: roomId,
     p_character: characterId,
-    p_content: `${dice.name}: ${result.text}`,
+    // Tiro su un'abilita': in chat solo la frase col totale (il dettaglio
+    // resta in roll_data). Il nome del personaggio lo mette la chat davanti
+    p_content: skill
+      ? `effettua una prova su ${skill.name} ed ottiene un totale di ${result.total}` +
+        // con la DV: superata se il totale la raggiunge (margine >= 0)
+        (result.target !== null
+          ? `: DV ${result.target} ${result.total >= result.target ? "superata" : "non superata"}`
+          : "")
+      : `tira ${dice.name}: ${result.text}`,
     p_data: { dice: dice.name, formula: dice.formula, ...result },
   });
   if (error)
@@ -259,11 +270,17 @@ export async function rollFreeDice(
   const f = formula.trim().slice(0, 40);
   const result = rollFormula(f, [], { vars: {} }, secureRng, []);
   if ("error" in result) return { error: result.error };
-  return postRoll(user.id, roomId, characterId, `dadi liberi: ${result.text}`, {
-    dice: "libero",
-    formula: f,
-    ...result,
-  });
+  return postRoll(
+    user.id,
+    roomId,
+    characterId,
+    `tira dadi liberi: ${result.text}`,
+    {
+      dice: "libero",
+      formula: f,
+      ...result,
+    },
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -369,7 +386,7 @@ export async function rollRaggira(
   const won = att.total > def.total; // a parita' vince chi difende
   const margin = att.total - def.total;
   const content =
-    `Raggira ${target.name}: ${att.text.replace(/ contro DV.*$/, "")} contro ` +
+    `tira Raggira ${target.name}: ${att.text.replace(/ contro DV.*$/, "")} contro ` +
     `${def.text} — ${won ? "riuscito" : "fallito"} (margine ${margin >= 0 ? "+" : ""}${margin})`;
   return postRoll(user.id, roomId, characterId, content, {
     dice: "raggira",

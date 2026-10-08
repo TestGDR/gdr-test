@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
 import { GameArea } from "@/components/game/GameShell";
+import { freshSince } from "@/lib/chat-ttl";
 import { getStaffContext } from "@/lib/staff";
 import type { Character, Location, Message, Room } from "@/lib/types";
 import ChatRoom from "./ChatRoom";
@@ -123,6 +124,8 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       .from("messages")
       .select("*")
       .eq("room_id", id)
+      // solo le azioni dell'ultima ora: le altre sono sparite dalla chat
+      .gte("created_at", freshSince())
       .order("created_at", { ascending: false })
       .limit(HISTORY_SIZE),
     // Solo i personaggi attivi possono giocare (lo impone anche il database)
