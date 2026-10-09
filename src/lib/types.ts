@@ -24,6 +24,12 @@ export type Character = {
   resources?: number; // Risorse (R)
   honor?: number; // Onore 0-10
   hp_current?: number | null; // Punti Ferita attuali (vuoto = pieni)
+  hp_updated_at?: string | null; // da quando conta il recupero giornaliero
+  dead_at?: string | null; // morto in combattimento (o per scelta dello staff)
+  stamina_updated_at?: string | null; // ultima azione di combattimento
+  dying_since?: string | null; // a 0 PF: morente
+  stabilized_at?: string | null; // morente stabilizzato (incosciente)
+  stunned?: boolean; // perde la prossima azione
   stamina_current?: number | null; // Stamina attuale (vuoto = piena)
   marital_status?: string | null; // stato civile (vedi lib/marital), lo imposta l'admin
   partner_character_id?: string | null; // sposato/fidanzato con un PG

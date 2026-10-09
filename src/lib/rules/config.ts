@@ -12,13 +12,48 @@ export type StatId = string;
 export const RULES = {
   // Le 6 statistiche (sezione 1)
   stats: [
-    { id: "int", code: "INT", label: "Intelligenza", description: "Ragionamento, memoria, percezione" },
-    { id: "ref", code: "REF", label: "Riflessi", description: "Riflessi, coordinazione, mira" },
-    { id: "body", code: "BODY", label: "Corpo", description: "Forza e costituzione" },
-    { id: "emp", code: "EMP", label: "Empatia", description: "Empatia e intuito" },
-    { id: "pre", code: "PRE", label: "Presenza", description: "Presenza, carisma, autorità" },
-    { id: "will", code: "WILL", label: "Volontà", description: "Volontà, coraggio, autocontrollo" },
-  ] as const satisfies readonly { id: StatId; code: string; label: string; description: string }[],
+    {
+      id: "int",
+      code: "INT",
+      label: "Intelligenza",
+      description: "Ragionamento, memoria, percezione",
+    },
+    {
+      id: "ref",
+      code: "REF",
+      label: "Riflessi",
+      description: "Riflessi, coordinazione, mira",
+    },
+    {
+      id: "body",
+      code: "BODY",
+      label: "Corpo",
+      description: "Forza e costituzione",
+    },
+    {
+      id: "emp",
+      code: "EMP",
+      label: "Empatia",
+      description: "Empatia e intuito",
+    },
+    {
+      id: "pre",
+      code: "PRE",
+      label: "Presenza",
+      description: "Presenza, carisma, autorità",
+    },
+    {
+      id: "will",
+      code: "WILL",
+      label: "Volontà",
+      description: "Volontà, coraggio, autocontrollo",
+    },
+  ] as const satisfies readonly {
+    id: StatId;
+    code: string;
+    label: string;
+    description: string;
+  }[],
   statMin: 1,
   statMax: 10,
   skillMax: 10,
@@ -28,10 +63,30 @@ export const RULES = {
 
   // Difficolta' (DV)
   difficulties: [
-    { id: "facile", label: "Facile", dv: 10, example: "Cavalcare al trotto su terreno battuto" },
-    { id: "normale", label: "Normale", dv: 15, example: "Seguire tracce fresche, calmare un cavallo spaventato" },
-    { id: "difficile", label: "Difficile", dv: 20, example: "Convincere un lord ostile, medicare una ferita grave" },
-    { id: "molto_difficile", label: "Molto difficile", dv: 25, example: "Decifrare un codice di corte, sfondare una porta rinforzata" },
+    {
+      id: "facile",
+      label: "Facile",
+      dv: 10,
+      example: "Cavalcare al trotto su terreno battuto",
+    },
+    {
+      id: "normale",
+      label: "Normale",
+      dv: 15,
+      example: "Seguire tracce fresche, calmare un cavallo spaventato",
+    },
+    {
+      id: "difficile",
+      label: "Difficile",
+      dv: 20,
+      example: "Convincere un lord ostile, medicare una ferita grave",
+    },
+    {
+      id: "molto_difficile",
+      label: "Molto difficile",
+      dv: 25,
+      example: "Decifrare un codice di corte, sfondare una porta rinforzata",
+    },
     { id: "eroica", label: "Eroica", dv: 30, example: "Imprese da leggenda" },
   ],
 
@@ -67,6 +122,17 @@ export const RULES = {
       { maxBody: 8, damage: "1d6+2" },
       { maxBody: 10, damage: "1d6+4" },
     ],
+  },
+
+  // Combattimento: attacco REF + abilita' d'arma + d10 contro REF + Schivare + d10
+  // (a parita' vince chi difende); senza arma si usa Lotta e il danno a mani nude.
+  // A 0 PF ferito grave; morto quando i PF scendono a -(PF massimi x deathAtFraction)
+  combat: {
+    attackStat: "ref",
+    defenseStat: "ref",
+    defenseSkill: "Schivare",
+    unarmedSkill: "Lotta",
+    deathAtFraction: 0.5,
   },
 
   // Esperienza (sezione 8): per salire al livello N servono N x 10 PX

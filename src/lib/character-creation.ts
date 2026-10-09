@@ -20,6 +20,7 @@ export const AGE_MAX = 80;
 export const ATTRIBUTES = RULES.stats;
 
 export const TEXT_MAX = 4000;
+export const APPEARANCE_MAX = 20000; // Aspetto della scheda (anche in HTML)
 
 export type CustomValue = string | number | boolean | string[];
 
@@ -89,9 +90,14 @@ export function sanitizeCreationData(raw: unknown): CreationData {
     // statistiche gestite dal pannello: chiavi semplici, valori interi 1-10
     out.attributes = Object.fromEntries(
       Object.entries(attrs)
-        .filter(([k, v]) => /^[a-z][a-z0-9_]{0,19}$/.test(k) && Number.isInteger(v))
+        .filter(
+          ([k, v]) => /^[a-z][a-z0-9_]{0,19}$/.test(k) && Number.isInteger(v),
+        )
         .slice(0, 30)
-        .map(([k, v]) => [k, Math.min(RULES.statMax, Math.max(RULES.statMin, v as number))]),
+        .map(([k, v]) => [
+          k,
+          Math.min(RULES.statMax, Math.max(RULES.statMin, v as number)),
+        ]),
     );
   }
   if (input.skills && typeof input.skills === "object") {
@@ -127,9 +133,17 @@ export function sanitizeCreationData(raw: unknown): CreationData {
   out.visible_marks = text(input.visible_marks, 300);
   out.face_claim = text(input.face_claim, 80)?.replace(/\s+/g, " ");
   if (uuid(input.house_role_id)) out.house_role_id = input.house_role_id;
-  if (Number.isInteger(input.birth_day) && (input.birth_day as number) >= 1 && (input.birth_day as number) <= 31)
+  if (
+    Number.isInteger(input.birth_day) &&
+    (input.birth_day as number) >= 1 &&
+    (input.birth_day as number) <= 31
+  )
     out.birth_day = input.birth_day as number;
-  if (Number.isInteger(input.birth_month) && (input.birth_month as number) >= 1 && (input.birth_month as number) <= 12)
+  if (
+    Number.isInteger(input.birth_month) &&
+    (input.birth_month as number) >= 1 &&
+    (input.birth_month as number) <= 12
+  )
     out.birth_month = input.birth_month as number;
   if (uuid(input.dragon_id)) out.dragon_id = input.dragon_id;
   if (input.custom && typeof input.custom === "object") {

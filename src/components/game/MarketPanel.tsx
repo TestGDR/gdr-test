@@ -11,13 +11,16 @@ import {
   type Slot,
 } from "@/components/scheda/Equipment";
 import type { MainCharacter } from "@/lib/main-character";
+import { durability } from "@/lib/rules/combat";
 import { createClient } from "@/lib/supabase/client";
 
 type Mine = {
   id: string;
   equipped: boolean;
   quality_id: string | null;
-  quality: Pick<Quality, "name" | "level"> | null;
+  quality: Pick<Quality, "name" | "level" | "aff_bonus" | "sp_bonus"> | null;
+  aff_current?: number | null;
+  sp_current?: number | null;
   item: Item;
 };
 
@@ -287,7 +290,7 @@ function Smith({
       supabase
         .from("character_items")
         .select(
-          "id, equipped, quality_id, quality:item_qualities(name, level), item:items(*)",
+          "id, equipped, quality_id, aff_current, sp_current, quality:item_qualities(name, level, aff_bonus, sp_bonus), item:items(*)",
         )
         .eq("character_id", characterId)
         .order("acquired_at")
@@ -304,6 +307,49 @@ function Smith({
   useEffect(() => {
     load();
   }, [load]);
+
+  // monete per punto di AFF/SP riparato (Gestione -> Oggetti)
+  const [repairCost, setRepairCost] = useState(5);
+  useEffect(() => {
+    supabase
+      .from("item_settings")
+      .select("repair_cost")
+      .maybeSingle()
+      .then(({ data }) =>
+        setRepairCost((data?.repair_cost as number | undefined) ?? 5),
+      );
+  }, [supabase]);
+
+  async function repair(m: Mine, missing: number) {
+    if (
+      !window.confirm(
+        `Riparare ${m.item.name}? Costo: ${missing * repairCost} monete.`,
+      )
+    )
+      return;
+    setBusy(m.id);
+    setMsg(null);
+    const { data, error } = await supabase.rpc("smith_repair", {
+      p_character_item: m.id,
+    });
+    setBusy(null);
+    if (error)
+      return setMsg({
+        ok: false,
+        text: error.message.includes("monete")
+          ? "Sul conto non ci sono abbastanza monete."
+          : error.message.length < 120
+            ? error.message
+            : "Il fabbro non può riparare questo oggetto.",
+      });
+    const r = ((data as { restored: number; paid: number }[] | null) ?? [])[0];
+    setMsg({
+      ok: true,
+      text: `${m.item.name} è come nuovo. Hai pagato ${r?.paid ?? 0} monete.`,
+    });
+    load();
+    onPaid();
+  }
 
   const levelOf = (m: Mine) => m.quality?.level ?? qualities[0]?.level ?? 1;
   const nextOf = (m: Mine) => qualities.find((q) => q.level > levelOf(m));
@@ -355,7 +401,9 @@ function Smith({
         {qualities.length > 0 &&
           ` (${qualities.map((q) => q.name).join(" → ")})`}
         . Il lavoro è subito pronto, ma può non riuscire: in quel caso perdi
-        metà del costo e l&apos;oggetto resta com&apos;era.
+        metà del costo e l&apos;oggetto resta com&apos;era. Ripara anche armi,
+        scudi e armature consumati in battaglia (AFF e SP), a {repairCost}{" "}
+        monete per punto.
       </p>
       {msg && (
         <p
@@ -374,6 +422,7 @@ function Smith({
         <ul className="space-y-1.5">
           {mine.map((m) => {
             const next = nextOf(m);
+            const wear = durability(m.item, m.quality, m);
             return (
               <li
                 key={m.id}
@@ -392,8 +441,32 @@ function Smith({
                     </span>{" "}
                     · {slotName(m.item)}
                     {m.equipped && " · indossato"}
+                    {wear && (
+                      <span
+                        className={
+                          wear.current < wear.max ? " text-red-300" : ""
+                        }
+                      >
+                        {" "}
+                        · {wear.label} {wear.current}/{wear.max}
+                      </span>
+                    )}
                   </span>
                 </span>
+                {wear && wear.current < wear.max && (
+                  <button
+                    type="button"
+                    disabled={
+                      busy === m.id ||
+                      (coins ?? 0) < (wear.max - wear.current) * repairCost
+                    }
+                    onClick={() => repair(m, wear.max - wear.current)}
+                    className="btn-ghost px-2.5 py-1 text-xs"
+                    title={`${(wear.max - wear.current) * repairCost} monete`}
+                  >
+                    Ripara ({(wear.max - wear.current) * repairCost})
+                  </button>
+                )}
                 {next ? (
                   <>
                     <span className="text-right text-xs leading-tight text-muted">

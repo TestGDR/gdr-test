@@ -42,6 +42,13 @@ export default function RulesManage({
     resources: String(character.resources ?? 0),
     honor: String(character.honor ?? RULES.honor.start),
   });
+  const [hp, setHp] = useState({
+    value:
+      character.hp_current === null || character.hp_current === undefined
+        ? ""
+        : String(character.hp_current),
+    dead: !!character.dead_at,
+  });
   const [addTrait, setAddTrait] = useState("");
   const [addChoice, setAddChoice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -101,6 +108,19 @@ export default function RulesManage({
       ),
     });
     done(error, "PX, Risorse e Onore salvati.");
+  }
+
+  // PF attuali: vuoto = pieni; il recupero giornaliero riparte da adesso
+  async function saveHp() {
+    setBusy(true);
+    setMsg(null);
+    const v = hp.value.trim();
+    const { error } = await supabase.rpc("admin_set_hp", {
+      p_character: character.id,
+      p_hp: v === "" ? null : Math.trunc(Number(v)) || 0,
+      p_dead: hp.dead,
+    });
+    done(error, "Punti ferita salvati.");
   }
 
   async function saveLevels() {
@@ -172,7 +192,9 @@ export default function RulesManage({
       }
     >
       {section === "progress" && (
-        <h4 className="font-serif text-lg text-accent">PX, Risorse e Onore</h4>
+        <h4 className="font-serif text-lg text-accent">
+          PX, Risorse, Onore e Punti ferita
+        </h4>
       )}
       {msg && (
         <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>
@@ -210,6 +232,41 @@ export default function RulesManage({
           >
             Salva
           </button>
+        </div>
+      )}
+
+      {section === "progress" && (
+        <div className="flex flex-wrap items-end gap-3 border-t border-border/50 pt-3">
+          <label className="block">
+            <span className={label}>PF attuali (vuoto = pieni)</span>
+            <input
+              type="number"
+              value={hp.value}
+              onChange={(e) => setHp((h) => ({ ...h, value: e.target.value }))}
+              className="input w-28! py-1.5"
+            />
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={hp.dead}
+              onChange={(e) => setHp((h) => ({ ...h, dead: e.target.checked }))}
+            />
+            Morto
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={saveHp}
+            className="btn px-4 py-1.5 text-sm"
+          >
+            Salva PF
+          </button>
+          <p className="w-full text-xs text-muted">
+            I PF scendono da soli negli attacchi in chat e risalgono ogni giorno
+            del valore di Recupero. Togliendo &quot;Morto&quot; il personaggio
+            torna in vita con i PF scritti qui.
+          </p>
         </div>
       )}
 

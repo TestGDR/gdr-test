@@ -17,6 +17,7 @@ import ModalButton from "@/components/ui/ModalButton";
 import {
   SEXES,
   TEXT_MAX,
+  APPEARANCE_MAX,
   labelOf,
   type CreationData,
 } from "@/lib/character-creation";
@@ -65,7 +66,11 @@ export default function SheetButton({
     >
       {() =>
         openCount > 0 ? (
-          <SheetContent key={openCount} characterId={characterId} onName={setName} />
+          <SheetContent
+            key={openCount}
+            characterId={characterId}
+            onName={setName}
+          />
         ) : null
       }
     </ModalButton>
@@ -89,7 +94,11 @@ export function SheetModal({
       size="pg"
     >
       {characterId && (
-        <SheetContent key={characterId} characterId={characterId} onName={setName} />
+        <SheetContent
+          key={characterId}
+          characterId={characterId}
+          onName={setName}
+        />
       )}
     </Modal>
   );
@@ -97,7 +106,8 @@ export function SheetModal({
 
 // Titolo della finestra: "Scheda" e nome e cognome del PG
 const sheetTitle = (name: string) => (name ? `Scheda · ${name}` : "Scheda");
-const fullNameOf = (c: Character) => (c.house ? `${c.name} ${c.house.name}` : c.name);
+const fullNameOf = (c: Character) =>
+  c.house ? `${c.name} ${c.house.name}` : c.name;
 
 export function SheetContent({
   characterId,
@@ -238,9 +248,14 @@ function CharacterSheet({
   const [canRules, setCanRules] = useState(false);
   useEffect(() => {
     if (!active) return;
-    supabase.rpc("can_manage_rules").then(({ data }) => setCanRules(data === true));
+    supabase
+      .rpc("can_manage_rules")
+      .then(({ data }) => setCanRules(data === true));
   }, [supabase, active]);
-  const canManage = active && (!!info?.is_admin || (isOwn && !!character.sheet_unlocks?.includes("scheda")));
+  const canManage =
+    active &&
+    (!!info?.is_admin ||
+      (isOwn && !!character.sheet_unlocks?.includes("scheda")));
   // l'admin modifica le sezioni degli altri come se la scheda fosse sua
   const canEdit = isOwn || (active && !!info?.is_admin);
 
@@ -292,7 +307,11 @@ function CharacterSheet({
         {(canManage || (active && isOwn)) && (
           <div className="ml-auto flex shrink-0 items-center gap-1 px-2 lg:mt-auto lg:ml-0 lg:justify-center lg:border-t lg:border-border lg:py-3">
             {active && isOwn && (
-              <BottomIcon label="Opzioni" active={tab === "opzioni"} onClick={() => setTab("opzioni")}>
+              <BottomIcon
+                label="Opzioni"
+                active={tab === "opzioni"}
+                onClick={() => setTab("opzioni")}
+              >
                 <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
                 <circle cx="16" cy="6" r="2" />
                 <circle cx="10" cy="12" r="2" />
@@ -300,7 +319,11 @@ function CharacterSheet({
               </BottomIcon>
             )}
             {canManage && (
-              <BottomIcon label={info?.is_admin ? "Gestisci" : "Modifica scheda"} active={tab === "gestisci"} onClick={() => setTab("gestisci")}>
+              <BottomIcon
+                label={info?.is_admin ? "Gestisci" : "Modifica scheda"}
+                active={tab === "gestisci"}
+                onClick={() => setTab("gestisci")}
+              >
                 <path d="M14.5 5.5a4 4 0 0 0 5 5L12 18a2.1 2.1 0 0 1-3-3l7.5-7.5" />
                 <path d="M4 20l3-3" />
               </BottomIcon>
@@ -362,9 +385,28 @@ function CharacterSheet({
           <StoryPage character={character} info={info} isOwn={isOwn} />
         )}
         {active && isOwn && tab === "opzioni" && <SheetOptions />}
-        {canManage && tab === "gestisci" && <SheetManage character={character} isAdmin={!!info?.is_admin} onSaved={onSaved} />}
-        {active && tab === "abilita" && <SkillsPage character={character} isOwn={isOwn} canEdit={canRules} onSaved={onSaved} />}
-        {active && tab === "tratti" && <TraitsPage character={character} canEdit={canRules} onSaved={onSaved} />}
+        {canManage && tab === "gestisci" && (
+          <SheetManage
+            character={character}
+            isAdmin={!!info?.is_admin}
+            onSaved={onSaved}
+          />
+        )}
+        {active && tab === "abilita" && (
+          <SkillsPage
+            character={character}
+            isOwn={isOwn}
+            canEdit={canRules}
+            onSaved={onSaved}
+          />
+        )}
+        {active && tab === "tratti" && (
+          <TraitsPage
+            character={character}
+            canEdit={canRules}
+            onSaved={onSaved}
+          />
+        )}
         {active && tab === "equipaggiamento" && (
           <Equipment characterId={character.id} isOwn={canEdit} />
         )}
@@ -498,7 +540,9 @@ function CoverPage({
   const [canApprove, setCanApprove] = useState(false);
   useEffect(() => {
     if (character.status !== "revisione") return;
-    supabaseCover.rpc("can_approve_story").then(({ data }) => setCanApprove(data === true));
+    supabaseCover
+      .rpc("can_approve_story")
+      .then(({ data }) => setCanApprove(data === true));
   }, [supabaseCover, character.status]);
   // computer: quella orizzontale; cellulare (sotto i 1024px): quella verticale.
   // Se ne manca una si usa l'altra
@@ -762,9 +806,15 @@ function DataPage({
         ribbon={
           character.house?.sigil_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={character.house.sigil_url} alt="" className="h-7 w-7 object-contain drop-shadow" />
+            <img
+              src={character.house.sigil_url}
+              alt=""
+              className="h-7 w-7 object-contain drop-shadow"
+            />
           ) : (
-            <span className="font-serif text-lg text-[#f0dcb4]">{character.name[0]}</span>
+            <span className="font-serif text-lg text-[#f0dcb4]">
+              {character.name[0]}
+            </span>
           )
         }
         titleAction={
@@ -776,7 +826,16 @@ function DataPage({
               aria-label="Modifica i dati"
               className="shrink-0 p-1 text-[#7a1d16]/70 transition hover:text-[#7a1d16]"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden
+              >
                 <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
               </svg>
             </button>
@@ -794,15 +853,33 @@ function DataPage({
             }
           />
           <PaperRow label="Casata" value={character.house?.name ?? "—"} />
-          <PaperRow label="Ruolo in casata" value={character.house_role?.name ?? "—"} />
-          <PaperRow label="Stato civile" value={<MaritalValue character={character} />} />
+          <PaperRow
+            label="Ruolo in casata"
+            value={character.house_role?.name ?? "—"}
+          />
+          <PaperRow
+            label="Stato civile"
+            value={<MaritalValue character={character} />}
+          />
           <PaperRow label="Altezza" value={character.height || "—"} />
           <PaperRow label="Colore occhi" value={character.eye_color || "—"} />
-          <PaperRow label="Colore capelli" value={character.hair_color || "—"} />
+          <PaperRow
+            label="Colore capelli"
+            value={character.hair_color || "—"}
+          />
           <DragonField character={character} isOwn={isOwn} />
-          {character.sex === "donna" && <PregnancyRow character={character} isOwn={isOwn} />}
+          {character.sex === "donna" && (
+            <PregnancyRow character={character} isOwn={isOwn} />
+          )}
         </div>
-        <PaperRow label="Segni visibili" value={<span className="whitespace-normal">{character.visible_marks || "—"}</span>} />
+        <PaperRow
+          label="Segni visibili"
+          value={
+            <span className="whitespace-normal">
+              {character.visible_marks || "—"}
+            </span>
+          }
+        />
         <CustomFieldRows character={character} />
       </PaperSheet>
       {actions && !isOwn && (
@@ -823,7 +900,11 @@ function DataPage({
           </button>
         </div>
       )}
-      <FateNotes character={character} canWrite={!!info?.can_write_fate} onSaved={onSaved} />
+      <FateNotes
+        character={character}
+        canWrite={!!info?.can_write_fate}
+        onSaved={onSaved}
+      />
     </div>
   );
 }
@@ -842,8 +923,12 @@ function DataEditor({
   const supabase = useMemo(() => createClient(), []);
   // il prestavolto si sceglie una volta sola: poi lo cambia solo l'admin da Gestisci
   const locked = !!character.face_claim && !isAdmin;
-  const [faceClaim, setFaceClaim] = useState(isAdmin ? (character.face_claim ?? "") : "");
-  const [taken, setTaken] = useState<{ claim: string; by: boolean } | null>(null);
+  const [faceClaim, setFaceClaim] = useState(
+    isAdmin ? (character.face_claim ?? "") : "",
+  );
+  const [taken, setTaken] = useState<{ claim: string; by: boolean } | null>(
+    null,
+  );
   const [avatar, setAvatar] = useState(character.avatar_url ?? "");
   const [looks, setLooks] = useState({
     height: character.height ?? "",
@@ -879,11 +964,23 @@ function DataEditor({
     if (!locked && claim && checked?.by) return;
     setBirthError(null);
     if (needsBirth && (birth.day || birth.month)) {
-      if (!validBirth(birth.day, birth.month)) return setBirthError("Scegli un giorno e una luna validi.");
-      const { error: e } = await supabase.rpc("set_birthday", { p_character: character.id, p_day: birth.day, p_month: birth.month });
-      if (e) return setBirthError(e.message.length < 140 ? e.message : "Data di nascita non salvata.");
+      if (!validBirth(birth.day, birth.month))
+        return setBirthError("Scegli un giorno e una luna validi.");
+      const { error: e } = await supabase.rpc("set_birthday", {
+        p_character: character.id,
+        p_day: birth.day,
+        p_month: birth.month,
+      });
+      if (e)
+        return setBirthError(
+          e.message.length < 140 ? e.message : "Data di nascita non salvata.",
+        );
     }
-    save(locked || !claim ? { avatarUrl: avatar, ...looks } : { faceClaim: claim, avatarUrl: avatar, ...looks });
+    save(
+      locked || !claim
+        ? { avatarUrl: avatar, ...looks }
+        : { faceClaim: claim, avatarUrl: avatar, ...looks },
+    );
   }
 
   return (
@@ -891,13 +988,20 @@ function DataEditor({
       <PageTitle title="Dati" />
       {locked ? (
         <div>
-          <p className="mb-1 text-xs tracking-wider text-muted uppercase">Prestavolto</p>
+          <p className="mb-1 text-xs tracking-wider text-muted uppercase">
+            Prestavolto
+          </p>
           <p className="font-serif text-lg">{character.face_claim}</p>
-          <p className="text-xs text-muted">Il prestavolto non si cambia più: può modificarlo solo l&apos;admin da Gestisci.</p>
+          <p className="text-xs text-muted">
+            Il prestavolto non si cambia più: può modificarlo solo l&apos;admin
+            da Gestisci.
+          </p>
         </div>
       ) : (
         <label className="block">
-          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Prestavolto (nome e cognome)</span>
+          <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+            Prestavolto (nome e cognome)
+          </span>
           <input
             value={faceClaim}
             onChange={(e) => setFaceClaim(e.target.value)}
@@ -906,13 +1010,20 @@ function DataEditor({
             className="input py-1.5"
           />
           {claim.length >= 3 && (
-            <span className={`mt-1 block text-xs ${!checked ? "text-muted" : checked.by ? "text-red-400" : "text-green-400"}`}>
-              {!checked ? "Controllo..." : checked.by ? "Questo prestavolto è già usato da un altro personaggio." : "Prestavolto libero."}
+            <span
+              className={`mt-1 block text-xs ${!checked ? "text-muted" : checked.by ? "text-red-400" : "text-green-400"}`}
+            >
+              {!checked
+                ? "Controllo..."
+                : checked.by
+                  ? "Questo prestavolto è già usato da un altro personaggio."
+                  : "Prestavolto libero."}
             </span>
           )}
           {!isAdmin && (
             <span className="mt-1 block text-xs text-[#f0c75e]">
-              Attenzione: una volta salvato il prestavolto non si può più cambiare.
+              Attenzione: una volta salvato il prestavolto non si può più
+              cambiare.
             </span>
           )}
         </label>
@@ -926,10 +1037,14 @@ function DataEditor({
           ] as const
         ).map(([key, label, max, placeholder]) => (
           <label key={key} className="block">
-            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">{label}</span>
+            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+              {label}
+            </span>
             <input
               value={looks[key]}
-              onChange={(e) => setLooks((x) => ({ ...x, [key]: e.target.value }))}
+              onChange={(e) =>
+                setLooks((x) => ({ ...x, [key]: e.target.value }))
+              }
               maxLength={max}
               placeholder={placeholder}
               className="input py-1.5"
@@ -938,26 +1053,34 @@ function DataEditor({
         ))}
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Segni visibili</span>
+        <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
+          Segni visibili
+        </span>
         <textarea
           value={looks.visibleMarks}
-          onChange={(e) => setLooks((x) => ({ ...x, visibleMarks: e.target.value }))}
+          onChange={(e) =>
+            setLooks((x) => ({ ...x, visibleMarks: e.target.value }))
+          }
           maxLength={VISIBLE_MARKS_MAX}
           rows={3}
           placeholder="Cicatrici, tatuaggi, voglie... ciò che chiunque può notare."
           className="input resize-y text-sm"
         />
-        <span className={`text-xs ${looks.visibleMarks.length >= VISIBLE_MARKS_MAX ? "text-red-400" : "text-muted"}`}>
+        <span
+          className={`text-xs ${looks.visibleMarks.length >= VISIBLE_MARKS_MAX ? "text-red-400" : "text-muted"}`}
+        >
           {looks.visibleMarks.length} / {VISIBLE_MARKS_MAX} caratteri
         </span>
       </label>
       {needsBirth && (
         <div>
-          <p className="mb-1 text-xs tracking-wider text-muted uppercase">Data di nascita</p>
+          <p className="mb-1 text-xs tracking-wider text-muted uppercase">
+            Data di nascita
+          </p>
           <BirthPicker value={birth} onChange={setBirth} />
           <p className="mt-1 text-xs text-[#f0c75e]">
-            Giorno e luna di nascita: al compleanno l&apos;età cresce di un anno. Si indica una volta sola (poi la cambia
-            solo l&apos;admin).
+            Giorno e luna di nascita: al compleanno l&apos;età cresce di un
+            anno. Si indica una volta sola (poi la cambia solo l&apos;admin).
           </p>
         </div>
       )}
@@ -969,7 +1092,12 @@ function DataEditor({
         onChange={setAvatar}
         frame="aspect-square w-[100px]"
       />
-      <EditButtons busy={busy} error={birthError ?? error} onSave={saveAll} onCancel={onDone} />
+      <EditButtons
+        busy={busy}
+        error={birthError ?? error}
+        onSave={saveAll}
+        onCancel={onDone}
+      />
     </div>
   );
 }
@@ -977,7 +1105,9 @@ function DataEditor({
 // Stato civile, con il PG o il PNG per sposati e fidanzati ufficialmente
 function MaritalValue({ character }: { character: Character }) {
   const supabase = useMemo(() => createClient(), []);
-  const [partner, setPartner] = useState<{ id: string; name: string } | null>(null);
+  const [partner, setPartner] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const partnerId = character.partner_character_id;
 
   useEffect(() => {
@@ -988,13 +1118,24 @@ function MaritalValue({ character }: { character: Character }) {
       .eq("id", partnerId)
       .maybeSingle<{ name: string; house: { name: string } | null }>()
       .then(({ data }) =>
-        setPartner(data ? { id: partnerId, name: data.house ? `${data.name} ${data.house.name}` : data.name } : null),
+        setPartner(
+          data
+            ? {
+                id: partnerId,
+                name: data.house
+                  ? `${data.name} ${data.house.name}`
+                  : data.name,
+              }
+            : null,
+        ),
       );
   }, [supabase, partnerId]);
 
   const [open, setOpen] = useState<string | null>(null);
   const label = maritalLabel(character.marital_status, character.sex, true);
-  const withName = character.marital_status === "sposato" || character.marital_status === "fidanzato";
+  const withName =
+    character.marital_status === "sposato" ||
+    character.marital_status === "fidanzato";
   if (!withName) return <>{label}</>;
   return (
     <span className="whitespace-normal">
@@ -1054,14 +1195,26 @@ function FateNotes({
   return (
     <section className="iron-panel relative p-4">
       {canWrite && !editing && (
-        <Pen onClick={() => setEditing(true)} label="Modifica le Note del Fato" className="absolute top-3 right-3" />
+        <Pen
+          onClick={() => setEditing(true)}
+          label="Modifica le Note del Fato"
+          className="absolute top-3 right-3"
+        />
       )}
       <div className="min-w-0">
-        <h4 className="px-10 text-center font-serif text-2xl leading-tight text-[#efe6d6]">Note del Fato</h4>
+        <h4 className="px-10 text-center font-serif text-2xl leading-tight text-[#efe6d6]">
+          Note del Fato
+        </h4>
         <div className="my-3 h-px bg-gradient-to-r from-transparent via-[#6b625a] to-transparent" />
         {editing ? (
           <div className="space-y-2">
-            <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} rows={5} className="input resize-y text-sm" />
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={4000}
+              rows={5}
+              className="input resize-y text-sm"
+            />
             <EditButtons
               busy={busy}
               error={error}
@@ -1074,7 +1227,9 @@ function FateNotes({
           </div>
         ) : (
           <p className="text-sm leading-relaxed whitespace-pre-line text-[#e4dccf]">
-            {character.fate_notes || <span className="text-[#8d847a] italic">Nessuna nota.</span>}
+            {character.fate_notes || (
+              <span className="text-[#8d847a] italic">Nessuna nota.</span>
+            )}
           </p>
         )}
       </div>
@@ -1152,8 +1307,29 @@ function RichSection({
 }
 
 // ---------------------------------------------------------------------
-// Aspetto: il giocatore lo aggiorna (cicatrici, capelli tagliati...)
+// Aspetto: il giocatore lo aggiorna (cicatrici, capelli tagliati...).
+// Si puo' scrivere in HTML (senza <style>: gli stili vanno nei tag) per
+// impaginarlo; il testo semplice di prima si vede come sempre
 // ---------------------------------------------------------------------
+const looksHtml = (s: string) => /<[a-z][^>]*>/i.test(s);
+
+function AppearanceView({ text }: { text: string }) {
+  const clean = useMemo(
+    () => (looksHtml(text) ? cleanPlayerHtml(text) : null),
+    [text],
+  );
+  if (!text.trim()) return <p className="text-muted">—</p>;
+  if (clean === null)
+    return <p className="leading-relaxed whitespace-pre-line">{text}</p>;
+  // contain: paint tiene dentro la pagina anche gli stili scritti dal giocatore
+  return (
+    <div
+      className="guide-content overflow-hidden [contain:paint]"
+      dangerouslySetInnerHTML={{ __html: clean }}
+    />
+  );
+}
+
 function AppearancePage({
   character,
   isOwn,
@@ -1177,13 +1353,31 @@ function AppearancePage({
       />
       {editing ? (
         <div className="space-y-3">
+          <p className="text-xs text-muted">
+            Puoi scrivere testo semplice oppure HTML per impaginare questa
+            pagina: colori, caratteri, riquadri e immagini (solo indirizzi
+            https). Gli stili vanno dentro i tag, per esempio{" "}
+            <code>{'<p style="color:#c9a45c">'}</code>; niente{" "}
+            <code>{"<style>"}</code>, script o moduli: vengono tolti.
+          </p>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            maxLength={TEXT_MAX}
-            rows={10}
-            className="input resize-y"
+            maxLength={APPEARANCE_MAX}
+            rows={12}
+            spellCheck={false}
+            className="input resize-y font-mono text-xs"
           />
+          <p className="text-xs text-muted">
+            {text.length.toLocaleString("it-IT")} /{" "}
+            {APPEARANCE_MAX.toLocaleString("it-IT")} caratteri
+          </p>
+          <p className="text-[0.7rem] tracking-wider text-muted uppercase">
+            Anteprima
+          </p>
+          <div className="border border-border p-3">
+            <AppearanceView text={text} />
+          </div>
           <EditButtons
             busy={busy}
             error={error}
@@ -1195,9 +1389,7 @@ function AppearancePage({
           />
         </div>
       ) : (
-        <p className="leading-relaxed whitespace-pre-line">
-          {character.appearance || "—"}
-        </p>
+        <AppearanceView text={character.appearance ?? ""} />
       )}
     </div>
   );
@@ -1208,9 +1400,21 @@ function AppearancePage({
 // "schede.storia" (admin, moderatori, master); gli altri leggono che non hanno
 // i permessi. Si modifica solo da Gestisci
 // ---------------------------------------------------------------------
-function StoryPage({ character, info, isOwn }: { character: Character; info: SheetInfo | null; isOwn: boolean }) {
+function StoryPage({
+  character,
+  info,
+  isOwn,
+}: {
+  character: Character;
+  info: SheetInfo | null;
+  isOwn: boolean;
+}) {
   const supabase = useMemo(() => createClient(), []);
-  const [story, setStory] = useState<{ body: string; submitted_at: string | null; approved_at: string | null } | null>(null);
+  const [story, setStory] = useState<{
+    body: string;
+    submitted_at: string | null;
+    approved_at: string | null;
+  } | null>(null);
   const [canApprove, setCanApprove] = useState(false);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
@@ -1238,7 +1442,9 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
   useEffect(() => {
     if (!canRead) return;
     load();
-    supabase.rpc("can_approve_story").then(({ data }) => setCanApprove(data === true));
+    supabase
+      .rpc("can_approve_story")
+      .then(({ data }) => setCanApprove(data === true));
   }, [supabase, canRead, load]);
 
   const approved = !!story?.approved_at;
@@ -1246,12 +1452,24 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
   const canEdit = isOwn && !submitted;
 
   async function submit() {
-    if (!window.confirm("Mandare la storia in approvazione? Dopo non potrai più modificarla, a meno che lo staff non la sblocchi.")) return;
+    if (
+      !window.confirm(
+        "Mandare la storia in approvazione? Dopo non potrai più modificarla, a meno che lo staff non la sblocchi.",
+      )
+    )
+      return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.rpc("submit_my_story", { p_character: character.id });
+    const { error } = await supabase.rpc("submit_my_story", {
+      p_character: character.id,
+    });
     setBusy(false);
-    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Invio non riuscito." });
+    if (error)
+      return setMsg({
+        ok: false,
+        text:
+          error.message.length < 140 ? error.message : "Invio non riuscito.",
+      });
     setMsg({ ok: true, text: "Storia inviata in approvazione." });
     load();
   }
@@ -1259,21 +1477,46 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
   async function save() {
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.rpc("save_my_story", { p_character: character.id, p_body: text });
+    const { error } = await supabase.rpc("save_my_story", {
+      p_character: character.id,
+      p_body: text,
+    });
     setBusy(false);
-    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Storia non salvata." });
+    if (error)
+      return setMsg({
+        ok: false,
+        text:
+          error.message.length < 140 ? error.message : "Storia non salvata.",
+      });
     setEditing(false);
     setMsg({ ok: true, text: "Storia salvata." });
     load();
   }
 
   async function approve(on: boolean) {
-    if (!window.confirm(on ? "Approvare la storia?" : "Sbloccare la storia? Torna in bozza e il giocatore può correggerla.")) return;
+    if (
+      !window.confirm(
+        on
+          ? "Approvare la storia?"
+          : "Sbloccare la storia? Torna in bozza e il giocatore può correggerla.",
+      )
+    )
+      return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.rpc("approve_story", { p_character: character.id, p_on: on });
+    const { error } = await supabase.rpc("approve_story", {
+      p_character: character.id,
+      p_on: on,
+    });
     setBusy(false);
-    if (error) return setMsg({ ok: false, text: error.message.length < 140 ? error.message : "Operazione non riuscita." });
+    if (error)
+      return setMsg({
+        ok: false,
+        text:
+          error.message.length < 140
+            ? error.message
+            : "Operazione non riuscita.",
+      });
     setMsg({ ok: true, text: on ? "Storia approvata." : "Storia sbloccata." });
     load();
   }
@@ -1282,7 +1525,11 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
     <div className="p-6">
       <PageTitle
         title="Storia"
-        onEdit={canEdit && !editing ? () => (setText(story?.body ?? ""), setEditing(true)) : undefined}
+        onEdit={
+          canEdit && !editing
+            ? () => (setText(story?.body ?? ""), setEditing(true))
+            : undefined
+        }
       />
       {info === null && !isOwn ? (
         <p className="text-muted">Caricamento...</p>
@@ -1315,25 +1562,53 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
           </p>
           {editing ? (
             <div className="space-y-2">
-              <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} rows={14} className="input resize-y text-sm" />
-              <p className="text-xs text-muted">{text.length} / 4.000 caratteri</p>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={4000}
+                rows={14}
+                className="input resize-y text-sm"
+              />
+              <p className="text-xs text-muted">
+                {text.length} / 4.000 caratteri
+              </p>
               <div className="flex gap-2">
-                <button type="button" disabled={busy} onClick={save} className="btn px-4 py-1.5 text-sm">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={save}
+                  className="btn px-4 py-1.5 text-sm"
+                >
                   {busy ? "Salvataggio..." : "Salva"}
                 </button>
-                <button type="button" onClick={() => setEditing(false)} className="btn-ghost px-4 py-1.5 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="btn-ghost px-4 py-1.5 text-sm"
+                >
                   Annulla
                 </button>
               </div>
             </div>
           ) : (
             <p className="leading-relaxed whitespace-pre-line">
-              {story.body || <span className="text-muted italic">{isOwn ? "Non hai ancora scritto la storia: usa la pennina." : "Storia non ancora scritta."}</span>}
+              {story.body || (
+                <span className="text-muted italic">
+                  {isOwn
+                    ? "Non hai ancora scritto la storia: usa la pennina."
+                    : "Storia non ancora scritta."}
+                </span>
+              )}
             </p>
           )}
           {canEdit && !editing && story.body.trim() && (
             <div className="mt-5 border-t border-border pt-3">
-              <button type="button" disabled={busy} onClick={submit} className="btn px-4 py-1.5 text-sm">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={submit}
+                className="btn px-4 py-1.5 text-sm"
+              >
                 Manda in approvazione
               </button>
             </div>
@@ -1341,17 +1616,35 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
           {canApprove && !editing && submitted && (
             <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-3">
               {!approved && (
-                <button type="button" disabled={busy} onClick={() => approve(true)} className="btn px-4 py-1.5 text-sm">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => approve(true)}
+                  className="btn px-4 py-1.5 text-sm"
+                >
                   Approva la storia
                 </button>
               )}
-              <button type="button" disabled={busy} onClick={() => approve(false)} className="btn-ghost px-4 py-1.5 text-sm">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => approve(false)}
+                className="btn-ghost px-4 py-1.5 text-sm"
+              >
                 Sblocca la storia
               </button>
             </div>
           )}
-          {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
-          <p className="mt-4 text-xs text-muted">La storia la leggono solo il proprietario e lo staff.</p>
+          {msg && (
+            <p
+              className={`mt-3 text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}
+            >
+              {msg.text}
+            </p>
+          )}
+          <p className="mt-4 text-xs text-muted">
+            La storia la leggono solo il proprietario e lo staff.
+          </p>
         </>
       )}
     </div>
@@ -1359,7 +1652,17 @@ function StoryPage({ character, info, isOwn }: { character: Character; info: She
 }
 
 // Icona in fondo alle linguette (Opzioni, Gestisci)
-function BottomIcon({ label, active, onClick, children }: { label: string; active: boolean; onClick: () => void; children: ReactNode }) {
+function BottomIcon({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -1368,10 +1671,21 @@ function BottomIcon({ label, active, onClick, children }: { label: string; activ
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={`flex h-10 w-10 items-center justify-center border transition ${
-        active ? "border-accent bg-blood/20 text-accent" : "border-border text-muted hover:border-accent/60 hover:text-accent"
+        active
+          ? "border-accent bg-blood/20 text-accent"
+          : "border-border text-muted hover:border-accent/60 hover:text-accent"
       }`}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        aria-hidden
+      >
         {children}
       </svg>
     </button>
@@ -1409,7 +1723,11 @@ function DragonField({
       <PaperRow
         label="Drago"
         value={
-          <button type="button" onClick={() => setOpen(true)} className="font-semibold text-[#7a1d16] underline-offset-2 hover:underline">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="font-semibold text-[#7a1d16] underline-offset-2 hover:underline"
+          >
             {dragon ? dragonName(dragon) : "Nessuno · uova della casata"}
           </button>
         }
@@ -1440,16 +1758,17 @@ function AttributesPage({ character }: { character: Character }) {
   const max = Math.max(RULES.statMax, ...values);
   return (
     <div className="flex flex-col items-center gap-6 p-6">
-      <h3 className="w-full border-b border-border pb-2 font-serif text-2xl text-accent">Caratteristiche</h3>
-      <Radar
-        labels={stats.map((a) => a.code)}
-        values={values}
-        max={max}
-      />
+      <h3 className="w-full border-b border-border pb-2 font-serif text-2xl text-accent">
+        Caratteristiche
+      </h3>
+      <Radar labels={stats.map((a) => a.code)} values={values} max={max} />
       <ul className="w-full min-w-0 flex-1 space-y-3">
         {stats.map((a, i) => (
           <li key={a.id}>
-            <p className="flex justify-between text-xs font-semibold tracking-[0.14em] text-muted uppercase" title={a.description}>
+            <p
+              className="flex justify-between text-xs font-semibold tracking-[0.14em] text-muted uppercase"
+              title={a.description}
+            >
               {a.code} · {a.label}
               <span className="text-base text-accent">{values[i] || "—"}</span>
             </p>

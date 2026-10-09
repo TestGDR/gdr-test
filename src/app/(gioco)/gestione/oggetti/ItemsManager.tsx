@@ -11,6 +11,8 @@ import {
   type Slot,
 } from "@/components/scheda/Equipment";
 import { createClient } from "@/lib/supabase/client";
+import { importCombatCatalog } from "./actions";
+import CombatFields from "./CombatFields";
 
 const TABS = [
   { id: "oggetti", label: "Oggetti" },
@@ -94,6 +96,9 @@ const EMPTY: Omit<Item, "id"> = {
   at_signup: false,
   quality_id: null,
   damage: null,
+  kind: "altro",
+  weapon_skill_id: null,
+  effects: [],
 };
 
 function ItemsTab({
@@ -121,6 +126,7 @@ function ItemsTab({
     <div className="grid gap-5 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
       <div className="space-y-2">
         <SignupMax />
+        <ImportCatalog />
         <button
           type="button"
           onClick={() => setSelected("nuovo")}
@@ -197,6 +203,18 @@ function ItemForm({
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const set = (p: Partial<Omit<Item, "id">>) => setV((x) => ({ ...x, ...p }));
+  // abilita' per attaccare con l'arma (combattimento in chat)
+  const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    supabase
+      .from("skills")
+      .select("id, name")
+      .eq("active", true)
+      .order("name")
+      .then(({ data }) =>
+        setSkills((data ?? []) as { id: string; name: string }[]),
+      );
+  }, [supabase]);
 
   async function save() {
     if (!v.name.trim()) return setMsg({ ok: false, text: "Scrivi il nome." });
@@ -213,11 +231,14 @@ function ItemForm({
       description: v.description.trim(),
       image_url: image,
       in_shop: v.in_shop && v.price !== null,
-      damage: v.damage?.trim().toLowerCase().replace(/s+/g, "") || null,
+      damage: v.damage?.trim().toLowerCase().replace(/\s+/g, "") || null,
     };
-    if (row.damage && !/^(d*dd+([+-]d+)*|d+)$/.test(row.damage)) {
+    if (row.damage && !/^(\d*d\d+([+-]\d+)*|\d+)$/.test(row.damage)) {
       setBusy(false);
-      return setMsg({ ok: false, text: "Danno non valido: scrivilo come 2d5, 1d10+2 o un numero." });
+      return setMsg({
+        ok: false,
+        text: "Danno non valido: scrivilo come 2d5, 1d10+2 o un numero.",
+      });
     }
     const res = item
       ? await supabase
@@ -406,6 +427,7 @@ function ItemForm({
           </select>
         </label>
       </div>
+      <CombatFields v={v} set={set} skills={skills} />
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2">
           <input
@@ -1002,7 +1024,24 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
 function QualitiesTab({ qualities }: { qualities: Quality[] }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  type Row = Pick<Quality, "name" | "upgrade_cost" | "success_pct">;
+  type Row = Pick<
+    Quality,
+    | "name"
+    | "upgrade_cost"
+    | "success_pct"
+    | "hit_bonus"
+    | "damage_bonus"
+    | "pierce_bonus"
+    | "aff_bonus"
+    | "sp_bonus"
+  >;
+  const BONUS = [
+    ["hit_bonus", "colpire"],
+    ["damage_bonus", "danno"],
+    ["pierce_bonus", "perf."],
+    ["aff_bonus", "AFF"],
+    ["sp_bonus", "SP"],
+  ] as const;
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [added, setAdded] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
@@ -1011,6 +1050,11 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
       name: q.name,
       upgrade_cost: q.upgrade_cost,
       success_pct: q.success_pct,
+      hit_bonus: q.hit_bonus ?? 0,
+      damage_bonus: q.damage_bonus ?? 0,
+      pierce_bonus: q.pierce_bonus ?? 0,
+      aff_bonus: q.aff_bonus ?? 0,
+      sp_bonus: q.sp_bonus ?? 0,
     };
   const set = (q: Quality, p: Partial<Row>) =>
     setRows((r) => ({ ...r, [q.id]: { ...row(q), ...p } }));
@@ -1019,7 +1063,8 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
     return (
       r.name.trim() !== q.name ||
       r.upgrade_cost !== q.upgrade_cost ||
-      r.success_pct !== q.success_pct
+      r.success_pct !== q.success_pct ||
+      BONUS.some(([k]) => r[k] !== (q[k] ?? 0))
     );
   };
 
@@ -1061,7 +1106,10 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
         oggetti nuovi partono dal primo. Per ogni livello: quanto costa al
         fabbro arrivarci dal livello prima e la probabilità che il lavoro
         riesca. Se fallisce, il PG perde metà del costo e l&apos;oggetto resta
-        com&apos;era. Il fabbro migliora solo gli oggetti che si indossano.
+        com&apos;era. Il fabbro migliora gli oggetti che si indossano o si
+        impugnano. I bonus valgono in combattimento: al colpire, al danno, al
+        Perforante, all&apos;AFF massima di armi e scudi e all&apos;SP massimo
+        delle armature.
       </p>
       <ul className="space-y-1.5">
         {qualities.map((q, i) => (
@@ -1117,6 +1165,29 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
                 </label>
               </>
             )}
+            <span className="flex w-full flex-wrap items-center gap-2 pl-8 text-xs text-muted">
+              bonus:
+              {BONUS.map(([k, l]) => (
+                <label key={k} className="flex items-center gap-1">
+                  {l}
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={row(q)[k] ?? 0}
+                    onChange={(e) =>
+                      set(q, {
+                        [k]: Math.min(
+                          10,
+                          Math.max(0, Math.trunc(Number(e.target.value)) || 0),
+                        ),
+                      })
+                    }
+                    className="input w-14! py-0.5 text-xs"
+                  />
+                </label>
+              ))}
+            </span>
             <button
               type="button"
               disabled={i === 0}
@@ -1209,16 +1280,24 @@ function SignupMax() {
   const [max, setMax] = useState<number | null>(null);
   const [saved, setSaved] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
+  const [extra, setExtra] = useState({ rate: 100, repair: 5 });
+  const [extraSaved, setExtraSaved] = useState(extra);
 
   useEffect(() => {
     supabase
       .from("item_settings")
-      .select("signup_max")
+      .select("signup_max, coins_per_r, repair_cost")
       .maybeSingle()
       .then(({ data }) => {
         const n = (data?.signup_max as number | undefined) ?? 3;
         setMax(n);
         setSaved(n);
+        const x = {
+          rate: (data?.coins_per_r as number | undefined) ?? 100,
+          repair: (data?.repair_cost as number | undefined) ?? 5,
+        };
+        setExtra(x);
+        setExtraSaved(x);
       });
   }, [supabase]);
 
@@ -1226,14 +1305,21 @@ function SignupMax() {
     if (max === null) return;
     const { error } = await supabase
       .from("item_settings")
-      .update({ signup_max: max })
+      .update({
+        signup_max: max,
+        coins_per_r: extra.rate,
+        repair_cost: extra.repair,
+      })
       .eq("id", true);
     setMsg(
       error
         ? { ok: false, text: "Non salvato." }
         : { ok: true, text: "Salvato." },
     );
-    if (!error) setSaved(max);
+    if (!error) {
+      setSaved(max);
+      setExtraSaved(extra);
+    }
   }
 
   return (
@@ -1256,10 +1342,45 @@ function SignupMax() {
           className="input w-16! py-1 text-sm"
         />
       </label>
+      <label className="flex items-center justify-between gap-2 text-muted">
+        1 Risorsa (R) del regolamento = monete
+        <input
+          type="number"
+          min={1}
+          value={extra.rate}
+          onChange={(e) =>
+            setExtra((x) => ({
+              ...x,
+              rate: Math.max(1, Math.trunc(Number(e.target.value)) || 1),
+            }))
+          }
+          className="input w-20! py-1 text-sm"
+        />
+      </label>
+      <label className="flex items-center justify-between gap-2 text-muted">
+        Fabbro: monete per punto riparato
+        <input
+          type="number"
+          min={0}
+          value={extra.repair}
+          onChange={(e) =>
+            setExtra((x) => ({
+              ...x,
+              repair: Math.max(0, Math.trunc(Number(e.target.value)) || 0),
+            }))
+          }
+          className="input w-20! py-1 text-sm"
+        />
+      </label>
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={max === null || max === saved}
+          disabled={
+            max === null ||
+            (max === saved &&
+              extra.rate === extraSaved.rate &&
+              extra.repair === extraSaved.repair)
+          }
           onClick={save}
           className="btn px-2 py-1 text-xs"
         >
@@ -1267,6 +1388,48 @@ function SignupMax() {
         </button>
         <Note msg={msg} />
       </div>
+    </div>
+  );
+}
+
+// Importa il catalogo del regolamento (armi, scudi, armature, munizioni)
+function ImportCatalog() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  async function run() {
+    if (
+      !window.confirm(
+        "Importare armi, scudi, armature e munizioni del regolamento? Si aggiungono solo quelli che mancano (stesso nome).",
+      )
+    )
+      return;
+    setBusy(true);
+    const res = await importCombatCatalog();
+    setBusy(false);
+    setMsg(
+      res.added !== undefined
+        ? {
+            ok: !res.error,
+            text:
+              `Aggiunti ${res.added} oggetti (${res.skipped} c'erano già).` +
+              (res.error ? " " + res.error : ""),
+          }
+        : { ok: false, text: res.error ?? "Importazione non riuscita." },
+    );
+    router.refresh();
+  }
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={run}
+        className="btn-ghost w-full py-1.5 text-xs"
+      >
+        {busy ? "Importazione..." : "Importa il catalogo del regolamento"}
+      </button>
+      <Note msg={msg} />
     </div>
   );
 }

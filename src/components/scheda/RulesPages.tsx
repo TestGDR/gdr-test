@@ -10,6 +10,13 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import {
+  HP_STATE_LABEL,
+  currentHp,
+  currentStamina,
+  hpState,
+} from "@/lib/rules/hp";
+import CombatSummary from "./CombatSummary";
 import { useStats } from "@/lib/rules/useStats";
 import {
   skillLevelCap,
@@ -135,9 +142,16 @@ export function DerivedPanel({ character }: { character: Character }) {
     statsOf(character),
     data ? traitHpBonus(data.owned, data.traits) : 0,
   );
+  // PF attuali con il recupero dei giorni passati (calcolato al momento)
+  const [now] = useState(() => Date.now());
+  const hpNow = currentHp(character, d.hp, d.rec, now);
+  const state = hpState(character, hpNow, d.hp);
   const rows: [string, string][] = [
-    ["Punti Ferita", `${character.hp_current ?? d.hp} / ${d.hp}`],
-    ["Stamina", `${character.stamina_current ?? d.stamina} / ${d.stamina}`],
+    [
+      "Punti Ferita",
+      `${hpNow} / ${d.hp}${state === "illeso" ? "" : ` — ${HP_STATE_LABEL[state]}`}`,
+    ],
+    ["Stamina", `${currentStamina(character, d.stamina, now)} / ${d.stamina}`],
     ["Recupero", String(d.rec)],
     ["Corsa", `${d.run} m a round`],
     ["Salto", `${d.jump} m (da fermo ${d.jumpStanding} m)`],
@@ -178,6 +192,10 @@ export function DerivedPanel({ character }: { character: Character }) {
           </div>
         ))}
       </dl>
+      <CombatSummary
+        characterId={character.id}
+        refStat={statsOf(character).ref}
+      />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { isFresh } from "@/lib/chat-ttl";
 import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
-import ChatCommands from "./ChatCommands";
+import { combatAlerts } from "../combat-actions";
+import ChatCommands, { type CommandTab } from "./ChatCommands";
 import { ChatNotepad, ChatSave, type RoomInfo } from "./ChatTools";
 
 type Props = {
@@ -47,6 +48,10 @@ export default function ChatRoom({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool | null>(null);
+  const [cmdTab, setCmdTab] = useState<CommandTab>("abilita");
+  const [alerts, setAlerts] = useState<{ attackers: string[]; dying: boolean }>(
+    { attackers: [], dying: false },
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function addMessage(msg: Message) {
@@ -100,6 +105,17 @@ export default function ChatRoom({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Avvisi di combattimento (attacchi da cui difendersi, tiro salvezza):
+  // si ricontrollano a ogni nuovo tiro in chat
+  const diceKey = messages
+    .filter((m) => m.kind === "dado")
+    .map((m) => m.id)
+    .slice(-1)[0];
+  useEffect(() => {
+    if (!characterId) return;
+    combatAlerts(roomId, characterId).then(setAlerts);
+  }, [roomId, characterId, diceKey]);
 
   // PG che hanno giocato in questa chat (per destinatario e Raggira)
   const others = useMemo(() => {
@@ -185,6 +201,22 @@ export default function ChatRoom({
         <div ref={bottomRef} />
       </div>
 
+      {(alerts.attackers.length > 0 || alerts.dying) && (
+        <button
+          type="button"
+          onClick={() => {
+            setCmdTab("combattimento");
+            setTool("comandi");
+          }}
+          className="flex w-full items-center justify-center gap-2 border border-red-800/70 bg-red-950/40 px-3 py-1.5 text-sm text-red-200 hover:bg-red-950/60"
+        >
+          ⚔{" "}
+          {alerts.dying
+            ? "Sei morente: fai il tiro salvezza prima della tua azione"
+            : `Sei attaccato da ${alerts.attackers.join(", ")}: scrivi la tua azione e difenditi`}
+        </button>
+      )}
+
       {/* Barra dei comandi: ognuno apre una finestra */}
       <nav
         aria-label="Strumenti della chat"
@@ -194,7 +226,10 @@ export default function ChatRoom({
           <button
             key={t.id}
             type="button"
-            onClick={() => setTool(t.id)}
+            onClick={() => {
+              setCmdTab("abilita");
+              setTool(t.id);
+            }}
             className="flex items-center gap-1.5 text-[0.7rem] font-semibold tracking-[0.18em] text-[#c97a7a] uppercase transition hover:text-[#f0a0a0]"
           >
             <svg
@@ -320,7 +355,11 @@ export default function ChatRoom({
               characterId={characterId}
               canNarrate={canNarrate}
               others={others}
-              onDone={() => setTool(null)}
+              initialTab={cmdTab}
+              onDone={() => {
+                setTool(null);
+                combatAlerts(roomId, characterId).then(setAlerts);
+              }}
             />
           ) : (
             <p className="text-muted">Serve un personaggio attivo.</p>
@@ -353,7 +392,10 @@ function MessageRow({ message }: { message: Message }) {
             {message.character_name}
           </strong>{" "}
           {/* i tiri vecchi non avevano il verbo nel testo */}
-          {/^(tira|effettua) /.test(message.content) ? "" : "tira "}
+          {(message.roll_data as { verb?: boolean } | null)?.verb ||
+          /^(tira|effettua|attacca) /.test(message.content)
+            ? ""
+            : "tira "}
           {message.content}
         </p>
       </div>

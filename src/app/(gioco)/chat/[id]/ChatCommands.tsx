@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import CombatPanel from "./CombatPanel";
 import { rollFreeDice, rollRaggira } from "../dice-actions";
 import DicePanel, { type DiceCategory } from "./DicePanel";
 
-type Tab = DiceCategory | "raggira";
+export type CommandTab = DiceCategory | "raggira" | "combattimento";
+type Tab = CommandTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: "abilita", label: "Tiri sulle abilità" },
   { id: "statistiche", label: "Tiri sulle statistiche" },
   { id: "liberi", label: "Dadi liberi" },
   { id: "raggira", label: "Raggira" },
+  { id: "combattimento", label: "Combattimento" },
   { id: "oggetti", label: "Lancia oggetti" },
 ];
 
@@ -20,14 +23,16 @@ export default function ChatCommands({
   canNarrate,
   others,
   onDone,
+  initialTab = "abilita",
 }: {
   roomId: string;
   characterId: string;
   canNarrate: boolean;
-  others: { id: string; name: string }[]; // PG presenti in chat (per Raggira)
+  others: { id: string; name: string }[]; // PG presenti in chat (per Raggira e combattimento)
   onDone: () => void;
+  initialTab?: Tab;
 }) {
-  const [tab, setTab] = useState<Tab>("abilita");
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <div className="space-y-4">
@@ -52,7 +57,14 @@ export default function ChatCommands({
         ))}
       </nav>
 
-      {tab === "raggira" ? (
+      {tab === "combattimento" ? (
+        <CombatPanel
+          roomId={roomId}
+          characterId={characterId}
+          others={others}
+          onDone={onDone}
+        />
+      ) : tab === "raggira" ? (
         <Raggira
           roomId={roomId}
           characterId={characterId}

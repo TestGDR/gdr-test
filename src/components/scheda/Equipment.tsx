@@ -25,6 +25,29 @@ export type Item = {
   at_signup?: boolean; // disponibile all'iscrizione
   quality_id?: string | null; // livello (qualita') con cui nasce
   damage?: string | null; // danno (es. "2d5+1"), per i tiri con ARMA
+  // Combattimento (documento "Combattimento, armi e danni")
+  kind?: "altro" | "arma" | "scudo" | "armatura" | "munizione";
+  weapon_category?: "mischia" | "distanza" | null;
+  weapon_skill_id?: string | null; // abilita' per attaccare
+  damage_type?: string | null;
+  hands?: string | null;
+  body_min?: number;
+  reach_m?: number | null;
+  range_m?: number | null;
+  reload_actions?: number;
+  pierce?: number; // effetto perforante
+  effects?: string[];
+  ammo_type?: string | null;
+  aff_max?: number | null; // armi e scudi
+  parry_bonus?: number; // scudi
+  bash_dice?: string | null;
+  attack_penalty?: number;
+  armor_part?: string | null; // armature
+  material?: string | null;
+  sp_max?: number | null;
+  encumbrance?: number;
+  weight_kg?: number | null;
+  ammo_capacity?: number | null; // munizioni
 };
 export type Quality = {
   id: string;
@@ -32,6 +55,12 @@ export type Quality = {
   level: number;
   upgrade_cost: number;
   success_pct: number;
+  // bonus di combattimento del livello
+  hit_bonus?: number;
+  damage_bonus?: number;
+  pierce_bonus?: number;
+  aff_bonus?: number;
+  sp_bonus?: number;
 };
 // Si indossa: in una nicchia precisa o in una del suo gruppo
 export const isWearable = (i: Pick<Item, "slot_id" | "slot_group">) =>
