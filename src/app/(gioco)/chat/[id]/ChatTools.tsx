@@ -13,8 +13,19 @@ export type RoomInfo = {
   location_name: string;
 };
 
-// Notepad: appunti personali (restano su questo dispositivo)
-export function ChatNotepad({ characterId }: { characterId: string }) {
+// Notepad: appunti personali (restano su questo dispositivo); "Invia in chat"
+// copia il testo nella barra di scrittura e lo manda in chat
+export function ChatNotepad({
+  characterId,
+  sendAs,
+  maxLen,
+  onSend,
+}: {
+  characterId: string;
+  sendAs: string; // es. "A: tutti · Parlato / Azione"
+  maxLen: number;
+  onSend: (text: string) => Promise<boolean>;
+}) {
   const key = `notepad:${characterId}`;
   const [text, setText] = useState(() => {
     try {
@@ -26,6 +37,13 @@ export function ChatNotepad({ characterId }: { characterId: string }) {
     }
   });
   const [saved, setSaved] = useState(false);
+  const [sending, setSending] = useState(false);
+  const length = text.trim().length;
+  async function send() {
+    setSending(true);
+    await onSend(text.trim());
+    setSending(false);
+  }
   function save(v: string) {
     setText(v);
     setSaved(false);
@@ -49,7 +67,28 @@ export function ChatNotepad({ characterId }: { characterId: string }) {
         maxLength={10000}
         className="input resize-y text-sm"
       />
-      <p className="text-xs text-muted">{saved ? "Salvato." : " "}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={sending || length === 0 || length > maxLen}
+          onClick={send}
+          className="btn px-4 py-1.5 text-sm"
+        >
+          {sending ? "..." : "Invia in chat"}
+        </button>
+        <span className="text-xs text-muted">
+          {sendAs} ·{" "}
+          <span className={length > maxLen ? "text-red-400" : ""}>
+            {length}/{maxLen}
+          </span>
+          {saved && " · Salvato."}
+        </span>
+      </div>
+      {length > maxLen && (
+        <p className="text-xs text-red-400">
+          Per inviarlo in chat il testo deve stare in {maxLen} caratteri.
+        </p>
+      )}
     </div>
   );
 }

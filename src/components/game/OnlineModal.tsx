@@ -29,6 +29,8 @@ type Props = {
   onSavePhrase: (phrase: string) => Promise<void>;
   onMessageOff: (to: Contact) => void;
   onChangeAvailability: (value: Availability) => void;
+  invisible: boolean | null; // null = senza il permesso dell'invisibilita'
+  onToggleInvisible: (on: boolean) => void;
 };
 
 // Elenco esteso di tutti i presenti, raggruppati per posto
@@ -82,6 +84,23 @@ export default function OnlineModal(props: Props) {
             ))}
           </div>
         </div>
+
+        {/* Staff con il permesso: invisibile ai giocatori */}
+        {props.invisible !== null && props.invisible !== undefined && (
+          <label className="flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2 text-sm sm:px-4">
+            <input
+              type="checkbox"
+              checked={!!props.invisible}
+              onChange={(e) => props.onToggleInvisible(e.target.checked)}
+            />
+            <span className={props.invisible ? "text-accent" : "text-foreground"}>Invisibile</span>
+            <span className="text-xs text-muted">
+              {props.invisible
+                ? "i giocatori non ti vedono tra i presenti; nelle chat leggi e scrivi senza entrare in giocata"
+                : "ti vedono tutti"}
+            </span>
+          </label>
+        )}
 
         <PhraseEditor phrase={props.phrase} onSave={props.onSavePhrase} />
 
@@ -154,6 +173,11 @@ function PlayerRow({
       title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
     >
       <AvailabilityDot value={player.availability} onChange={isMe ? onChangeAvailability : undefined} />
+      {player.invisible && (
+        <span title="Invisibile ai giocatori" className="shrink-0 rounded border border-accent/50 px-1 text-[0.625rem] tracking-wider text-accent uppercase">
+          invisibile
+        </span>
+      )}
       <Avatar name={player.name} url={player.avatar} size="h-8 w-8 sm:h-11 sm:w-11" />
       {/* Stemma della casata: alto quanto nome e frase insieme */}
       {player.sigil ? (

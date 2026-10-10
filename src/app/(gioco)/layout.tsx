@@ -31,6 +31,10 @@ export default async function GameLayout({ children }: { children: React.ReactNo
     ? !!(await supabase.from("dragons").select("id").eq("rider_id", character.id).limit(1).maybeSingle()).data
     : false;
 
+  // Invisibilita' dello staff (colonna aggiunta dalla migrazione 0112)
+  const { data: inv } = await supabase.from("profiles").select("invisible").eq("id", user.id).maybeSingle();
+  const invisible = !!(inv as { invisible?: boolean } | null)?.invisible;
+
   // L'admin e' staff anche senza un ruolo assegnato
   const staffRole =
     profile?.staff_role ?? (profile?.role === "admin" ? { name: "Admin", color: "#c9a45c" } : null);
@@ -58,6 +62,8 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canManageForum={permissions.has("forum.sezioni")}
       canReviewGossip={permissions.has("pettegolezzi.gestire")}
       hasDragon={hasDragon}
+      canInvisible={permissions.has("staff.invisibile")}
+      initialInvisible={invisible}
     >
       {children}
     </GameShell>

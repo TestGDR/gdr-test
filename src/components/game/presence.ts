@@ -27,6 +27,7 @@ export type OnlinePlayer = {
   placeKey: string; // "mappa" oppure "chat:<id lista>": chi ha la stessa chiave e' nello stesso posto
   placeLabel: string; // nome del posto (mappa, luogo o lista)
   live: boolean; // sempre true: si e' presenti fino a un'ora dall'ultima azione
+  invisible?: boolean; // staff invisibile: lo vede solo chi ha lo stesso permesso
 };
 
 export type PresencePayload = Omit<OnlinePlayer, "live">;
@@ -36,10 +37,16 @@ const POLL_MS = 20_000; // ogni quanto si rilegge chi ha dato segnale di recente
 const RETRY_MS = 4_000; // dopo quanto si ricrea il collegamento in tempo reale caduto
 
 // Dati arrivati da altri browser: completati con valori neutri se mancano
-function normalize(userId: string, p: Partial<OnlinePlayer>, live: boolean): OnlinePlayer {
+function normalize(
+  userId: string,
+  p: Partial<OnlinePlayer>,
+  live: boolean,
+): OnlinePlayer {
   return {
     userId,
-    availability: isAvailability(p.availability) ? p.availability : "disponibile",
+    availability: isAvailability(p.availability)
+      ? p.availability
+      : "disponibile",
     characterId: p.characterId ?? null,
     name: p.name ?? "?",
     avatar: p.avatar ?? null,
@@ -52,6 +59,7 @@ function normalize(userId: string, p: Partial<OnlinePlayer>, live: boolean): Onl
     place: p.place ?? "mappa",
     placeKey: p.placeKey ?? "mappa",
     placeLabel: p.placeLabel ?? "",
+    invisible: !!p.invisible,
     live,
   };
 }
@@ -60,19 +68,25 @@ function normalize(userId: string, p: Partial<OnlinePlayer>, live: boolean): Onl
 //        + chi ha fatto un'azione nel sito nell'ultima ora (cambiare pagina, aggiornare,
 //          scrivere in chat, missive e OFF): una scheda in secondo piano o un telefono in
 //          standby non fanno sparire nessuno. Si sparisce subito solo con Esci.
-export function usePresence(me: PresencePayload) {
+// invisible: non ci si annuncia in tempo reale (il canale e' di tutti); resta il
+// segnale nel database, che il database mostra solo a chi puo' vederlo
+export function usePresence(me: PresencePayload, invisible = false) {
   const supabase = useMemo(() => createClient(), []);
   const [live, setLive] = useState<OnlinePlayer[]>([]);
   const [recent, setRecent] = useState<OnlinePlayer[]>([]);
-  const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  const [channel, setChannel] = useState<ReturnType<
+    typeof supabase.channel
+  > | null>(null);
   // Cambia per ricreare da zero il collegamento in tempo reale quando cade
   const [attempt, setAttempt] = useState(0);
   // Ultimi dati da annunciare: servono anche dopo una riconnessione
   const payload = JSON.stringify(me);
   const latest = useRef(payload);
+  const hidden = useRef(invisible);
   useEffect(() => {
     latest.current = payload;
-  }, [payload]);
+    hidden.current = invisible;
+  }, [payload, invisible]);
 
   // Chi ha dato segnale negli ultimi 5 minuti (ora decisa dal database)
   const refreshRecent = useCallback(
@@ -80,7 +94,11 @@ export function usePresence(me: PresencePayload) {
       supabase.rpc("recent_online").then(({ data }) => {
         if (!data) return;
         // il database restituisce chi ha fatto un'azione nell'ultima ora: tutti presenti
-        setRecent((data as { user_id: string; info: Partial<OnlinePlayer> }[]).map((r) => normalize(r.user_id, r.info, true)));
+        setRecent(
+          (data as { user_id: string; info: Partial<OnlinePlayer> }[]).map(
+            (r) => normalize(r.user_id, r.info, true),
+          ),
+        );
       }),
     [supabase],
   );
@@ -89,17 +107,27 @@ export function usePresence(me: PresencePayload) {
   useEffect(() => {
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    const ch = supabase.channel("online", { config: { presence: { key: me.userId } } });
+    const ch = supabase.channel("online", {
+      config: { presence: { key: me.userId } },
+    });
     ch.on("presence", { event: "sync" }, () => {
       // Una voce per utente (con piu' schede vale l'ultima); l'id dalla chiave della presenza
       const state = ch.presenceState<Partial<OnlinePlayer>>();
-      setLive(Object.entries(state).map(([key, entries]) => normalize(key, entries[entries.length - 1], true)));
+      setLive(
+        Object.entries(state).map(([key, entries]) =>
+          normalize(key, entries[entries.length - 1], true),
+        ),
+      );
       // Qualcuno e' entrato o uscito: rileggo presto anche i segnali (chi ha chiuso il
       // sito ha appena spento il suo), cosi' l'uscita si vede subito
       setTimeout(refreshRecent, 1500);
     }).subscribe((status) => {
       if (disposed) return;
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
         // Collegamento caduto e non ripreso: lo ricreo da zero tra poco
         setChannel(null);
         clearTimeout(retry);
@@ -109,7 +137,7 @@ export function usePresence(me: PresencePayload) {
       if (status !== "SUBSCRIBED") return;
       setChannel(ch);
       // Dopo una caduta Supabase si ricollega da solo ma NON ripete l'annuncio: lo rifacciamo
-      ch.track(JSON.parse(latest.current));
+      if (!hidden.current) ch.track(JSON.parse(latest.current));
     });
 
     return () => {
@@ -122,7 +150,11 @@ export function usePresence(me: PresencePayload) {
 
   // --- Segnale nel database ----------------------------------------------
   useEffect(() => {
-    const beat = (action = false) => supabase.rpc("touch_online", { p_info: JSON.parse(latest.current), p_action: action });
+    const beat = (action = false) =>
+      supabase.rpc("touch_online", {
+        p_info: JSON.parse(latest.current),
+        p_action: action,
+      });
     const loadRecent = refreshRecent;
 
     beat(true).then(loadRecent); // aprire o aggiornare la pagina e' un'azione
@@ -133,10 +165,12 @@ export function usePresence(me: PresencePayload) {
     const onBack = () => {
       if (document.visibilityState !== "visible") return;
       beat().then(loadRecent);
-      const ch = supabase.getChannels().find((c) => c.topic === "realtime:online");
+      const ch = supabase
+        .getChannels()
+        .find((c) => c.topic === "realtime:online");
       // Collegamento in tempo reale non attivo (es. dopo ore in secondo piano): lo ricreo
       if (!ch || ch.state !== "joined") setAttempt((a) => a + 1);
-      else ch.track(JSON.parse(latest.current));
+      else if (!hidden.current) ch.track(JSON.parse(latest.current));
     };
 
     document.addEventListener("visibilitychange", onBack);
@@ -152,14 +186,20 @@ export function usePresence(me: PresencePayload) {
   // Ogni volta che cambio posto, frase, disponibilita'... aggiorno subito cio' che vedono
   // gli altri. Cambiare pagina o frase e' un'azione: tiene presenti per un'altra ora.
   useEffect(() => {
-    channel?.track(JSON.parse(payload));
-  }, [channel, payload]);
+    if (invisible) channel?.untrack();
+    else channel?.track(JSON.parse(payload));
+  }, [channel, payload, invisible]);
   useEffect(() => {
-    supabase.rpc("touch_online", { p_info: JSON.parse(payload), p_action: true });
+    supabase.rpc("touch_online", {
+      p_info: JSON.parse(payload),
+      p_action: true,
+    });
   }, [supabase, payload]);
 
   return useMemo(() => {
     const liveIds = new Set(live.map((p) => p.userId));
-    return [...live, ...recent.filter((p) => !liveIds.has(p.userId))].sort(byAvailabilityThenName);
+    return [...live, ...recent.filter((p) => !liveIds.has(p.userId))].sort(
+      byAvailabilityThenName,
+    );
   }, [live, recent]);
 }

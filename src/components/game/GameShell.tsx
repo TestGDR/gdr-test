@@ -70,6 +70,7 @@ import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
 import { usePresence, type OnlinePlayer } from "./presence";
+import { setInvisible } from "@/app/(gioco)/chat/presence-actions";
 import SalaryCollector from "./SalaryCollector";
 import WeatherView from "./WeatherView";
 import DragonPanel from "@/components/draghi/DragonPanel";
@@ -114,6 +115,8 @@ type Props = {
   canManageForum: boolean; // categorie e sezioni del forum
   canReviewGossip: boolean; // approva i pettegolezzi
   hasDragon: boolean; // cavalca un drago: vede "Il mio drago"
+  canInvisible: boolean; // ha il permesso dell'invisibilita'
+  initialInvisible: boolean; // e' invisibile adesso
   children: ReactNode;
 };
 
@@ -153,10 +156,13 @@ export default function GameShell({
   canManageForum,
   canReviewGossip,
   hasDragon,
+  canInvisible,
+  initialInvisible,
   children,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname();
+  const inChat = pathname.startsWith("/chat/"); // cellulare: la chat occupa tutto lo schermo
   const [area, setArea] = useState<Area>({ title: "Westeros" });
   const [leftOpen, setLeftOpen] = useState(true); // desktop
   const [rightOpen, setRightOpen] = useState(true); // desktop
@@ -170,6 +176,14 @@ export default function GameShell({
   const [phrase, setPhrase] = useState(statusText);
   const [availability, setAvailability] = useState(initialAvailability);
   const [onlineOpen, setOnlineOpen] = useState(false);
+  const router = useRouter();
+  const [invisible, setInvisibleState] = useState(!!(canInvisible && initialInvisible));
+  async function toggleInvisible(on: boolean) {
+    const res = await setInvisible(on);
+    if (res.error) return;
+    setInvisibleState(on);
+    router.refresh(); // la chat aperta si ricarica con le nuove regole
+  }
   const [dragonOpen, setDragonOpen] = useState(0); // 0 = chiuso; a ogni apertura cambia e ricarica i dati
   const [sheetId, setSheetId] = useState<string | null>(null); // scheda aperta dalla lista dei presenti
   const [messages, setMessages] = useState<{
@@ -392,7 +406,7 @@ export default function GameShell({
           <EdgeToggle side="left" open={leftOpen} onClick={() => setLeftOpen((v) => !v)} />
 
           {/* Centro: mappa, luoghi e chat */}
-          <main className="min-w-0 flex-1 overflow-y-auto p-3 pb-20 lg:p-5 lg:pb-5">{children}</main>
+          <main className={`min-w-0 flex-1 overflow-y-auto lg:p-5 lg:pb-5 ${inChat ? "flex flex-col p-0" : "p-3 pb-20"}`}>{children}</main>
 
           <EdgeToggle side="right" open={rightOpen} onClick={() => setRightOpen((v) => !v)} />
 
@@ -400,9 +414,9 @@ export default function GameShell({
           <nav
             aria-label="Menu di gioco"
             inert={!rightOpen}
-            className={`fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 ${
+            className={`${inChat ? "max-lg:hidden " : ""}fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 ${
               rightOpen
-                ? "lg:w-36 lg:overflow-visible lg:border-border lg:opacity-100"
+                ? "lg:w-40 lg:overflow-visible lg:border-border lg:opacity-100"
                 : "lg:w-0 lg:overflow-hidden lg:border-transparent lg:opacity-0"
             }`}
           >
@@ -517,6 +531,8 @@ export default function GameShell({
         )}
       </Modal>
       <OnlineModal
+        invisible={canInvisible ? invisible : null}
+        onToggleInvisible={toggleInvisible}
         open={onlineOpen}
         onClose={() => setOnlineOpen(false)}
         online={online}
@@ -791,7 +807,23 @@ function CharacterPicture({
 
 // Cellulare: icone del pannello a scomparsa
 const drawerBtn =
-  "group relative flex h-12 w-full items-center justify-center text-muted transition hover:text-accent";
+  "group relative flex h-14 w-full flex-col items-center justify-center gap-1.5 text-muted transition hover:text-accent";
+// nome piccolo sotto le icone del menu del cellulare
+function Caption({ children }: { children: ReactNode }) {
+  return <span className="block text-center text-[0.625rem] leading-tight tracking-wide text-muted group-hover:text-accent">{children}</span>;
+}
+// nomi corti dei pannelli, sotto le icone
+const PANEL_SHORT: Record<Panel, string> = {
+  "notizie-on": "Notizie ON",
+  "notizie-off": "Notizie OFF",
+  ricerca: "Ricerca",
+  assenze: "Assenze",
+  viaggio: "Viaggio",
+  feudi: "Feudi",
+  mercato: "Mercato",
+  forum: "Forum",
+  voci: "Voci",
+};
 
 function MobileTools({
   canManage,
@@ -815,40 +847,39 @@ function MobileTools({
     {/* come la barra del computer: titolo, poi le icone per categoria, centrate */}
     <p className="text-center font-serif text-sm tracking-[0.25em] text-accent uppercase">Menu</p>
     <RailRule />
-    <div className="flex flex-wrap justify-center gap-3 [&>*]:w-14">
-      <ManageButton canManage={canManage} className={`${drawerBtn} ${goldGear}`} />
+    <div className="grid grid-cols-4 gap-x-1 gap-y-2">
+      <ManageButton canManage={canManage} className={`${drawerBtn} ${goldGear}`} caption="Gestione" />
       <UtilityButton
         className={drawerBtn}
         trigger={
           <>
             <ToolsIcon />
-            <span className="sr-only">Utility giocatore</span>
+            <Caption>Utility</Caption>
           </>
         }
       />
-      <TicketButton className={drawerBtn} />
+      <TicketButton className={drawerBtn} caption="Ticket" />
       <button type="button" onClick={onOpenOnline} className={drawerBtn} aria-label={`${onlineCount} presenti online: apri l'elenco`}>
         <UsersIcon />
-        <span className="absolute -top-2 -right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">
+        <Caption>Presenti</Caption>
+        <span className="absolute -top-1 right-1 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">
           {onlineCount}
         </span>
       </button>
     </div>
-      {/* stesse categorie della barra di destra del computer */}
-      {panelGroups(inHouse).map((group, i) => (
-        <div key={i} className="flex flex-wrap justify-center gap-3 [&>*]:w-14">
-          {group.map((p) => (
-            <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} />
-          ))}
-        </div>
+    <RailRule />
+    {/* stessi pannelli della barra di destra del computer, quattro per riga */}
+    <div className="grid grid-cols-4 gap-x-1 gap-y-3">
+      {panelGroups(inHouse).flat().map((p) => (
+        <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} caption={PANEL_SHORT[p.id]} />
       ))}
       {onOpenDragon && (
-        <div className="flex justify-center [&>*]:w-14">
-          <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
-            <DragonIcon />
-          </button>
-        </div>
+        <button type="button" onClick={onOpenDragon} className={drawerBtn} aria-label="Il mio drago">
+          <DragonIcon />
+          <Caption>Drago</Caption>
+        </button>
       )}
+    </div>
     </div>
   );
 }
@@ -1119,12 +1150,13 @@ function TopTip({ children }: { children: ReactNode }) {
 }
 
 // Ticket: apre la finestra dei ticket; lampeggia finche' ci sono risposte (o, per lo staff, richieste) da leggere
-function TicketButton({ className, tip }: { className: string; tip?: boolean }) {
+function TicketButton({ className, tip, caption }: { className: string; tip?: boolean; caption?: string }) {
   const { count, open } = useContext(TicketContext);
   const label = count > 0 ? `Ticket: ${count} da leggere` : "Ticket";
   return (
     <button type="button" onClick={open} className={`${className} ${count > 0 ? "blink-call" : ""}`} aria-label={label}>
       <TicketIcon />
+      {caption && <Caption>{caption}</Caption>}
       {count > 0 && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">{count}</span>
       )}
@@ -1169,7 +1201,11 @@ function useTicketUnread(userId: string) {
 // Colonna destra: icone di navigazione
 // ---------------------------------------------------------------------
 const railBtn =
-  "group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent";
+  "group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent lg:h-auto lg:min-h-12 lg:w-full lg:flex-col lg:justify-start lg:gap-1 lg:py-1.5";
+// nome sotto l'icona, solo nella barra del computer
+function RailCaption({ children }: { children: ReactNode }) {
+  return <span className="hidden lg:contents"><Caption>{children}</Caption></span>;
+}
 
 function Tip({ children }: { children: ReactNode }) {
   // Etichetta al passaggio del mouse (solo desktop)
@@ -1216,12 +1252,13 @@ function RailRule({ className = "" }: { className?: string }) {
 
 // Gestione: per moderatori e admin porta ai pannelli; agli altri dice che
 // non hanno i permessi
-function ManageButton({ canManage, className, tip = false }: { canManage: boolean; className: string; tip?: boolean }) {
+function ManageButton({ canManage, className, tip = false, caption }: { canManage: boolean; className: string; tip?: boolean; caption?: string }) {
   const [denied, setDenied] = useState(false);
   if (canManage)
     return (
       <Link href="/gestione" className={className} aria-label="Gestione">
         <GearIcon />
+        {caption && <Caption>{caption}</Caption>}
         {tip && <Tip>Gestione</Tip>}
       </Link>
     );
@@ -1229,6 +1266,7 @@ function ManageButton({ canManage, className, tip = false }: { canManage: boolea
     <>
       <button type="button" onClick={() => setDenied(true)} className={className} aria-label="Gestione">
         <GearIcon />
+        {caption && <Caption>{caption}</Caption>}
         {tip && <Tip>Gestione</Tip>}
       </button>
       <Modal open={denied} onClose={() => setDenied(false)} title="Gestione" size="md">
@@ -1255,6 +1293,7 @@ function PanelButton({
   onOpen,
   className,
   tip,
+  caption,
 }: {
   panel: Panel;
   icon: ReactNode;
@@ -1262,6 +1301,7 @@ function PanelButton({
   onOpen: (p: Panel) => void;
   className: string;
   tip?: boolean;
+  caption?: string; // nome sotto l'icona (menu del cellulare)
 }) {
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
   const unseen = useContext(NewsUnseenContext);
@@ -1280,6 +1320,7 @@ function PanelButton({
       aria-label={panelLabel(panel, newRequests, newNews)}
     >
       {icon}
+      {caption && <Caption>{caption}</Caption>}
       {calling && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
           {newRequests}
@@ -1324,7 +1365,7 @@ function RightRail({
 
   return (
     <>
-      <div className="contents lg:grid lg:grid-cols-3 lg:justify-items-center lg:gap-2 lg:px-2">
+      <div className="contents lg:grid lg:w-40 lg:grid-cols-3 lg:items-start lg:justify-items-center lg:gap-x-1 lg:gap-y-2 lg:px-2">
         {/* titolo della barra (solo computer) */}
         <p className="col-span-full mb-1 w-full text-center font-serif text-sm tracking-[0.25em] text-accent uppercase max-lg:hidden">Menu</p>
         <RailRule className="max-lg:hidden" />
@@ -1339,14 +1380,16 @@ function RightRail({
           aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
         >
           <RefreshIcon />
+          <RailCaption>Aggiorna</RailCaption>
           <Tip>{pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}</Tip>
         </button>
         <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />
+          <RailCaption>Mappa</RailCaption>
           <Tip>Mappa</Tip>
         </Link>
         {/* Gestione: chi non e' moderatore o admin legge che non ha i permessi */}
-        <ManageButton canManage={canManage} className={`${railBtn} ${goldGear} max-lg:hidden`} tip />
+        <ManageButton canManage={canManage} className={`${railBtn} ${goldGear} max-lg:hidden`} tip caption="Gestione" />
         {/* Pannelli divisi per categoria (su cellulare stanno nel menu dell'hamburger) */}
         {panelGroups(inHouse).map((group, i) => (
           <Fragment key={i}>
@@ -1360,6 +1403,7 @@ function RightRail({
                 onOpen={onOpenPanel}
                 className={`${railBtn} max-lg:hidden`}
                 tip
+                caption={PANEL_SHORT[p.id]}
               />
             ))}
           </Fragment>
@@ -1370,14 +1414,16 @@ function RightRail({
             <div aria-hidden className="col-span-full h-2 max-lg:hidden" />
             <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
               <DragonIcon />
+              <RailCaption>Drago</RailCaption>
               <Tip>Il mio drago</Tip>
             </button>
           </>
         )}
       </div>
-      <form action={logout} className="lg:mt-auto">
+      <form action={logout} className="lg:mt-auto lg:w-14">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">
           <PowerIcon />
+          <RailCaption>Esci</RailCaption>
           <Tip>Esci</Tip>
         </button>
       </form>

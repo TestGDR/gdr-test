@@ -365,12 +365,13 @@ async function post(
 }
 
 async function inRoom(admin: Admin, roomId: string, characterId: string) {
+  // in giocata in questa chat (attivo nell'ultima ora)
   const { count } = await admin
-    .from("messages")
-    .select("id", { count: "exact", head: true })
+    .from("chat_presence")
+    .select("character_id", { count: "exact", head: true })
     .eq("room_id", roomId)
     .eq("character_id", characterId)
-    .gte("created_at", freshSince());
+    .gte("last_active_at", freshSince());
   return !!count;
 }
 
@@ -526,7 +527,7 @@ export async function attack(
     return { error: "Il bersaglio non è un personaggio attivo." };
   if (t.c.dead_at) return { error: `${t.c.name} è morto.` };
   if (!(await inRoom(admin, roomId, targetId)))
-    return { error: `${t.c.name} non è in questa chat.` };
+    return { error: `${t.c.name} non è in giocata in questa chat.` };
 
   const g = o.weaponId
     ? (f.equipped.find((x) => x.id === o.weaponId) ?? null)
@@ -1139,7 +1140,7 @@ export async function stabilize(
   if (!t || !t.c.dying_since || t.c.stabilized_at || t.c.dead_at)
     return { error: "Il personaggio non è morente." };
   if (!(await inRoom(admin, roomId, targetId)))
-    return { error: `${t.c.name} non è in questa chat.` };
+    return { error: `${t.c.name} non è in giocata in questa chat.` };
   const r = medicine(f, COMBAT.stabilizeDv);
   let hours = 0;
   if (r.ok) {
@@ -1183,7 +1184,7 @@ export async function firstAid(
     targetId === characterId ? f : await loadFighter(admin, targetId, now);
   if (!t) return { error: "Personaggio non trovato." };
   if (targetId !== characterId && !(await inRoom(admin, roomId, targetId)))
-    return { error: `${t.c.name} non è in questa chat.` };
+    return { error: `${t.c.name} non è in giocata in questa chat.` };
   const w = t.wounds.find((x) => x.id === woundId);
   if (!w || w.bleed <= 0) return { error: "Questa ferita non sanguina." };
   const dv = t.c.dying_since

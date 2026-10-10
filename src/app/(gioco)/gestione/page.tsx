@@ -9,7 +9,8 @@ const PANELS = [
     permission: "gestione.ruoli",
     href: "/gestione/ruoli",
     title: "Ruoli & Permessi",
-    description: "Crea i ruoli staff, scegli cosa possono fare e assegnali agli utenti.",
+    description:
+      "Crea i ruoli staff, scegli cosa possono fare e assegnali agli utenti.",
   },
   {
     permission: "utenti.gestire",
@@ -21,13 +22,15 @@ const PANELS = [
     permission: "manutenzione.sito",
     href: "/gestione/manutenzione",
     title: "Manutenzione",
-    description: "Pulizia di chat, missive e OFF vecchi; eliminazione dei personaggi inattivi.",
+    description:
+      "Pulizia di chat, missive e OFF vecchi; eliminazione dei personaggi inattivi.",
   },
   {
     permission: ["chat.log", "messaggi.log"],
     href: "/gestione/log",
     title: "Log",
-    description: "Cerca e scarica i log delle chat, delle missive (ON) e dei messaggi OFF.",
+    description:
+      "Cerca e scarica i log delle chat, delle missive (ON) e dei messaggi OFF.",
   },
   {
     permission: "gestione.accessi",
@@ -39,73 +42,93 @@ const PANELS = [
     permission: "casate.gestire",
     href: "/gestione/casate",
     title: "Casate",
-    description: "Stemmi, ruoli e stipendi, alberi genealogici, PNG e PG di ogni casata.",
+    description:
+      "Stemmi, ruoli e stipendi, alberi genealogici, PNG e PG di ogni casata.",
   },
   {
     permission: "draghi.gestire",
     href: "/gestione/draghi",
     title: "Draghi",
-    description: "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e punteggi.",
+    description:
+      "Draghi e uova delle casate, dotazione iniziale, fasi di crescita e punteggi.",
   },
   {
     permission: "meteo.gestire",
     href: "/gestione/meteo",
     title: "Meteo",
-    description: "Regioni climatiche, stagione attuale, semi (modelli di giornata) e meteo di oggi.",
+    description:
+      "Regioni climatiche, stagione attuale, semi (modelli di giornata) e meteo di oggi.",
   },
   {
     permission: "economia.gestire",
     href: "/gestione/economia",
     title: "Economia",
-    description: "Risorse, tipi di feudo con i loro introiti, strutture, feudi delle casate e tesoro.",
+    description:
+      "Risorse, tipi di feudo con i loro introiti, strutture, feudi delle casate e tesoro.",
   },
   {
     permission: "oggetti.gestire",
     href: "/gestione/oggetti",
     title: "Oggetti",
-    description: "Oggetti indossabili e negozio, parti del corpo, oggetti da assegnare ai PG.",
+    description:
+      "Oggetti indossabili e negozio, parti del corpo, oggetti da assegnare ai PG.",
   },
   {
     permission: "creazione.gestire",
     href: "/gestione/creazione",
     title: "Creazione personaggio",
-    description: "Passaggi della creazione del PG, cosa chiede ognuno (punti, testi, campi nuovi) e anteprima.",
+    description:
+      "Passaggi della creazione del PG, cosa chiede ognuno (punti, testi, campi nuovi) e anteprima.",
   },
   {
     permission: "dadi.gestire",
     href: "/gestione/dadi",
     title: "Dadi",
-    description: "Tiri usabili in chat: formule (es. STAT + ABILITA + 1d10, 2d5), regole condizionali ed esiti.",
+    description:
+      "Tiri usabili in chat: formule (es. STAT + ABILITA + 1d10, 2d5), regole condizionali ed esiti.",
   },
   {
     permission: "regole.gestire",
     href: "/gestione/regole",
     title: "Statistiche, abilità e tratti",
-    description: "Statistiche del personaggio (sigle usate anche nei dadi), abilità con la statistica collegata, vantaggi e svantaggi con i loro effetti sui tiri.",
+    description:
+      "Statistiche del personaggio (sigle usate anche nei dadi), abilità con la statistica collegata, vantaggi e svantaggi con i loro effetti sui tiri.",
   },
   {
     permission: "viaggi.gestire",
     href: "/gestione/viaggi",
     title: "Viaggi",
-    description: "Percorsi tra le macroaree (anche di mappe diverse), andature, rotte dei corvi, missive e posizione dei personaggi.",
+    description:
+      "Percorsi tra le macroaree (anche di mappe diverse), andature, rotte dei corvi, missive e posizione dei personaggi.",
   },
   {
     permission: "mondo.gestire",
     href: "/gestione/data",
     title: "Data di gioco",
-    description: "Data ON che scorre da sola (1 giorno reale = 1 giorno ON): correzione dell'anno e dei giorni.",
+    description:
+      "Data ON che scorre da sola (1 giorno reale = 1 giorno ON): correzione dell'anno e dei giorni.",
+  },
+  {
+    permission: "mondo.gestire",
+    href: "/gestione/chat",
+    title: "Chat",
+    description:
+      "Impostazioni delle chat di gioco: limite di caratteri delle azioni.",
   },
   {
     permission: "mondo.gestire",
     href: "/gestione/mondo",
     title: "Gestione mondo",
-    description: "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",
+    description:
+      "Mappe principali da attivare e spegnere, macroaree sulla mappa, chat pubbliche e private.",
   },
 ];
 
 export default async function GestionePage() {
   const { isAdmin, role, permissions } = await getStaffContext();
-  const visible = PANELS.filter((p) => [p.permission].flat().some((k) => permissions.has(k)));
+  const visible = PANELS.filter((p) =>
+    [p.permission].flat().some((k) => permissions.has(k)),
+  );
   // Senza nessun pannello (giocatori, master) la pagina "non esiste"
   if (visible.length === 0) notFound();
 
@@ -113,19 +136,25 @@ export default async function GestionePage() {
     <div className="mx-auto max-w-5xl">
       <GameArea title="Gestione" />
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-serif text-3xl tracking-wide text-accent">Gestione</h1>
+        <h1 className="font-serif text-3xl tracking-wide text-accent">
+          Gestione
+        </h1>
         <p className="text-sm text-muted">
           Il tuo ruolo:{" "}
           {isAdmin ? (
             <strong className="text-accent">Admin (tutti i permessi)</strong>
           ) : (
-            <strong style={{ color: role?.color }}>{role?.name ?? "Giocatore"}</strong>
+            <strong style={{ color: role?.color }}>
+              {role?.name ?? "Giocatore"}
+            </strong>
           )}
         </p>
       </div>
 
       {visible.length === 0 && (
-        <p className="text-muted">Il tuo ruolo non ha ancora accesso a nessun pannello.</p>
+        <p className="text-muted">
+          Il tuo ruolo non ha ancora accesso a nessun pannello.
+        </p>
       )}
 
       <ul className="grid gap-4 sm:grid-cols-2">
@@ -136,7 +165,9 @@ export default async function GestionePage() {
                 href={panel.href}
                 className="block h-full rounded-md border border-border bg-black/50 p-5 transition hover:border-accent hover:bg-blood/10"
               >
-                <h2 className="font-serif text-xl text-accent">{panel.title}</h2>
+                <h2 className="font-serif text-xl text-accent">
+                  {panel.title}
+                </h2>
                 <p className="mt-2 text-sm text-muted">{panel.description}</p>
               </Link>
             ) : (

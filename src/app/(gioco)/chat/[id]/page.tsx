@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
 import { GameArea } from "@/components/game/GameShell";
-import { freshSince } from "@/lib/chat-ttl";
+import { CHAT_LENGTH, freshSince } from "@/lib/chat-ttl";
 import { getStaffContext } from "@/lib/staff";
 import type { Character, Location, Message, Room } from "@/lib/types";
 import ChatRoom from "./ChatRoom";
@@ -73,17 +73,40 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       : Promise.resolve({ data: [] }),
   ]);
 
+  // Cellulare: solo "‹ Torna alla mappa" (il nome della chat e' nel menu)
   const header = (
-    <div className="mb-3">
-      <Link href={back} className="text-sm text-muted hover:text-accent">
+    <div className="mb-3 max-lg:mb-0 max-lg:flex max-lg:items-center max-lg:gap-3 max-lg:border-b max-lg:border-border max-lg:px-3 max-lg:py-2.5">
+      {/* computer: torna al luogo (con l'elenco delle sue chat) */}
+      <Link
+        href={back}
+        className="hidden text-sm text-muted hover:text-accent lg:inline"
+      >
         ← {room.location.name}
       </Link>
-      <h1 className="font-serif text-2xl text-accent">
+      {/* cellulare: torna alla mappa, senza aprire la finestra del luogo */}
+      <Link
+        href={`/mappa?id=${room.location.map_id}`}
+        className="flex shrink-0 items-center gap-1 text-sm text-muted hover:text-accent lg:hidden"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden
+        >
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
+        Torna alla mappa
+      </Link>
+      <h1 className="font-serif text-2xl text-accent max-lg:hidden">
         {isPrivate && <span title="Chat privata">🔒 </span>}
         {room.name}
       </h1>
       {room.description && (
-        <p className="text-sm text-muted">{room.description}</p>
+        <p className="text-sm text-muted max-lg:hidden">{room.description}</p>
       )}
     </div>
   );
@@ -119,13 +142,34 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     );
   }
 
+  // Chi e' in giocata (attivo nell'ultima ora). Le azioni le legge solo chi e'
+  // entrato (o lo staff): lo impone il database
+  const since = freshSince();
+  const cleared = (room as Room & { cleared_at?: string | null }).cleared_at;
+  const cutoff = cleared && cleared > since ? cleared : since;
+  const [{ data: presence }, { data: hiddenCount }] = await Promise.all([
+    supabase
+      .from("chat_presence")
+      .select("character_id, character:characters(name)")
+      .eq("room_id", id)
+      .gt("last_active_at", since)
+      .order("joined_at"),
+    supabase.rpc("chat_hidden_count", { p_room: id }),
+  ]);
+  const present = (
+    (presence ?? []) as unknown as {
+      character_id: string;
+      character: { name: string } | null;
+    }[]
+  ).map((p) => ({ id: p.character_id, name: p.character?.name ?? "—" }));
+
   const [{ data: messages }, { data: characters }] = await Promise.all([
     supabase
       .from("messages")
       .select("*")
       .eq("room_id", id)
-      // solo le azioni dell'ultima ora: le altre sono sparite dalla chat
-      .gte("created_at", freshSince())
+      // solo le azioni dell'ultima ora (e dopo l'ultima pulizia della chat)
+      .gt("created_at", cutoff)
       .order("created_at", { ascending: false })
       .limit(HISTORY_SIZE),
     // Solo i personaggi attivi possono giocare (lo impone anche il database)
@@ -137,15 +181,50 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       .order("created_at"),
   ]);
 
+  // Giocate in corso in altre chat: prima di entrare qui bisogna uscire da li'
+  const myIds = ((characters ?? []) as Character[]).map((c) => c.id);
+  const { data: busy } = myIds.length
+    ? await supabase
+        .from("chat_presence")
+        .select("character_id, room_id, room:rooms(name)")
+        .in("character_id", myIds)
+        .neq("room_id", id)
+        .gt("last_active_at", since)
+        .order("last_active_at", { ascending: false })
+    : { data: [] };
+  const elsewhere = (
+    (busy ?? []) as unknown as {
+      character_id: string;
+      room_id: string;
+      room: { name: string } | null;
+    }[]
+  ).map((b) => ({
+    characterId: b.character_id,
+    roomId: b.room_id,
+    roomName: b.room?.name ?? "un'altra chat",
+  }));
+
+  // staff invisibile: gioca senza entrare in giocata e senza comparire tra i presenti
+  const { data: invisibleNow } = await supabase.rpc("i_am_invisible");
+
+  // limite di caratteri delle azioni (Gestione -> Chat)
+  const { data: chatSettings } = await supabase
+    .from("chat_settings")
+    .select("max_length")
+    .maybeSingle();
+  const maxLen =
+    (chatSettings?.max_length as number | undefined) ?? CHAT_LENGTH.default;
+
   return (
-    <div className="flex h-full min-h-[24rem] flex-col">
+    <div className="flex h-full min-h-[24rem] flex-col max-lg:min-h-0 max-lg:flex-1">
       <GameArea
         title={room.name}
         image={image}
         description={room.description}
         weatherRegionId={weatherRegionId}
       />
-      {header}
+      {/* computer: luogo e nome della chat sono gia' nella colonna di sinistra */}
+      <div className="lg:hidden">{header}</div>
       {isPrivate && (
         <RoomAccessBar
           roomId={room.id}
@@ -165,6 +244,12 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       )}
       {characters?.length ? (
         <ChatRoom
+          key={`${present.some((p) => (characters as Character[]).some((c) => c.id === p.id)) ? "in" : "fuori"}-${invisibleNow ? "inv" : ""}-${cleared ?? ""}`}
+          presence={present}
+          elsewhere={elsewhere}
+          hiddenCount={(hiddenCount as number | null) ?? 0}
+          canSeeAll={permissions.has("chat.moderare")}
+          invisible={!!invisibleNow}
           room={{
             id: room.id,
             name: room.name,
@@ -175,6 +260,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
             location_name: room.location.name,
           }}
           canNarrate={permissions.has("chat.narrazione")}
+          maxLen={maxLen}
           characters={characters as Character[]}
           initialMessages={((messages ?? []) as Message[]).reverse()}
         />

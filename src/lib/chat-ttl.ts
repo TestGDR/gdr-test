@@ -10,3 +10,6 @@ export function isFresh(createdAt: string, now: number) {
 export function freshSince() {
   return new Date(Date.now() - CHAT_TTL_MS).toISOString();
 }
+
+// Limite di caratteri di un'azione in chat (Gestione -> Chat)
+export const CHAT_LENGTH = { default: 1200, min: 100, max: 4000 };
