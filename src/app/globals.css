@@ -538,3 +538,12 @@ textarea.input {
     inset 0 0 0 4px #3f3a35,
     0 6px 18px rgb(0 0 0 / 0.6);
 }
+
+/* Testo dei messaggi in chat (azioni, narrazioni, sussurri): carattere e grandezza di base */
+.chat-text {
+  font-family: var(--font-chat), var(--font-body), sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.55;
+}

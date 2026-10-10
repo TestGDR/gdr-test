@@ -1,6 +1,7 @@
 export type Character = {
   id: string;
-  owner_id: string;
+  owner_id: string | null; // vuoto = PNG
+  is_npc?: boolean; // personaggio non giocante (lo muove lo staff)
   name: string;
   description: string;
   avatar_url: string | null; // immagine di chat 100 x 100 (barra a sinistra, OFF, elenchi)

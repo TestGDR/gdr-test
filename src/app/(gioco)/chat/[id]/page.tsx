@@ -12,7 +12,7 @@ const HISTORY_SIZE = 100;
 
 export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const { id } = await params;
-  const { supabase, user, permissions } = await getStaffContext();
+  const { supabase, user, permissions, isAdmin } = await getStaffContext();
 
   // Le chat delle mappe spente non si vedono (regole del database)
   const { data: room } = await supabase
@@ -147,21 +147,34 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const since = freshSince();
   const cleared = (room as Room & { cleared_at?: string | null }).cleared_at;
   const cutoff = cleared && cleared > since ? cleared : since;
-  const [{ data: presence }, { data: hiddenCount }] = await Promise.all([
-    supabase
-      .from("chat_presence")
-      .select("character_id, character:characters(name)")
-      .eq("room_id", id)
-      .gt("last_active_at", since)
-      .order("joined_at"),
-    supabase.rpc("chat_hidden_count", { p_room: id }),
-  ]);
+  const canNpc = permissions.has("png.gestire");
+  const [{ data: presence }, { data: hiddenCount }, { data: npcRows }] =
+    await Promise.all([
+      supabase.rpc("chat_present", { p_room: id }),
+      supabase.rpc("chat_hidden_count", { p_room: id }),
+      // PNG che l'utente puo' portare in giocata e muovere
+      canNpc
+        ? supabase
+            .from("characters")
+            .select("id, name")
+            .eq("is_npc", true)
+            .eq("status", "attivo")
+            .or(
+              isAdmin
+                ? "is_npc.eq.true"
+                : `npc_manager_id.is.null,npc_manager_id.eq.${user.id}`,
+            )
+            .order("name")
+        : Promise.resolve({ data: [] }),
+    ]);
   const present = (
-    (presence ?? []) as unknown as {
+    (presence ?? []) as {
       character_id: string;
-      character: { name: string } | null;
+      name: string;
+      is_npc: boolean;
     }[]
-  ).map((p) => ({ id: p.character_id, name: p.character?.name ?? "—" }));
+  ).map((p) => ({ id: p.character_id, name: p.name, isNpc: p.is_npc }));
+  const npcs = (npcRows ?? []) as { id: string; name: string }[];
 
   const [{ data: messages }, { data: characters }] = await Promise.all([
     supabase
@@ -242,10 +255,20 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           ).flatMap((g) => (g.character ? [g.character] : []))}
         />
       )}
-      {characters?.length ? (
+      {characters?.length || canNpc ? (
         <ChatRoom
-          key={`${present.some((p) => (characters as Character[]).some((c) => c.id === p.id)) ? "in" : "fuori"}-${invisibleNow ? "inv" : ""}-${cleared ?? ""}`}
+          key={`${present
+            .filter(
+              (p) =>
+                ((characters ?? []) as Character[]).some(
+                  (c) => c.id === p.id,
+                ) || npcs.some((n) => n.id === p.id),
+            )
+            .map((p) => p.id)
+            .join(",")}-${invisibleNow ? "inv" : ""}-${cleared ?? ""}`}
           presence={present}
+          npcs={npcs}
+          canNpc={canNpc}
           elsewhere={elsewhere}
           hiddenCount={(hiddenCount as number | null) ?? 0}
           canSeeAll={permissions.has("chat.moderare")}
@@ -261,7 +284,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           }}
           canNarrate={permissions.has("chat.narrazione")}
           maxLen={maxLen}
-          characters={characters as Character[]}
+          characters={(characters ?? []) as Character[]}
           initialMessages={((messages ?? []) as Message[]).reverse()}
         />
       ) : (

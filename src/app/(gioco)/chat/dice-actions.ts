@@ -33,6 +33,18 @@ export type DiceChoice = {
 const secureRng = () =>
   webcrypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
+// Il personaggio e' dell'utente, oppure e' un PNG che l'utente puo' muovere
+// (permesso e affidamento): lo decide il database, con la stessa regola dei messaggi
+async function controls(
+  supabase: Awaited<ReturnType<typeof getStaffContext>>["supabase"],
+  characterId: string,
+) {
+  const { data } = await supabase.rpc("controls_character", {
+    p_character: characterId,
+  });
+  return !!data;
+}
+
 // Tira un dado configurato in Gestione -> Dadi e lo pubblica in chat
 export async function rollDice(
   roomId: string,
@@ -60,7 +72,7 @@ export async function rollDice(
     return { error: "Questo tiro è riservato al master." };
   if (
     !character ||
-    character.owner_id !== user.id ||
+    !(await controls(supabase, character.id)) ||
     character.status !== "attivo"
   )
     return { error: "Personaggio non valido." };
@@ -255,7 +267,7 @@ export async function rollFreeDice(
   characterId: string,
   formula: string,
 ): Promise<{ error?: string }> {
-  const { supabase, user } = await getStaffContext();
+  const { supabase, user, permissions } = await getStaffContext();
   const { data: character } = await supabase
     .from("characters")
     .select("id, owner_id, status")
@@ -263,7 +275,7 @@ export async function rollFreeDice(
     .maybeSingle();
   if (
     !character ||
-    character.owner_id !== user.id ||
+    !(await controls(supabase, character.id)) ||
     character.status !== "attivo"
   )
     return { error: "Personaggio non valido." };
@@ -313,7 +325,9 @@ export async function rollRaggira(
   characterId: string,
   targetId: string,
 ): Promise<{ error?: string }> {
-  const { supabase, user } = await getStaffContext();
+  const { supabase, user, permissions } = await getStaffContext();
+  // il bersaglio puo' essere un PNG, che i giocatori non leggono: lo legge il server
+  const reader = createAdminClient() ?? supabase;
   if (characterId === targetId)
     return { error: "Scegli un altro personaggio." };
   const [{ data: me }, { data: target }, { data: skills }] = await Promise.all([
@@ -322,7 +336,7 @@ export async function rollRaggira(
       .select("id, name, owner_id, status, attributes")
       .eq("id", characterId)
       .maybeSingle(),
-    supabase
+    reader
       .from("characters")
       .select("id, name, status, attributes")
       .eq("id", targetId)
@@ -332,7 +346,7 @@ export async function rollRaggira(
       .select("id, name")
       .in("name", ["Dissimulare", "Percepire Intenzioni"]),
   ]);
-  if (!me || me.owner_id !== user.id || me.status !== "attivo")
+  if (!me || !(await controls(supabase, me.id)) || me.status !== "attivo")
     return { error: "Personaggio non valido." };
   if (!target || target.status !== "attivo")
     return { error: "Il bersaglio non è un personaggio attivo." };
@@ -342,7 +356,7 @@ export async function rollRaggira(
   const levelOf = async (charId: string, name: string) => {
     const id = skillId(name);
     if (!id) return 0;
-    const { data } = await supabase
+    const { data } = await reader
       .from("character_skills")
       .select("level")
       .eq("character_id", charId)

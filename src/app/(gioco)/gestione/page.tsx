@@ -109,6 +109,12 @@ const PANELS = [
       "Data ON che scorre da sola (1 giorno reale = 1 giorno ON): correzione dell'anno e dei giorni.",
   },
   {
+    permission: "png.gestire",
+    href: "/gestione/png",
+    title: "PNG",
+    description: "Anagrafe dei personaggi non giocanti: crearli con la stessa scheda dei PG e usarli nelle chat.",
+  },
+  {
     permission: "mondo.gestire",
     href: "/gestione/chat",
     title: "Chat",

@@ -101,6 +101,12 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
         description: "Scrivere e modificare le pagine della documentazione",
       },
       {
+        key: "png.gestire",
+        label: "PNG",
+        description:
+          "Anagrafe dei PNG: crearli e modificarli con la stessa scheda dei PG, portarli nelle chat e muoverli (azioni, dadi, combattimento)",
+      },
+      {
         key: "utenti.gestire",
         label: "Gestione utenti",
         description: "Modificare, bannare ed eliminare gli account",
@@ -306,6 +312,7 @@ export const MANAGEMENT_PERMISSIONS = [
   "meteo.gestire",
   "economia.gestire",
   "oggetti.gestire",
+  "png.gestire",
   "regole.gestire",
   "creazione.gestire",
   "dadi.gestire",

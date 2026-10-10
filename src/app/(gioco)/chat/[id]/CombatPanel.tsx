@@ -37,11 +37,13 @@ export default function CombatPanel({
   characterId,
   others,
   onDone,
+  canNpc = false,
 }: {
   roomId: string;
   characterId: string;
   others: { id: string; name: string }[];
   onDone: () => void;
+  canNpc?: boolean; // l'utente muove i PNG
 }) {
   const [st, setSt] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +147,7 @@ export default function CombatPanel({
       {!down && (
         <Attack
           others={others}
+          canNpc={canNpc}
           weapons={m.weapons}
           busy={pending}
           onAttack={(target, o) =>
@@ -271,11 +274,13 @@ function Defense({
 
 function Attack({
   others,
+  canNpc,
   weapons,
   busy,
   onAttack,
 }: {
   others: { id: string; name: string }[];
+  canNpc: boolean;
   weapons: Status["me"]["weapons"];
   busy: boolean;
   onAttack: (target: string, o: Parameters<typeof attack>[3]) => void;
@@ -303,6 +308,8 @@ function Attack({
       {others.length === 0 ? (
         <p className="text-sm text-[#f0c75e]">
           In questa chat non ci sono altri personaggi da attaccare.
+          {canNpc &&
+            " Per far combattere un PNG portalo prima in giocata dal menu «+ PNG...» nella barra «Presenti in chat», sopra i messaggi."}
         </p>
       ) : (
         <>

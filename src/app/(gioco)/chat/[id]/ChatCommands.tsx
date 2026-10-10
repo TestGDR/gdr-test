@@ -24,6 +24,7 @@ export default function ChatCommands({
   others,
   onDone,
   initialTab = "abilita",
+  canNpc = false,
 }: {
   roomId: string;
   characterId: string;
@@ -31,6 +32,7 @@ export default function ChatCommands({
   others: { id: string; name: string }[]; // PG presenti in chat (per Raggira e combattimento)
   onDone: () => void;
   initialTab?: Tab;
+  canNpc?: boolean; // l'utente muove i PNG
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
 
@@ -59,6 +61,7 @@ export default function ChatCommands({
 
       {tab === "combattimento" ? (
         <CombatPanel
+          canNpc={canNpc}
           roomId={roomId}
           characterId={characterId}
           others={others}

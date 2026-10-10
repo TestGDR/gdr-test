@@ -92,7 +92,7 @@ type Gear = {
 type CharRow = {
   id: string;
   name: string;
-  owner_id: string;
+  owner_id: string | null; // vuoto = PNG
   status: string;
   attributes: Record<string, number> | null;
   hp_current: number | null;
@@ -394,13 +394,17 @@ async function startTurn(admin: Admin, f: Fighter, now: number) {
 }
 
 async function me(characterId: string) {
-  const { user } = await getStaffContext();
+  const { user, supabase } = await getStaffContext();
   const admin = createAdminClient();
   if (!admin)
     return { error: "Configurazione del server incompleta." } as const;
   const now = Date.now();
   const f = await loadFighter(admin, characterId, now);
-  if (!f || f.c.owner_id !== user.id || f.c.status !== "attivo")
+  // il proprio PG, oppure un PNG che l'utente puo' muovere (lo decide il database)
+  const { data: mine } = f
+    ? await supabase.rpc("controls_character", { p_character: characterId })
+    : { data: false };
+  if (!f || !mine || f.c.status !== "attivo")
     return { error: "Personaggio non valido." } as const;
   return { user, admin, now, f } as const;
 }
