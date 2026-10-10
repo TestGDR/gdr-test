@@ -30,7 +30,6 @@ type Props = {
   npcs: { id: string; name: string }[]; // PNG che l'utente puo' muovere (vuoto per i giocatori)
   canNpc: boolean; // l'utente ha il permesso di muovere i PNG
   hiddenCount: number; // azioni che chi non e' entrato vede sfocate
-  canSeeAll: boolean; // staff: legge la chat anche senza entrare
   invisible: boolean; // staff invisibile: gioca senza entrare in giocata
   // giocate in corso in altre chat (da cui non si e' ancora usciti)
   elsewhere: { characterId: string; roomId: string; roomName: string }[];
@@ -54,7 +53,6 @@ export default function ChatRoom({
   npcs,
   canNpc,
   hiddenCount,
-  canSeeAll,
   invisible,
   elsewhere,
 }: Props) {
@@ -419,7 +417,9 @@ export default function ChatRoom({
     </label>
   );
 
-  const blurred = !joined && !canSeeAll;
+  // chi non e' in giocata vede sempre lo sfondo sfocato, staff compreso
+  // (per leggere senza entrare c'e' l'invisibilita')
+  const blurred = !joined;
   // primo avviso di combattimento tra i personaggi che muovo
   const alert = alerts.find((a) => a.attackers.length > 0 || a.dying) ?? null;
   const alertWho =

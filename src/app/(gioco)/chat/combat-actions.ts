@@ -85,6 +85,7 @@ type Gear = {
   sp_current: number | null;
   charges: number | null;
   loaded: boolean;
+  poisoned?: boolean; // arma avvelenata: avvelena al primo colpo che penetra
   reload_progress: number;
   item: ItemRow;
   quality: Quality | null;
@@ -105,6 +106,9 @@ type CharRow = {
   dying_save_due: boolean;
   stabilized_at: string | null;
   stunned: boolean;
+  poison_rounds: number; // round di veleno rimasti
+  poison_halved: boolean; // ha resistito: danno dimezzato
+  healed_at: string | null; // ultima cura con Medicina
 };
 type Wound = {
   id: string;
@@ -115,7 +119,7 @@ type Wound = {
 };
 
 const CHAR_COLS =
-  "id, name, owner_id, status, attributes, hp_current, hp_updated_at, stamina_current, stamina_updated_at, dead_at, dying_since, dying_round, dying_save_due, stabilized_at, stunned";
+  "id, name, owner_id, status, attributes, hp_current, hp_updated_at, stamina_current, stamina_updated_at, dead_at, dying_since, dying_round, dying_save_due, stabilized_at, stunned, poison_rounds, poison_halved, healed_at";
 
 async function loadFighter(admin: Admin, id: string, now: number) {
   const [
@@ -138,7 +142,7 @@ async function loadFighter(admin: Admin, id: string, now: number) {
     admin
       .from("character_items")
       .select(
-        "id, equipped, aff_current, sp_current, charges, loaded, reload_progress, item:items(*), quality:item_qualities(hit_bonus, damage_bonus, pierce_bonus, aff_bonus, sp_bonus)",
+        "id, equipped, aff_current, sp_current, charges, loaded, poisoned, reload_progress, item:items(*), quality:item_qualities(hit_bonus, damage_bonus, pierce_bonus, aff_bonus, sp_bonus)",
       )
       .eq("character_id", id),
     admin
@@ -375,13 +379,47 @@ async function inRoom(admin: Admin, roomId: string, characterId: string) {
   return !!count;
 }
 
-// Inizio del turno: i sanguinamenti tolgono i loro PF; lo stordito perde l'azione
+// Veleno: quanti round dura e se il bersaglio resiste (danno dimezzato)
+async function applyPoison(admin: Admin, t: Fighter) {
+  const rounds = Math.max(
+    1,
+    rollDamageDice(COMBAT.poison.rounds, rng)?.total ?? 1,
+  );
+  const s = combatRoll(t, "body", t.skillByName(COMBAT.skills.stun), []);
+  const halved = s.total >= COMBAT.poison.dv;
+  await admin
+    .from("characters")
+    .update({ poison_rounds: rounds, poison_halved: halved })
+    .eq("id", t.c.id);
+  t.c.poison_rounds = rounds;
+  t.c.poison_halved = halved;
+  return (
+    `${t.c.name} è avvelenato per ${rounds} round` +
+    (halved
+      ? ` ma resiste (${s.total} contro DV ${COMBAT.poison.dv}): il danno è dimezzato.`
+      : ` (${s.total} contro DV ${COMBAT.poison.dv}: non resiste).`)
+  );
+}
+
+// Inizio del turno: sanguinamenti e veleno tolgono i loro PF; lo stordito perde l'azione
 async function startTurn(admin: Admin, f: Fighter, now: number) {
   const notes: string[] = [];
   const bleed = f.wounds.reduce((a, w) => a + w.bleed, 0);
   if (bleed > 0 && f.hp > 0) {
     await saveHp(admin, f, f.hp - bleed, now);
     notes.push(`sanguina e perde ${bleed} PF`);
+    if (f.hp <= 0) notes.push("crolla a terra, morente");
+  }
+  if (f.c.poison_rounds > 0 && f.hp > 0) {
+    const roll = rollDamageDice(COMBAT.poison.damage, rng)?.total ?? 0;
+    const dmg = f.c.poison_halved ? Math.ceil(roll / 2) : roll;
+    const left = f.c.poison_rounds - 1;
+    await saveHp(admin, f, f.hp - dmg, now, { poison_rounds: left });
+    f.c.poison_rounds = left;
+    notes.push(
+      `il veleno gli toglie ${dmg} PF` +
+        (left > 0 ? ` (ancora ${left} round)` : " (il veleno si esaurisce)"),
+    );
     if (f.hp <= 0) notes.push("crolla a terra, morente");
   }
   let lost = false;
@@ -938,6 +976,15 @@ async function resolveHit(
     // Lancia da giostra e simili: si spezzano al colpo
     if (attackerGear && a.effects.includes("si_spezza"))
       await wear(admin, attackerGear);
+    // Arma avvelenata: il primo colpo che supera l'armatura avvelena il bersaglio
+    let poisonTxt = "";
+    if (attackerGear?.poisoned && r.penetrates) {
+      await admin
+        .from("character_items")
+        .update({ poisoned: false })
+        .eq("id", attackerGear.id);
+      poisonTxt = " L'arma era avvelenata: " + (await applyPoison(admin, t));
+    }
 
     const newHp = await saveHp(admin, t, t.hp - r.hpLost, now, {
       ...(stunned ? { stunned: true } : {}),
@@ -958,6 +1005,7 @@ async function resolveHit(
           ? ` ${piece.item.name}: SP ${r.newArmorSp}.`
           : "") +
         stunTxt +
+        poisonTxt +
         (r.loseAction ? " Perde la prossima azione." : "") +
         (r.instantDeath
           ? ` ${t.c.name} muore sul colpo.`
@@ -1212,6 +1260,174 @@ export async function firstAid(
   );
 }
 
+// ---------------------------------------------------------------------
+// Cure con Medicina: PF, ferite critiche, veleno
+// ---------------------------------------------------------------------
+async function patient(
+  admin: Admin,
+  roomId: string,
+  f: Fighter,
+  targetId: string,
+  now: number,
+) {
+  if (f.c.dying_since || f.c.dead_at)
+    return { error: "Il tuo personaggio è a terra." } as const;
+  const t = targetId === f.c.id ? f : await loadFighter(admin, targetId, now);
+  if (!t) return { error: "Personaggio non trovato." } as const;
+  if (t.c.dead_at) return { error: `${t.c.name} è morto.` } as const;
+  if (targetId !== f.c.id && !(await inRoom(admin, roomId, targetId)))
+    return { error: `${t.c.name} non è in giocata in questa chat.` } as const;
+  return { t, who: t.c.id === f.c.id ? "se stesso" : t.c.name } as const;
+}
+
+// Curare: il paziente recupera il suo Recupero + il margine in PF (una cura al giorno)
+export async function heal(
+  roomId: string,
+  characterId: string,
+  targetId: string,
+): Promise<Result> {
+  const ctx = await me(characterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { user, admin, now, f } = ctx;
+  const p = await patient(admin, roomId, f, targetId, now);
+  if ("error" in p) return { error: p.error };
+  const { t, who } = p;
+  if (t.c.dying_since && !t.c.stabilized_at)
+    return { error: `${t.c.name} è morente: prima va stabilizzato.` };
+  if (t.hp >= t.maxHp) return { error: "Non ha ferite da curare." };
+  const hours = COMBAT.healing.cooldownHours;
+  if (t.c.healed_at && now - Date.parse(t.c.healed_at) < hours * 3_600_000)
+    return {
+      error: `${t.c.id === f.c.id ? "Sei già stato curato" : t.c.name + " è già stato curato"} nelle ultime ${hours} ore.`,
+    };
+  const r = medicine(f, COMBAT.healing.dv);
+  const iso = new Date(now).toISOString();
+  let gain = 0;
+  if (r.ok) {
+    gain = Math.min(t.maxHp - t.hp, t.rec + (r.total - COMBAT.healing.dv));
+    await saveHp(admin, t, t.hp + gain, now, { healed_at: iso });
+  } else {
+    await admin.from("characters").update({ healed_at: iso }).eq("id", t.c.id);
+  }
+  return post(
+    admin,
+    user.id,
+    roomId,
+    characterId,
+    `cura ${who}: ${r.text} contro DV ${COMBAT.healing.dv} — ` +
+      (r.ok
+        ? `ci riesce: recupera ${gain} PF.`
+        : "non ci riesce: per oggi la ferita non migliora."),
+    { dice: "cura", ok: r.ok, gain },
+  );
+}
+
+// Curare una ferita critica: toglie la ferita e la sua penalita'
+export async function treatWound(
+  roomId: string,
+  characterId: string,
+  targetId: string,
+  woundId: string,
+): Promise<Result> {
+  const ctx = await me(characterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { user, admin, now, f } = ctx;
+  const p = await patient(admin, roomId, f, targetId, now);
+  if ("error" in p) return { error: p.error };
+  const { t, who } = p;
+  const w = t.wounds.find((x) => x.id === woundId);
+  if (!w || w.severity === "bleeding") return { error: "Ferita non trovata." };
+  if (w.bleed > 0)
+    return { error: "La ferita sanguina: prima serve il Primo soccorso." };
+  const dv = COMBAT.firstAidDv[w.severity] ?? 10;
+  const r = medicine(f, dv);
+  if (r.ok) await admin.from("character_wounds").delete().eq("id", w.id);
+  return post(
+    admin,
+    user.id,
+    roomId,
+    characterId,
+    `cura la ferita di ${who} (${locationLabel(w.location)}): ${r.text} contro DV ${dv} — ` +
+      (r.ok ? "la ferita è guarita." : "non ci riesce."),
+    { dice: "cura-ferita", ok: r.ok },
+  );
+}
+
+// Curare il veleno: lo ferma
+export async function curePoison(
+  roomId: string,
+  characterId: string,
+  targetId: string,
+): Promise<Result> {
+  const ctx = await me(characterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { user, admin, now, f } = ctx;
+  const p = await patient(admin, roomId, f, targetId, now);
+  if ("error" in p) return { error: p.error };
+  const { t, who } = p;
+  if (t.c.poison_rounds <= 0) return { error: "Non è avvelenato." };
+  const r = medicine(f, COMBAT.poison.cureDv);
+  if (r.ok)
+    await admin
+      .from("characters")
+      .update({ poison_rounds: 0, poison_halved: false })
+      .eq("id", t.c.id);
+  return post(
+    admin,
+    user.id,
+    roomId,
+    characterId,
+    `cerca di fermare il veleno di ${who}: ${r.text} contro DV ${COMBAT.poison.cureDv} — ` +
+      (r.ok ? "ci riesce: il veleno è neutralizzato." : "non ci riesce."),
+    { dice: "antidoto", ok: r.ok },
+  );
+}
+
+// Avvelenare la propria arma: consuma una dose. Non compare in chat
+export async function poisonWeapon(
+  characterId: string,
+  weaponId: string,
+): Promise<Result & { info?: string }> {
+  const ctx = await me(characterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { admin, f } = ctx;
+  const g = f.equipped.find((x) => x.id === weaponId);
+  if (!g || g.item.kind !== "arma")
+    return { error: "Puoi avvelenare solo un'arma che impugni." };
+  if (g.poisoned) return { error: `${g.item.name} è già avvelenata.` };
+  const dose = f.items.find(
+    (x) => x.item.name.toLowerCase() === COMBAT.poison.item.toLowerCase(),
+  );
+  if (!dose) return { error: "Non hai una dose di veleno." };
+  await admin.from("character_items").delete().eq("id", dose.id);
+  await admin.from("character_items").update({ poisoned: true }).eq("id", g.id);
+  return {
+    info: `${g.item.name} è avvelenata: il primo colpo che supera l'armatura avvelenerà il bersaglio.`,
+  };
+}
+
+// Somministrare il veleno senza un attacco (cibo, bevande): solo chi narra
+export async function administerPoison(
+  roomId: string,
+  characterId: string,
+  targetId: string,
+): Promise<Result> {
+  const { permissions } = await getStaffContext();
+  if (!permissions.has("chat.narrazione"))
+    return { error: "Solo chi narra può somministrare un veleno." };
+  const ctx = await me(characterId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { user, admin, now, f } = ctx;
+  const t = targetId === f.c.id ? f : await loadFighter(admin, targetId, now);
+  if (!t || t.c.dead_at) return { error: "Bersaglio non valido." };
+  if (targetId !== f.c.id && !(await inRoom(admin, roomId, targetId)))
+    return { error: `${t.c.name} non è in giocata in questa chat.` };
+  const txt = await applyPoison(admin, t);
+  return post(admin, user.id, roomId, characterId, `rivela un veleno: ${txt}`, {
+    dice: "veleno",
+  });
+}
+
 const locationLabel = (id: string) =>
   COMBAT.locations.find((l) => l.id === id)?.label.toLowerCase() ?? id;
 
@@ -1240,6 +1456,23 @@ export async function combatStatus(
         id: w.id,
         label: `${locationLabel(w.location)} (${w.bleed} PF a round)`,
       }));
+  // cosa puo' curare la Medicina su un personaggio
+  const care = (x: Fighter) => ({
+    wounded: x.hp < x.maxHp && !x.c.dead_at,
+    healedToday:
+      !!x.c.healed_at &&
+      now - Date.parse(x.c.healed_at) <
+        COMBAT.healing.cooldownHours * 3_600_000,
+    poisoned: x.c.poison_rounds,
+    wounds: x.wounds
+      .filter((w) => w.severity !== "bleeding" && w.bleed <= 0)
+      .map((w) => ({
+        id: w.id,
+        label: locationLabel(w.location),
+        dv: COMBAT.firstAidDv[w.severity] ?? 10,
+      })),
+  });
+  const { permissions } = await getStaffContext();
   const near = await Promise.all(
     others.slice(0, 30).map(async (id) => {
       const o = await loadFighter(admin, id, now);
@@ -1249,6 +1482,7 @@ export async function combatStatus(
         name: o.c.name,
         state: hpState(o.c, o.hp, o.maxHp),
         bleeding: bleeding(o),
+        ...care(o),
       };
     }),
   );
@@ -1264,7 +1498,13 @@ export async function combatStatus(
       stunned: f.c.stunned,
       encumbrance: f.encumbrance,
       bleeding: bleeding(f),
+      ...care(f),
       hasBandages: f.items.some((x) => x.item.name.toLowerCase() === "bende"),
+      // dosi di veleno possedute; chi narra puo' anche somministrarlo
+      poisonDoses: f.items.filter(
+        (x) => x.item.name.toLowerCase() === COMBAT.poison.item.toLowerCase(),
+      ).length,
+      canAdminister: permissions.has("chat.narrazione"),
       weapons: f.equipped
         .filter((g) => g.item.kind === "arma" || g.item.kind === "scudo")
         .map((g) => {
@@ -1277,6 +1517,7 @@ export async function combatStatus(
             range: g.item.range_m,
             reload: g.item.reload_actions,
             loaded: g.loaded,
+            poisoned: !!g.poisoned,
             aff: d ? `${d.current}/${d.max}` : null,
             effects: g.item.effects ?? [],
           };

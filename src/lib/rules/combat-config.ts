@@ -166,6 +166,13 @@ export const COMBAT = {
     bleeding: 10,
   } as Record<string, number>,
 
+  // Veleno: danno a ogni round per alcuni round; con BODY + Robustezza + d10
+  // contro la DV si dimezza. Medicina contro cureDv lo ferma
+  poison: { item: "Veleno", dv: 15, damage: "1d6", rounds: "1d6", cureDv: 15 },
+  // Cure con Medicina: INT + Medicina + d10 contro dv; il paziente recupera
+  // il suo Recupero + il margine in PF. Una cura ogni cooldownHours per paziente
+  healing: { dv: 12, cooldownHours: 24 },
+
   // Distanza: bande di gittata rispetto alla portata dell'arma
   rangeBands: [
     { id: "ravvicinata", label: "Ravvicinata", upTo: 0.25, dv: 10 },

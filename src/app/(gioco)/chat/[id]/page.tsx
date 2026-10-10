@@ -219,6 +219,13 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
 
   // staff invisibile: gioca senza entrare in giocata e senza comparire tra i presenti
   const { data: invisibleNow } = await supabase.rpc("i_am_invisible");
+  // Le azioni arrivano alla pagina solo a chi e' in giocata (con il proprio PG o
+  // con un PNG che muove) o e' invisibile: vale anche per lo staff
+  const canRead =
+    !!invisibleNow ||
+    present.some(
+      (p) => myIds.includes(p.id) || npcs.some((n) => n.id === p.id),
+    );
 
   // limite di caratteri delle azioni (Gestione -> Chat)
   const { data: chatSettings } = await supabase
@@ -271,7 +278,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           canNpc={canNpc}
           elsewhere={elsewhere}
           hiddenCount={(hiddenCount as number | null) ?? 0}
-          canSeeAll={permissions.has("chat.moderare")}
           invisible={!!invisibleNow}
           room={{
             id: room.id,
@@ -285,7 +291,9 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           canNarrate={permissions.has("chat.narrazione")}
           maxLen={maxLen}
           characters={(characters ?? []) as Character[]}
-          initialMessages={((messages ?? []) as Message[]).reverse()}
+          initialMessages={
+            canRead ? ((messages ?? []) as Message[]).reverse() : []
+          }
         />
       ) : (
         <InactiveBanner />

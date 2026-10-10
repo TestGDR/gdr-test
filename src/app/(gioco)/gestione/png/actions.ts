@@ -263,6 +263,9 @@ export async function healNpc(id: string): Promise<{ error?: string }> {
       dying_save_due: false,
       stabilized_at: null,
       stunned: false,
+      poison_rounds: 0,
+      poison_halved: false,
+      healed_at: null,
     })
     .eq("id", id)
     .eq("is_npc", true);

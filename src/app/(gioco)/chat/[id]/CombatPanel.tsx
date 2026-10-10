@@ -18,6 +18,11 @@ import {
   reload,
   rollInitiative,
   stabilize,
+  administerPoison,
+  curePoison,
+  heal,
+  poisonWeapon,
+  treatWound,
 } from "../combat-actions";
 
 type Full = Awaited<ReturnType<typeof combatStatus>>;
@@ -63,6 +68,19 @@ export default function CombatPanel({
     Promise.resolve().then(load);
   }, [load]);
 
+  const [info, setInfo] = useState<string | null>(null);
+  const [victim, setVictim] = useState("");
+  // azioni che non scrivono in chat (avvelenare l'arma): il pannello resta aperto
+  function runQuiet(fn: () => Promise<{ error?: string; info?: string }>) {
+    setError(null);
+    setInfo(null);
+    startTransition(async () => {
+      const r = await fn();
+      if (r.error) setError(r.error);
+      else setInfo(r.info ?? null);
+      load();
+    });
+  }
   function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
@@ -97,6 +115,11 @@ export default function CombatPanel({
         <span className={m.state === "illeso" ? "text-muted" : "text-red-300"}>
           {HP_STATE_LABEL[m.state]}
         </span>
+        {m.poisoned > 0 && (
+          <span className="text-[#9fd08a]">
+            Avvelenato ({m.poisoned} round)
+          </span>
+        )}
         {m.stunned && (
           <span className="text-[#f0c75e]">
             Stordito: perde la prossima azione
@@ -110,6 +133,7 @@ export default function CombatPanel({
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
+      {info && <p className="text-sm text-green-400">{info}</p>}
 
       {m.state === "morto" ? (
         <p className="text-sm text-muted">Il personaggio è morto.</p>
@@ -190,15 +214,82 @@ export default function CombatPanel({
                 </button>
               ))}
           </div>
+          {/* Veleno: sull'arma (chi ha una dose) o somministrato (chi narra) */}
+          {(m.poisonDoses > 0 || m.canAdminister) && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2 text-sm">
+              <span className={field + " mb-0!"}>Veleno</span>
+              {m.poisonDoses > 0 &&
+                m.weapons
+                  .filter((w) => w.kind === "arma" && !w.poisoned)
+                  .map((w) => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        runQuiet(() => poisonWeapon(characterId, w.id))
+                      }
+                      className="btn-ghost px-3 py-1 text-xs"
+                    >
+                      Avvelena {w.name}
+                    </button>
+                  ))}
+              {m.poisonDoses > 0 && (
+                <span className="text-xs text-muted">
+                  {m.poisonDoses} {m.poisonDoses === 1 ? "dose" : "dosi"} (una
+                  per arma, non compare in chat)
+                </span>
+              )}
+              {m.weapons
+                .filter((w) => w.poisoned)
+                .map((w) => (
+                  <span key={w.id} className="text-xs text-[#9fd08a]">
+                    {w.name} è avvelenata
+                  </span>
+                ))}
+              {m.canAdminister && st.others.length > 0 && (
+                <span className="flex items-center gap-1">
+                  <select
+                    value={victim}
+                    onChange={(e) => setVictim(e.target.value)}
+                    aria-label="A chi somministrare il veleno"
+                    className="input w-44! py-0.5 text-xs"
+                  >
+                    <option value="">Somministra a...</option>
+                    {st.others.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={pending || !victim}
+                    onClick={() =>
+                      run(() => administerPoison(roomId, characterId, victim))
+                    }
+                    className="btn-ghost px-3 py-1 text-xs"
+                  >
+                    Somministra
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
           <Medicine
-            me={{ id: characterId, name: "te stesso", bleeding: m.bleeding }}
-            others={st.others}
+            people={[
+              { ...m, id: characterId, name: "te stesso", self: true },
+              ...st.others.map((o) => ({ ...o, self: false })),
+            ]}
             hasBandages={m.hasBandages}
             busy={pending}
             onStabilize={(t) => run(() => stabilize(roomId, characterId, t))}
             onFirstAid={(t, w) =>
               run(() => firstAid(roomId, characterId, t, w))
             }
+            onHeal={(t) => run(() => heal(roomId, characterId, t))}
+            onTreat={(t, w) => run(() => treatWound(roomId, characterId, t, w))}
+            onCure={(t) => run(() => curePoison(roomId, characterId, t))}
           />
         </div>
       )}
@@ -486,62 +577,119 @@ const kindHelp: Record<AttackKind, string> = {
     "−3 al colpire: se vinci di 5 o più l'avversario perde l'arma, nessun danno; 1 Stamina.",
 };
 
+type Patient = {
+  id: string;
+  name: string;
+  self: boolean;
+  state: string;
+  bleeding: { id: string; label: string }[];
+  wounded: boolean;
+  healedToday: boolean;
+  poisoned: number;
+  wounds: { id: string; label: string; dv: number }[];
+};
+
+// Medicina: stabilizzare, primo soccorso, curare PF, ferite critiche e veleno
 function Medicine({
-  me,
-  others,
+  people,
   hasBandages,
   busy,
   onStabilize,
   onFirstAid,
+  onHeal,
+  onTreat,
+  onCure,
 }: {
-  me: { id: string; name: string; bleeding: { id: string; label: string }[] };
-  others: Status["others"];
+  people: Patient[];
   hasBandages: boolean;
   busy: boolean;
   onStabilize: (target: string) => void;
   onFirstAid: (target: string, wound: string) => void;
+  onHeal: (target: string) => void;
+  onTreat: (target: string, wound: string) => void;
+  onCure: (target: string) => void;
 }) {
-  const dying = others.filter((o) => o.state === "morente");
-  const bleeding = [me, ...others].flatMap((o) =>
-    o.bleeding.map((b) => ({ target: o.id, who: o.name, ...b })),
+  const needs = people.filter(
+    (p) =>
+      (p.state === "morente" && !p.self) ||
+      p.bleeding.length > 0 ||
+      (p.wounded && p.state !== "morente" && p.state !== "morto") ||
+      p.wounds.length > 0 ||
+      p.poisoned > 0,
   );
-  if (!dying.length && !bleeding.length) return null;
+  if (!needs.length) return null;
+  const btn = "btn-ghost px-2.5 py-1 text-xs";
   return (
-    <div className="space-y-1.5 border-t border-border/50 pt-2 text-sm">
+    <div className="space-y-2 border-t border-border/50 pt-2 text-sm">
       <p className={field}>Medicina (INT + Medicina + d10)</p>
-      {dying.map((o) => (
-        <div key={o.id} className="flex flex-wrap items-center gap-2">
-          <span className="flex-1">
-            <strong className="text-red-300">{o.name}</strong> è morente
-          </span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onStabilize(o.id)}
-            className="btn px-2.5 py-1 text-xs"
-          >
-            Stabilizza (DV 15)
-          </button>
+      {needs.map((p) => (
+        <div key={p.id} className="flex flex-wrap items-center gap-2">
+          <strong className="w-full text-accent sm:w-32">
+            {p.self ? "Tu" : p.name}
+          </strong>
+          {p.state === "morente" && !p.self && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onStabilize(p.id)}
+              className="btn px-2.5 py-1 text-xs"
+            >
+              Stabilizza (DV {COMBAT.stabilizeDv})
+            </button>
+          )}
+          {p.bleeding.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              disabled={busy || !hasBandages}
+              title={hasBandages ? "" : "Servono delle bende"}
+              onClick={() => onFirstAid(p.id, b.id)}
+              className={btn}
+            >
+              Primo soccorso: {b.label}
+            </button>
+          ))}
+          {p.poisoned > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onCure(p.id)}
+              className={btn}
+            >
+              Ferma il veleno (DV {COMBAT.poison.cureDv})
+            </button>
+          )}
+          {p.wounded && p.state !== "morente" && p.state !== "morto" && (
+            <button
+              type="button"
+              disabled={busy || p.healedToday}
+              title={
+                p.healedToday
+                  ? "Già curato oggi"
+                  : "Recupera il suo Recupero + il margine in PF"
+              }
+              onClick={() => onHeal(p.id)}
+              className={btn}
+            >
+              {p.healedToday
+                ? "Già curato oggi"
+                : `Cura i PF (DV ${COMBAT.healing.dv})`}
+            </button>
+          )}
+          {p.wounds.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              disabled={busy}
+              onClick={() => onTreat(p.id, w.id)}
+              className={btn}
+            >
+              Cura la ferita: {w.label} (DV {w.dv})
+            </button>
+          ))}
         </div>
       ))}
-      {bleeding.map((b) => (
-        <div key={b.id} className="flex flex-wrap items-center gap-2">
-          <span className="flex-1">
-            {b.who === "te stesso" ? "Sanguini" : `${b.who} sanguina`}:{" "}
-            {b.label}
-          </span>
-          <button
-            type="button"
-            disabled={busy || !hasBandages}
-            title={hasBandages ? "" : "Servono delle bende"}
-            onClick={() => onFirstAid(b.target, b.id)}
-            className="btn-ghost px-2.5 py-1 text-xs"
-          >
-            Primo soccorso
-          </button>
-        </div>
-      ))}
-      {!hasBandages && bleeding.length > 0 && (
+      {!hasBandages && needs.some((p) => p.bleeding.length > 0) && (
         <p className="text-xs text-muted">
           Per il primo soccorso servono delle bende.
         </p>
