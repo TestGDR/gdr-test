@@ -219,3 +219,19 @@ export const GossipIcon = () => (
     <path d="M18.5 7.5c1 1 1.5 2.2 1.5 3.5s-.5 2.5-1.5 3.5M21 5c1.5 1.6 2.3 3.6 2.3 6s-.8 4.4-2.3 6" />
   </svg>
 );
+
+// Calendario degli eventi
+export const CalendarIcon = () => (
+  <svg {...base}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="1.5" />
+    <path d="M3.5 9.5h17M8 3v4M16 3v4M8 13.5h2M14 13.5h2M8 17h2" />
+  </svg>
+);
+
+// FAQ: punto di domanda in un fumetto
+export const FaqIcon = () => (
+  <svg {...base}>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10a1.5 1.5 0 0 1-1.5 1.5H11l-4.5 3.5V17h-1A1.5 1.5 0 0 1 4 15.5v-10Z" />
+    <path d="M9.8 8.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6M12 14.4v.1" />
+  </svg>
+);

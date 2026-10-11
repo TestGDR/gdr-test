@@ -34,6 +34,8 @@ import {
   MarketIcon,
   ForumIcon,
   GossipIcon,
+  CalendarIcon,
+  FaqIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -56,6 +58,8 @@ import NewsPanel from "./NewsPanel";
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
+import CalendarPanel, { useEventsUnseen } from "./CalendarPanel";
+import FaqPanel from "./FaqPanel";
 import TravelPanel from "./TravelPanel";
 import FiefsPanel from "@/components/houses/FiefsPanel";
 import MarketPanel from "./MarketPanel";
@@ -84,6 +88,8 @@ type Area = { title: string; image?: string | null; description?: string | null;
 const AreaContext = createContext<(area: Area) => void>(() => {});
 // Notizie ON / OFF nuove, non ancora viste: l'icona cambia colore
 const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
+// Eventi creati dopo l'ultima apertura del calendario: l'icona si accende
+const EventsUnseenContext = createContext(false);
 // Ticket: quanti da leggere e come aprire la finestra dei ticket
 const TicketContext = createContext<{ count: number; open: () => void }>({ count: 0, open: () => {} });
 
@@ -121,7 +127,7 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci" | "calendario" | "faq";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -132,6 +138,8 @@ const PANEL_TITLE: Record<Panel, string> = {
   mercato: "Mercato",
   forum: "Forum",
   voci: "Voci e pettegolezzi",
+  calendario: "Calendario degli eventi",
+  faq: "FAQ",
 };
 
 export default function GameShell({
@@ -247,6 +255,7 @@ export default function GameShell({
   }
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
   const news = useNewsUnseen(userId, panelOpen("notizie-on") ? "on" : panelOpen("notizie-off") ? "off" : null);
+  const events = useEventsUnseen(userId, panelOpen("calendario"));
   const openPanel = (p: Panel) => {
     setPanels((x) => ({ ...x, [p]: (x[p] ?? 0) + 1 }));
     setDrawerOpen(false); // su cellulare il menu si richiude: resta la finestra
@@ -272,6 +281,7 @@ export default function GameShell({
   return (
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
+      <EventsUnseenContext.Provider value={events.unseen}>
       <TicketContext.Provider value={ticketCtx}>
       <ForumUnreadContext.Provider value={forumUnread.count}>
       <GossipPendingContext.Provider value={gossipPending}>
@@ -348,6 +358,7 @@ export default function GameShell({
               </span>
             )}
           </div>
+          <TopActions canManage={canManage} />
         </header>
 
         <div className="relative flex min-h-0 flex-1">
@@ -422,7 +433,6 @@ export default function GameShell({
             }`}
           >
             <RightRail
-              canManage={canManage}
               onOpenDragon={character && hasDragon ? () => setDragonOpen((n) => n + 1) : null}
               onOpenPanel={openPanel}
               newRequests={playRequests.count}
@@ -538,6 +548,15 @@ export default function GameShell({
         {panel === "assenze" && (
           <AbsencesPanel key={panelSession} userId={userId} character={character} canManage={canManageUsers} />
         )}
+        {panel === "calendario" && (
+          <CalendarPanel
+            key={panelSession}
+            userId={userId}
+            character={character && character.status === "attivo" ? { id: character.id, name: character.name } : null}
+            onSeen={events.clear}
+          />
+        )}
+        {panel === "faq" && <FaqPanel key={panelSession} canEdit={canEditDocs} />}
       </Modal>
         );
       })}
@@ -574,6 +593,7 @@ export default function GameShell({
       </GossipPendingContext.Provider>
       </ForumUnreadContext.Provider>
       </TicketContext.Provider>
+      </EventsUnseenContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
   );
@@ -838,6 +858,8 @@ const PANEL_SHORT: Record<Panel, string> = {
   mercato: "Mercato",
   forum: "Forum",
   voci: "Voci",
+  calendario: "Calendario",
+  faq: "FAQ",
 };
 
 function MobileTools({
@@ -863,7 +885,8 @@ function MobileTools({
     <p className="text-center font-serif text-sm tracking-[0.25em] text-accent uppercase">Menu</p>
     <RailRule />
     <div className="grid grid-cols-4 gap-x-1 gap-y-2">
-      <ManageButton canManage={canManage} className={`${drawerBtn} ${goldGear}`} caption="Gestione" />
+      {/* Gestione: la vedono solo moderatori e admin */}
+      {canManage && <ManageButton canManage className={`${drawerBtn} ${goldGear}`} caption="Gestione" />}
       <UtilityButton
         className={drawerBtn}
         trigger={
@@ -883,9 +906,10 @@ function MobileTools({
       </button>
     </div>
     <RailRule />
-    {/* stessi pannelli della barra di destra del computer, quattro per riga */}
+    {/* stessi pannelli della barra di destra del computer, divisi in zona ON e zona OFF, quattro per riga */}
+    <p className="text-center text-[0.625rem] font-semibold tracking-[0.3em] text-[#c9a45c] uppercase">On game</p>
     <div className="grid grid-cols-4 gap-x-1 gap-y-3">
-      {panelGroups(inHouse).flat().map((p) => (
+      {zonePanels(ZONE_ON, inHouse).map((p) => (
         <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} caption={PANEL_SHORT[p.id]} />
       ))}
       {onOpenDragon && (
@@ -894,6 +918,13 @@ function MobileTools({
           <Caption>Drago</Caption>
         </button>
       )}
+    </div>
+    <RailRule />
+    <p className="text-center text-[0.625rem] font-semibold tracking-[0.3em] text-[#c9a45c] uppercase">Off game</p>
+    <div className="grid grid-cols-4 gap-x-1 gap-y-3">
+      {zonePanels(ZONE_OFF, inHouse).map((p) => (
+        <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} caption={PANEL_SHORT[p.id]} />
+      ))}
     </div>
     </div>
   );
@@ -1230,15 +1261,19 @@ function Tip({ children }: { children: ReactNode }) {
 
 // Notizie, ricerca gioco e assenze: per tutti i giocatori
 const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
+  // ON game
   { id: "notizie-on", icon: <ScrollIcon /> },
-  { id: "notizie-off", icon: <HornIcon /> },
-  { id: "ricerca", icon: <SwordsIcon /> },
-  { id: "assenze", icon: <HourglassIcon /> },
+  { id: "voci", icon: <GossipIcon /> },
   { id: "viaggio", icon: <CompassIcon /> },
   { id: "feudi", icon: <FiefIcon /> },
   { id: "mercato", icon: <MarketIcon /> },
+  // OFF game
+  { id: "notizie-off", icon: <HornIcon /> },
   { id: "forum", icon: <ForumIcon /> },
-  { id: "voci", icon: <GossipIcon /> },
+  { id: "ricerca", icon: <SwordsIcon /> },
+  { id: "assenze", icon: <HourglassIcon /> },
+  { id: "calendario", icon: <CalendarIcon /> },
+  { id: "faq", icon: <FaqIcon /> },
 ];
 // Feudi: solo per chi appartiene a una casata
 // Pettegolezzi in attesa (per chi li approva): l'icona Voci si accende
@@ -1246,16 +1281,53 @@ const GossipPendingContext = createContext(0);
 
 const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
 
-// Le icone dei pannelli divise per categoria, separate da una riga dorata
-const PANEL_GROUPS: Panel[][] = [
-  ["notizie-on", "notizie-off", "voci"], // notizie e pettegolezzi
-  ["forum", "assenze", "ricerca"], // comunita'
-  ["viaggio", "feudi", "mercato"], // mondo
-];
-const panelGroups = (inHouse: boolean) => {
+// Le icone dei pannelli divise in due zone: quello che riguarda il gioco (ON)
+// e quello che riguarda i giocatori e la comunita' (OFF)
+const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato"];
+const ZONE_OFF: Panel[] = ["notizie-off", "forum", "ricerca", "assenze", "calendario", "faq"];
+const zonePanels = (zone: Panel[], inHouse: boolean) => {
   const icons = panelsFor(inHouse);
-  return PANEL_GROUPS.map((g) => g.flatMap((id) => icons.filter((p) => p.id === id))).filter((g) => g.length > 0);
+  return zone.flatMap((id) => icons.filter((p) => p.id === id));
 };
+
+// Titolino di una zona della barra (solo computer)
+function RailZone({ children }: { children: ReactNode }) {
+  return (
+    <p className="col-span-full mt-1 w-full text-center text-[0.625rem] font-semibold tracking-[0.3em] text-[#c9a45c] uppercase max-lg:hidden">
+      {children}
+    </p>
+  );
+}
+
+// Aggiorna, Gestione (solo moderatori e admin) ed Esci: in alto a destra, su computer
+function TopActions({ canManage }: { canManage: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const inPlace = pathname.startsWith("/chat/") || pathname === "/mappa";
+  const btn =
+    "group flex w-14 flex-col items-center gap-0.5 rounded-md py-1 text-muted transition hover:bg-blood/25 hover:text-accent";
+  return (
+    <div className="absolute top-1/2 right-3 hidden -translate-y-1/2 items-start gap-1 lg:flex">
+      <button
+        type="button"
+        onClick={() => (inPlace ? router.refresh() : router.push("/mappa"))}
+        className={btn}
+        aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+        title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+      >
+        <RefreshIcon />
+        <Caption>Aggiorna</Caption>
+      </button>
+      {canManage && <ManageButton canManage className={`${btn} ${goldGear}`} caption="Gestione" />}
+      <form action={logout}>
+        <button className={`${btn} text-red-500 hover:text-red-400`} aria-label="Esci" title="Esci">
+          <PowerIcon />
+          <Caption>Esci</Caption>
+        </button>
+      </form>
+    </div>
+  );
+}
 
 // Riga dorata che sfuma ai lati, tra una categoria e l'altra
 function RailRule({ className = "" }: { className?: string }) {
@@ -1292,6 +1364,8 @@ const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
     ? "Forum: interventi nuovi"
     : p === "voci" && newNews
     ? "Voci e pettegolezzi: da approvare"
+    : p === "calendario" && newNews
+    ? "Calendario: eventi nuovi"
     : p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
     : newNews
@@ -1319,7 +1393,9 @@ function PanelButton({
   const unseen = useContext(NewsUnseenContext);
   const forumNew = useContext(ForumUnreadContext);
   const gossipNew = useContext(GossipPendingContext);
+  const eventsNew = useContext(EventsUnseenContext);
   const newNews =
+    (panel === "calendario" && eventsNew) ||
     (panel === "notizie-on" && unseen.on) ||
     (panel === "notizie-off" && unseen.off) ||
     (panel === "forum" && forumNew > 0) ||
@@ -1359,13 +1435,11 @@ const goldGear =
   "text-[#d4a72c] drop-shadow-[0_0_4px_rgb(212_167_44/0.45)] hover:text-[#f0c75e] hover:drop-shadow-[0_0_6px_rgb(240_199_94/0.7)]";
 
 function RightRail({
-  canManage,
   onOpenDragon,
   onOpenPanel,
   newRequests,
   inHouse,
 }: {
-  canManage: boolean;
   onOpenDragon: (() => void) | null;
   onOpenPanel: (p: Panel) => void;
   newRequests: number;
@@ -1381,62 +1455,49 @@ function RightRail({
         {/* titolo della barra (solo computer) */}
         <p className="col-span-full mb-1 w-full text-center font-serif text-sm tracking-[0.25em] text-accent uppercase max-lg:hidden">Menu</p>
         <RailRule className="max-lg:hidden" />
-        {/* In chat: resta e aggiorna i messaggi. Altrove: torna alla mappa aggiornata */}
+        {/* Aggiorna ed Esci: su computer stanno in alto a destra; qui restano per il cellulare */}
         <button
           type="button"
           onClick={() => {
             if (pathname.startsWith("/chat/") || pathname === "/mappa") router.refresh();
             else router.push("/mappa");
           }}
-          className={railBtn}
+          className={`${railBtn} lg:hidden`}
           aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
         >
           <RefreshIcon />
-          <RailCaption>Aggiorna</RailCaption>
-          <Tip>{pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}</Tip>
         </button>
+
+        {/* Zona ON game: il mondo di gioco */}
+        <RailZone>On game</RailZone>
         <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />
           <RailCaption>Mappa</RailCaption>
           <Tip>Mappa</Tip>
         </Link>
-        {/* Gestione: chi non e' moderatore o admin legge che non ha i permessi */}
-        <ManageButton canManage={canManage} className={`${railBtn} ${goldGear} max-lg:hidden`} tip caption="Gestione" />
-        {/* Pannelli divisi per categoria (su cellulare stanno nel menu dell'hamburger) */}
-        {panelGroups(inHouse).map((group, i) => (
-          <Fragment key={i}>
-            <div aria-hidden className="col-span-full h-2 max-lg:hidden" />
-            {group.map((p) => (
-              <PanelButton
-                key={p.id}
-                panel={p.id}
-                icon={p.icon}
-                newRequests={newRequests}
-                onOpen={onOpenPanel}
-                className={`${railBtn} max-lg:hidden`}
-                tip
-                caption={PANEL_SHORT[p.id]}
-              />
-            ))}
-          </Fragment>
+        {zonePanels(ZONE_ON, inHouse).map((p) => (
+          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} tip caption={PANEL_SHORT[p.id]} />
         ))}
         {/* Il mio drago: solo per chi cavalca un drago */}
         {onOpenDragon && (
-          <>
-            <div aria-hidden className="col-span-full h-2 max-lg:hidden" />
-            <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
-              <DragonIcon />
-              <RailCaption>Drago</RailCaption>
-              <Tip>Il mio drago</Tip>
-            </button>
-          </>
+          <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
+            <DragonIcon />
+            <RailCaption>Drago</RailCaption>
+            <Tip>Il mio drago</Tip>
+          </button>
         )}
+
+        {/* Zona OFF game: giocatori e comunita' */}
+        <div aria-hidden className="col-span-full h-1 max-lg:hidden" />
+        <RailRule className="max-lg:hidden" />
+        <RailZone>Off game</RailZone>
+        {zonePanels(ZONE_OFF, inHouse).map((p) => (
+          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} tip caption={PANEL_SHORT[p.id]} />
+        ))}
       </div>
-      <form action={logout} className="lg:mt-auto lg:w-14">
+      <form action={logout} className="lg:hidden">
         <button className={`${railBtn} text-red-500 hover:text-red-400`} aria-label="Esci">
           <PowerIcon />
-          <RailCaption>Esci</RailCaption>
-          <Tip>Esci</Tip>
         </button>
       </form>
     </>

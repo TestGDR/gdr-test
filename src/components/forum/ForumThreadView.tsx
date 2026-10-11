@@ -456,7 +456,13 @@ function PostEditor({
 
   return (
     <div className="space-y-2">
-      <RichEditor value={body} onChange={setBody} textClassName="forum-text" />
+      {/* modifica di un post: riquadro alto 400px, il testo lungo scorre dentro */}
+      <RichEditor
+        value={body}
+        onChange={setBody}
+        textClassName="forum-text"
+        scroll
+      />
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button

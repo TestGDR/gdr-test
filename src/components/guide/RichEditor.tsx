@@ -18,10 +18,12 @@ export default function RichEditor({
   value,
   onChange,
   textClassName = "",
+  scroll = false,
 }: {
   value: string;
   onChange: (html: string) => void;
   textClassName?: string; // stile di base del testo (es. "forum-text": quello del forum)
+  scroll?: boolean; // altezza fissa di 400px: il testo lungo scorre dentro
 }) {
   const [mode, setMode] = useState<"visuale" | "html">("visuale");
 
@@ -63,7 +65,7 @@ export default function RichEditor({
           return kept ? `style="${kept}"` : "";
         }),
       attributes: {
-        class: `guide-content min-h-64 p-4 outline-none ${textClassName}`,
+        class: `guide-content p-4 outline-none ${scroll ? "h-[400px] max-h-[70dvh] overflow-y-auto" : "min-h-64"} ${textClassName}`,
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -104,7 +106,7 @@ export default function RichEditor({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="block min-h-64 w-full resize-y bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
+          className={`block w-full bg-transparent p-4 font-mono text-xs leading-relaxed outline-none ${scroll ? "h-[400px] max-h-[70dvh] resize-none overflow-y-auto" : "min-h-64 resize-y"}`}
           aria-label="Codice HTML"
         />
       )}
