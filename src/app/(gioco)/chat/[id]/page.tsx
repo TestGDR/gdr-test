@@ -232,8 +232,19 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     .from("chat_settings")
     .select("max_length")
     .maybeSingle();
+  // modalita' master: i limiti della chat sostituiscono quelli generali
+  const master =
+    typeof room.master_max === "number"
+      ? {
+          min: (room.master_min as number | null) ?? 0,
+          max: room.master_max as number,
+          by: (room.master_by as string | null) ?? "",
+        }
+      : null;
   const maxLen =
-    (chatSettings?.max_length as number | undefined) ?? CHAT_LENGTH.default;
+    master?.max ??
+    (chatSettings?.max_length as number | undefined) ??
+    CHAT_LENGTH.default;
 
   return (
     <div className="flex h-full min-h-[24rem] flex-col max-lg:min-h-0 max-lg:flex-1">
@@ -289,6 +300,11 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
             location_name: room.location.name,
           }}
           canNarrate={permissions.has("chat.narrazione")}
+          canMaster={
+            permissions.has("chat.narrazione") ||
+            permissions.has("chat.moderare")
+          }
+          master={master}
           maxLen={maxLen}
           characters={(characters ?? []) as Character[]}
           initialMessages={

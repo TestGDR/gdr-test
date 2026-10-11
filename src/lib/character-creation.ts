@@ -15,6 +15,41 @@ export const SEXES = [
 export const AGE_MIN = 16;
 export const AGE_MAX = 80;
 
+// Due PG della stessa casata non possono avere la stessa eta': tra le loro
+// eta' devono esserci almeno tanti anni (1 = basta un anno di differenza)
+export const HOUSE_AGE_GAP = 1;
+
+// L'eta' e' gia' presa in una casata i cui PG hanno queste eta'?
+export function houseAgeTaken(age: number, taken: number[]) {
+  return taken.some((t) => Math.abs(t - age) < HOUSE_AGE_GAP);
+}
+
+// Le eta' libere piu' vicine, una sotto e una sopra
+export function nearestFreeAges(age: number, taken: number[]) {
+  const free: number[] = [];
+  for (let a = age - 1; a >= AGE_MIN; a--)
+    if (!houseAgeTaken(a, taken)) {
+      free.push(a);
+      break;
+    }
+  for (let a = age + 1; a <= AGE_MAX; a++)
+    if (!houseAgeTaken(a, taken)) {
+      free.push(a);
+      break;
+    }
+  return free;
+}
+
+// "Casata Blackfyre: ruolo disponibile ma età già presa..."
+export function houseAgeMessage(house: string, age: number, taken: number[]) {
+  const free = nearestFreeAges(age, taken);
+  const years = HOUSE_AGE_GAP === 1 ? "1 anno" : `${HOUSE_AGE_GAP} anni`;
+  return (
+    `Casata ${house}: ruolo disponibile ma età già presa. Sposta l'età in avanti o indietro di almeno ${years} per scegliere un ruolo in questa casata` +
+    (free.length ? ` (età libere più vicine: ${free.join(" o ")}).` : ".")
+  );
+}
+
 // Statistiche del regolamento (INT, REF, BODY, EMP, PRE, WILL): i numeri
 // stanno in lib/rules/config.ts
 export const ATTRIBUTES = RULES.stats;

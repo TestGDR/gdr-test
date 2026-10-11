@@ -6,6 +6,7 @@ import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import Bank from "./Bank";
+import GameArchive from "./GameArchive";
 import { DragonIcon } from "./icons";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +29,7 @@ const BOXES = [
   { id: "png", label: "Anagrafe PNG", icon: <AddressBookIcon />, color: "text-[#9fb4c9]" },
   { id: "casate-png", label: "Casate PNG", icon: <ShieldIcon />, color: "text-[#9fb4c9]" },
   { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[2.2]"><DragonIcon /></span>, color: "text-orange-400" },
+  { id: "giocate", label: "Archivio giocate", icon: <ScrollArchiveIcon />, color: "text-[#c98a8a]" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
   { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
 ] as const;
@@ -224,6 +226,7 @@ function UtilityPanel() {
         {tab === "stanze" && <RoomBooking />}
         {tab === "banca" && <Bank />}
         {tab === "draghi" && <DragonRegistry />}
+        {tab === "giocate" && <GameArchive />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
         {/* Pagina della casata aperta, al posto dell'elenco */}
@@ -286,6 +289,14 @@ function Portrait({ pg }: { pg: Pg }) {
 
 // Icone dei box
 const big = { width: 44, height: 44, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true };
+
+function ScrollArchiveIcon() {
+  return (
+    <svg {...big}>
+      <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM7.5 11v1.5h9V11h-9Zm0 3.5V16h9v-1.5h-9Zm0 3.5v1.5h6V18h-6Z" />
+    </svg>
+  );
+}
 
 function AddressBookIcon() {
   return (

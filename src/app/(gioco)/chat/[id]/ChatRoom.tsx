@@ -16,7 +16,12 @@ import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
 import { combatAlerts } from "../combat-actions";
-import { joinChat, leaveChat } from "../presence-actions";
+import {
+  joinChat,
+  leaveChat,
+  saveGame,
+  setMasterMode,
+} from "../presence-actions";
 import ChatCommands, { type CommandTab } from "./ChatCommands";
 import { ChatNotepad, ChatSave, type RoomInfo } from "./ChatTools";
 
@@ -25,7 +30,9 @@ type Props = {
   canNarrate: boolean;
   characters: Character[];
   initialMessages: Message[];
-  maxLen: number; // limite di caratteri di un'azione (Gestione -> Chat)
+  maxLen: number; // limite di caratteri di un'azione (Gestione -> Chat, o modalita' master)
+  canMaster: boolean; // master, moderatori e admin: possono usare la modalita' master
+  master: { min: number; max: number; by: string } | null; // modalita' master attiva
   presence: Present[]; // personaggi in giocata
   npcs: { id: string; name: string }[]; // PNG che l'utente puo' muovere (vuoto per i giocatori)
   canNpc: boolean; // l'utente ha il permesso di muovere i PNG
@@ -49,6 +56,8 @@ export default function ChatRoom({
   characters,
   initialMessages,
   maxLen: MAX_LEN,
+  canMaster,
+  master,
   presence,
   npcs,
   canNpc,
@@ -163,6 +172,12 @@ export default function ChatRoom({
         (payload) => {
           const msg = payload.new as Message;
           const own = mine.has(msg.character_id);
+          if (msg.kind === "sistema") {
+            // entrate, uscite e modalita' master: si rileggono presenti e limiti
+            addMessage(msg, own);
+            router.refresh();
+            return;
+          }
           if (!own) playEvent("chat");
           addMessage(msg, own);
         },
@@ -171,7 +186,7 @@ export default function ChatRoom({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, mine]);
+  }, [supabase, roomId, mine, router]);
 
   // Dopo un'ora dall'invio l'azione sparisce dalla chat (resta nel database)
   useEffect(() => {
@@ -288,9 +303,27 @@ export default function ChatRoom({
     }
     router.refresh(); // ricarica la chat con le azioni da leggere
   }
-  async function exit() {
+  // "Esci dalla chat" chiede prima se salvare la giocata nell'archivio
+  const [exitAsk, setExitAsk] = useState(false);
+  const [masterOpen, setMasterOpen] = useState(false);
+  function exit() {
+    if (!myPresent) return;
+    setError(null);
+    setExitAsk(true);
+  }
+  async function leave(save: boolean) {
     if (!myPresent) return;
     setEntering(true);
+    if (save) {
+      const res = await saveGame(roomId, myPresent.id);
+      if (res.error) {
+        // non si esce: cosi' la giocata non va persa
+        setEntering(false);
+        setError(res.error);
+        return;
+      }
+    }
+    setExitAsk(false);
     await leaveChat(roomId, myPresent.id);
     router.refresh();
   }
@@ -298,6 +331,12 @@ export default function ChatRoom({
   // content: testo da mandare (di base quello della barra di scrittura)
   async function send(content = text.trim()): Promise<boolean> {
     if (!content || !actorId || sending) return false;
+    if (kind === "azione" && master && content.length < master.min) {
+      setError(
+        `Modalità master: l'azione deve avere almeno ${master.min} caratteri (ne ha ${content.length}).`,
+      );
+      return false;
+    }
     setSending(true);
     setError(null);
     const { data, error } = await supabase
@@ -440,7 +479,84 @@ export default function ChatRoom({
         canNpc={canNpc}
         onAddNpc={addNpc}
         onRemoveNpc={removeNpc}
+        onMaster={canMaster ? () => setMasterOpen(true) : null}
+        masterOn={!!master}
       />
+      {master && (
+        <p className="border border-accent/50 bg-[#45100b]/60 px-3 py-1 text-center text-xs tracking-wide text-[#e8cf9c]">
+          Modalità master{master.by ? ` (${master.by})` : ""}: azioni{" "}
+          {master.min > 0 ? `da ${master.min} a ` : "fino a "}
+          {master.max} caratteri
+        </p>
+      )}
+      <Modal
+        open={exitAsk}
+        onClose={() => setExitAsk(false)}
+        title="Esci dalla chat"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p>Vuoi salvare questa giocata tra le tue giocate preferite?</p>
+          <p className="text-sm text-muted">
+            La ritrovi in Utility → Archivio giocate, dove puoi rileggerla,
+            scaricarla o cancellarla. La vedi solo tu.
+          </p>
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={entering}
+              onClick={() => leave(true)}
+              className="btn px-4 py-1.5 text-sm"
+            >
+              Sì, salva ed esci
+            </button>
+            <button
+              type="button"
+              disabled={entering}
+              onClick={() => leave(false)}
+              className="btn-ghost px-4 py-1.5 text-sm"
+            >
+              No, esci senza salvare
+            </button>
+            <button
+              type="button"
+              onClick={() => setExitAsk(false)}
+              className="px-2 text-sm text-muted hover:text-accent"
+            >
+              Resta in chat
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {canMaster && (
+        <Modal
+          open={masterOpen}
+          onClose={() => setMasterOpen(false)}
+          title="Modalità master"
+          size="md"
+        >
+          {masterOpen && (
+            <MasterMode
+              current={master}
+              globalMax={MAX_LEN}
+              onSet={async (min, max) => {
+                const res = await setMasterMode(
+                  roomId,
+                  actorId || characterId,
+                  min,
+                  max,
+                );
+                if (!res.error) {
+                  setMasterOpen(false);
+                  router.refresh();
+                }
+                return res.error ?? null;
+              }}
+            />
+          )}
+        </Modal>
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={listRef}
@@ -895,6 +1011,19 @@ function MessageRow({ message, who }: { message: Message; who?: Who }) {
     );
   }
 
+  // Avviso di sistema (entrate, uscite, modalita' master): una riga come i sussurri OFF
+  if (message.kind === "sistema") {
+    return (
+      <p className="rounded-md bg-gradient-to-r from-black/80 via-[#5a1414]/55 to-black/80 px-3 py-1.5 text-sm text-[#d9b8b8] shadow shadow-black/60 max-lg:mt-2">
+        <span className="mr-2 text-xs text-muted">{time}</span>
+        <strong className="mr-1 text-xs font-bold tracking-wide text-foreground uppercase">
+          {message.character_name}
+        </strong>{" "}
+        {message.content}
+      </p>
+    );
+  }
+
   // Sussurro OFF: una riga, con una sfumatura sui toni del rosso
   if (message.kind === "fuori_gioco") {
     return (
@@ -984,6 +1113,8 @@ function PresenceBar({
   canNpc,
   onAddNpc,
   onRemoveNpc,
+  onMaster,
+  masterOn,
 }: {
   present: Present[];
   mine: Set<string>;
@@ -994,6 +1125,8 @@ function PresenceBar({
   canNpc: boolean; // l'utente muove i PNG
   onAddNpc: (id: string) => void;
   onRemoveNpc: (id: string) => void;
+  onMaster: (() => void) | null; // solo master, moderatori e admin
+  masterOn: boolean;
 }) {
   return (
     <div className="flex items-center gap-3 border border-border bg-black/60 px-3 py-1.5 max-lg:border-x-0 max-lg:border-t-0">
@@ -1076,6 +1209,18 @@ function PresenceBar({
           ))}
         </select>
       )}
+      {onMaster && (
+        <button
+          type="button"
+          onClick={onMaster}
+          title="Fissa il minimo e il massimo di caratteri delle azioni in questa chat"
+          className={`shrink-0 border px-2 py-0.5 text-xs transition hover:border-accent hover:text-accent ${
+            masterOn ? "border-accent text-accent" : "border-border text-muted"
+          }`}
+        >
+          Modalità master{masterOn ? " ✓" : ""}
+        </button>
+      )}
       {joined && (
         <button
           type="button"
@@ -1086,6 +1231,96 @@ function PresenceBar({
           Esci dalla chat
         </button>
       )}
+    </div>
+  );
+}
+
+// Modalita' master: minimo e massimo di caratteri delle azioni di questa chat
+function MasterMode({
+  current,
+  globalMax,
+  onSet,
+}: {
+  current: { min: number; max: number; by: string } | null;
+  globalMax: number;
+  onSet: (min: number, max: number | null) => Promise<string | null>;
+}) {
+  const [min, setMin] = useState(String(current?.min ?? 0));
+  const [max, setMax] = useState(String(current?.max ?? globalMax));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lo = Math.max(0, Math.trunc(Number(min)) || 0);
+  const hi = Math.trunc(Number(max)) || 0;
+  const valid = hi >= 1 && hi <= 4000 && lo <= hi;
+  async function run(a: number, b: number | null) {
+    setBusy(true);
+    setError(null);
+    const err = await onSet(a, b);
+    setBusy(false);
+    if (err) setError(err);
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        Fissa quanti caratteri devono avere le azioni in questa chat. Vale per
+        tutti i presenti finché non la spegni; si spegne da sola quando la chat
+        si svuota. Tiri, sussurri OFF e narrazioni del master non hanno il
+        minimo.
+      </p>
+      <div className="flex flex-wrap gap-4">
+        <label className="block space-y-1">
+          <span className="block text-xs tracking-wide text-muted uppercase">
+            Minimo di caratteri
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={4000}
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            className="input w-32"
+          />
+        </label>
+        <label className="block space-y-1">
+          <span className="block text-xs tracking-wide text-muted uppercase">
+            Massimo di caratteri
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={4000}
+            value={max}
+            onChange={(e) => setMax(e.target.value)}
+            className="input w-32"
+          />
+        </label>
+      </div>
+      {!valid && (
+        <p className="text-sm text-amber-200">
+          Il massimo va da 1 a 4000 e il minimo non può superarlo.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy || !valid}
+          onClick={() => run(lo, hi)}
+          className="btn px-4 py-1.5 text-sm"
+        >
+          {current ? "Cambia i limiti" : "Attiva la modalità master"}
+        </button>
+        {current && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(0, null)}
+            className="btn-ghost px-4 py-1.5 text-sm"
+          >
+            Spegni
+          </button>
+        )}
+      </div>
     </div>
   );
 }

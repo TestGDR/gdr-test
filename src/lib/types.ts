@@ -81,6 +81,10 @@ export type Location = {
 export type RoomAccess = "pubblica" | "casata" | "affitto";
 
 export type Room = {
+  // modalita master: limiti delle azioni fissati per questa chat (null = spenta)
+  master_min?: number | null;
+  master_max?: number | null;
+  master_by?: string | null;
   id: string;
   location_id: string;
   name: string;
@@ -102,7 +106,8 @@ export type RoomGroup = {
   sort_order: number;
 };
 
-export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado"; // dado: lo scrive solo il server
+// dado e sistema (entrate, uscite, modalita' master) li scrive solo il server
+export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema";
 
 export type Message = {
   id: number;

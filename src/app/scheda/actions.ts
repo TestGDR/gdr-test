@@ -8,6 +8,8 @@ import {
   type CreationData,
   type CustomValue,
   type TraitInfo,
+  houseAgeMessage,
+  houseAgeTaken,
 } from "@/lib/character-creation";
 import {
   allBlocks,
@@ -254,6 +256,20 @@ async function processCreation(
         invalidStep: stepOf("casata"),
       };
     houseId = role.house_id;
+    // un altro PG della casata ha gia' questa eta'
+    const { data: mates } = await supabase
+      .from("characters")
+      .select("age")
+      .eq("house_id", role.house_id)
+      .eq("is_npc", false)
+      .neq("owner_id", user.id)
+      .not("age", "is", null);
+    const takenAges = (mates ?? []).map((m) => m.age as number);
+    if (data.age && houseAgeTaken(data.age, takenAges))
+      return {
+        error: houseAgeMessage(role.house_name, data.age, takenAges),
+        invalidStep: stepOf("casata"),
+      };
     roleLabel = `${role.role_name} della Casata ${role.house_name}`;
   }
 

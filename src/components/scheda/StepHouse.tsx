@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CreationData } from "@/lib/character-creation";
+import {
+  houseAgeMessage,
+  houseAgeTaken,
+  type CreationData,
+} from "@/lib/character-creation";
 import { createClient } from "@/lib/supabase/client";
 
 type SignupRole = {
@@ -76,6 +80,26 @@ export function StepHouse({ data, update }: Props) {
     list: SignupRole[];
   } | null>(null);
   const key = `${data.sex ?? ""}-${data.age ?? ""}`;
+  // eta' dei PG gia' in ogni casata (escluso il proprio personaggio)
+  const [ages, setAges] = useState<Record<string, number[]> | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: auth }) => {
+      const { data: rows } = await supabase
+        .from("characters")
+        .select("house_id, age, owner_id")
+        .eq("is_npc", false)
+        .not("house_id", "is", null)
+        .not("age", "is", null);
+      const map: Record<string, number[]> = {};
+      for (const c of (rows ?? []) as {
+        house_id: string;
+        age: number;
+        owner_id: string | null;
+      }[])
+        if (c.owner_id !== auth.user?.id) (map[c.house_id] ??= []).push(c.age);
+      setAges(map);
+    });
+  }, [supabase]);
 
   useEffect(() => {
     if (!data.sex || !data.age) return;
@@ -96,7 +120,9 @@ export function StepHouse({ data, update }: Props) {
       </p>
     );
   const list = roles?.key === key ? roles.list : null;
-  if (!list) return <p className="text-sm text-muted">Caricamento...</p>;
+  if (!list || !ages) return <p className="text-sm text-muted">Caricamento...</p>;
+  const age = data.age;
+  const taken = (houseId: string) => houseAgeTaken(age, ages[houseId] ?? []);
   if (!list.length)
     return (
       <p className="text-sm text-muted">
@@ -107,7 +133,8 @@ export function StepHouse({ data, update }: Props) {
 
   const houses = [...new Map(list.map((r) => [r.house_id, r])).values()];
   const chosenGone =
-    data.house_role_id && !list.some((r) => r.role_id === data.house_role_id);
+    data.house_role_id &&
+    !list.some((r) => r.role_id === data.house_role_id && !taken(r.house_id));
 
   return (
     <div className="space-y-4">
@@ -133,6 +160,11 @@ export function StepHouse({ data, update }: Props) {
             )}
             Casata {h.house_name}
           </h4>
+          {taken(h.house_id) && (
+            <p className="mb-2 border border-amber-700/60 bg-amber-900/15 px-3 py-2 text-sm text-amber-200">
+              {houseAgeMessage(h.house_name, age, ages[h.house_id] ?? [])}
+            </p>
+          )}
           <div className="grid gap-2 sm:grid-cols-2">
             {list
               .filter((r) => r.house_id === h.house_id)
@@ -143,6 +175,7 @@ export function StepHouse({ data, update }: Props) {
                     key={r.role_id}
                     type="button"
                     aria-pressed={on}
+                    disabled={taken(h.house_id)}
                     onClick={() =>
                       update({
                         house_role_id: r.role_id,
@@ -150,10 +183,10 @@ export function StepHouse({ data, update }: Props) {
                         dragon_id: on ? data.dragon_id : undefined,
                       })
                     }
-                    className={`border px-3 py-2 text-left text-sm transition ${
-                      on
+                    className={`border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      on && !taken(h.house_id)
                         ? "border-accent bg-accent/15"
-                        : "border-border hover:border-accent/60"
+                        : "border-border enabled:hover:border-accent/60"
                     }`}
                   >
                     <span className="block font-semibold">{r.role_name}</span>
