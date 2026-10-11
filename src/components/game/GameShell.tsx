@@ -219,8 +219,10 @@ export default function GameShell({
     if (tickId) supabase.rpc("pregnancy_tick", { p_character: tickId }).then(() => {});
     supabase.rpc("refresh_ages").then(() => {}); // compleanni: eta' aggiornate
   }, [supabase, tickId]);
-  const [panel, setPanel] = useState<Panel | null>(null);
-  const playRequests = usePlayRequestsUnseen(userId, panel === "ricerca");
+  // Pannelli aperti (anche piu' d'uno insieme): 0 = chiuso; a ogni apertura il numero sale e il pannello si ricarica
+  const [panels, setPanels] = useState<Partial<Record<Panel, number>>>({});
+  const panelOpen = (p: Panel) => (panels[p] ?? 0) > 0;
+  const playRequests = usePlayRequestsUnseen(userId, panelOpen("ricerca"));
   const tickets = useTicketUnread(userId);
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
@@ -234,7 +236,7 @@ export default function GameShell({
   }, [supabase, userId]);
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
   const forumUnread = useForumUnread(userId);
-  const gossipPending = useGossipPending(canReviewGossip, panel === "voci"); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
+  const gossipPending = useGossipPending(canReviewGossip, panelOpen("voci")); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
   // Avviso a schermo quando arriva una risposta a un ticket: resta finche' non lo si chiude
   const [ticketSeenCount, setTicketSeenCount] = useState(tickets.count);
   const [ticketToast, setTicketToast] = useState(false);
@@ -244,11 +246,10 @@ export default function GameShell({
     else if (tickets.count === 0) setTicketToast(false);
   }
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
-  const news = useNewsUnseen(userId, panel === "notizie-on" ? "on" : panel === "notizie-off" ? "off" : null);
-  const [panelSession, setPanelSession] = useState(0); // a ogni apertura il pannello si ricarica
+  const news = useNewsUnseen(userId, panelOpen("notizie-on") ? "on" : panelOpen("notizie-off") ? "off" : null);
   const openPanel = (p: Panel) => {
-    setPanel(p);
-    setPanelSession((n) => n + 1);
+    setPanels((x) => ({ ...x, [p]: (x[p] ?? 0) + 1 }));
+    setDrawerOpen(false); // su cellulare il menu si richiude: resta la finestra
     if (p === "notizie-on") news.markSeen("on");
     if (p === "notizie-off") news.markSeen("off");
   };
@@ -485,7 +486,15 @@ export default function GameShell({
           {dragonOpen > 0 && <DragonPanel key={dragonOpen} characterId={character.id} />}
         </Modal>
       )}
-      <Modal open={panel !== null} onClose={() => setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}
+      {(Object.keys(PANEL_TITLE) as Panel[]).map((panel) => {
+        const panelSession = panels[panel] ?? 0;
+        return (
+      <Modal
+        // ogni pannello ha la sua finestra; riaprendolo dall'icona riparte (anche se era ridotto a icona)
+        key={`${panel}-${panelSession}`}
+        open={panelSession > 0}
+        onClose={() => setPanels((x) => ({ ...x, [panel]: 0 }))}
+        title={PANEL_TITLE[panel]}
         size={
           panel === "ricerca" || panel === "assenze" || panel === "viaggio"
             ? "panel"
@@ -530,6 +539,8 @@ export default function GameShell({
           <AbsencesPanel key={panelSession} userId={userId} character={character} canManage={canManageUsers} />
         )}
       </Modal>
+        );
+      })}
       <OnlineModal
         invisible={canInvisible ? invisible : null}
         onToggleInvisible={toggleInvisible}

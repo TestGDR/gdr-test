@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -29,10 +30,28 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   // scheda del personaggio: linguette (13rem) + pagina 750 x 600, il contenuto gestisce lo scorrimento
   pg: "w-[min(59.875rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem)]",
   // voci e pettegolezzi: sempre alta 600px (meno su schermi bassi), il contenuto scorre dentro
-  panel600: "w-[min(46rem,calc(100vw-2rem))] h-[min(37.5rem,calc(100dvh-1rem))]",
+  panel600:
+    "w-[min(46rem,calc(100vw-2rem))] h-[min(37.5rem,calc(100dvh-1rem))]",
 };
 
-// Finestra modale controllata dal chiamante (open / onClose).
+// Le finestre stanno una sopra l'altra: quella aperta o toccata per ultima
+// passa davanti (le icone delle finestre ridotte restano sempre sopra a tutte)
+let topZ = 70;
+const raise = (el: HTMLElement | null) => {
+  if (el) el.style.zIndex = String(++topZ);
+};
+const noSubscribe = () => () => {};
+// Scalino per ogni finestra gia aperta (su cellulare no: non ci sarebbe spazio)
+function cascade() {
+  if (typeof document === "undefined" || window.innerWidth < 640)
+    return { x: 0, y: 0 };
+  const n = Math.min(5, document.querySelectorAll("dialog[open]").length);
+  return { x: n * 28, y: n * 28 };
+}
+
+// Finestra controllata dal chiamante (open / onClose).
+// - non blocca la pagina: niente velo scuro, quello che sta sotto resta
+//   cliccabile e si possono tenere piu' finestre aperte insieme
 // - si chiude SOLO con la X (niente clic fuori, niente tasto Esc)
 // - si trascina dalla barra del titolo
 // - dimensione fissa, non ridimensionabile
@@ -52,13 +71,25 @@ export default function Modal({
   children: ReactNode;
 }) {
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // la finestra si disegna in fondo alla pagina (non dentro un'altra finestra):
+  // serve il documento, quindi solo nel browser
+  const mounted = useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  );
+  // nata gia aperta (un pannello appena aperto): parte subito a scalino
+  const [offset, setOffset] = useState(() =>
+    open ? cascade() : { x: 0, y: 0 },
+  );
   const [tray, setTray] = useState<HTMLElement | null>(null); // contenitore delle icone, se ridotta
   // Chiusa dal chiamante (es. cambio pagina): non resta ridotta a icona
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (!open) setTray(null);
+    // si apre un po spostata rispetto alle finestre gia aperte, cosi non le copre del tutto
+    else setOffset(cascade());
   }
   const minimized = open && tray !== null;
   const drag = useRef<{
@@ -71,7 +102,10 @@ export default function Modal({
   useEffect(() => {
     if (!dialog) return;
     // Ridotta: il dialog si chiude (la pagina torna cliccabile) ma il contenuto resta
-    if (open && !minimized && !dialog.open) dialog.showModal();
+    if (open && !minimized && !dialog.open) {
+      dialog.show(); // non modale: la pagina sotto resta usabile
+      raise(dialog);
+    }
     if ((!open || minimized) && dialog.open) dialog.close();
   }, [dialog, open, minimized]);
 
@@ -140,56 +174,63 @@ export default function Modal({
           </div>,
           tray,
         )}
-      <dialog
-        ref={setDialog}
-        // Esc non chiude la modale
-        onCancel={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.key === "Escape" && e.preventDefault()}
-        style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-        className={`${SIZE_CLASS[size]} painted-modal m-auto flex-col overflow-hidden p-0 text-foreground shadow-2xl shadow-black backdrop:bg-black/70 open:flex`}
-      >
-        <div
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={() => (drag.current = null)}
-          onPointerCancel={() => (drag.current = null)}
-          className="relative flex shrink-0 cursor-grab touch-none items-center justify-between gap-3 py-2 pr-3 pl-1 select-none active:cursor-grabbing"
-        >
-          {/* titolo su una pennellata chiara, in alto a sinistra */}
-          <h2 className="painted-title min-w-0 truncate">{title}</h2>
-          <div className="ml-auto flex shrink-0 items-center gap-3 text-[#d9d3c4]">
-            <GrabIcon />
-            <button
-              type="button"
-              onClick={minimize}
-              aria-label="Riduci a icona"
-              title="Riduci a icona"
-              className="leading-none hover:text-white"
+      {mounted &&
+        createPortal(
+          <dialog
+            ref={setDialog}
+            // toccandola passa davanti alle altre (in cattura: una finestra aperta
+            // da dentro un'altra resta sopra a quella che l'ha aperta)
+            onPointerDownCapture={(e) => raise(e.currentTarget)}
+            // Esc non chiude la modale
+            onCancel={(e) => e.preventDefault()}
+            onKeyDown={(e) => e.key === "Escape" && e.preventDefault()}
+            style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+            className={`${SIZE_CLASS[size]} painted-modal fixed inset-0 m-auto flex-col overflow-hidden p-0 text-foreground shadow-2xl shadow-black open:flex`}
+          >
+            <div
+              onPointerDown={onDragStart}
+              onPointerMove={onDragMove}
+              onPointerUp={() => (drag.current = null)}
+              onPointerCancel={() => (drag.current = null)}
+              className="relative flex shrink-0 cursor-grab touch-none items-center justify-between gap-3 py-2 pr-3 pl-1 select-none active:cursor-grabbing"
             >
-              <MinimizeIcon />
-            </button>
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Chiudi"
-              title="Chiudi"
-              className="painted-close"
-            />
-          </div>
-        </div>
-        <div
-          className={
-            size === "xl" ||
-            size === "tall" ||
-            size === "sheet" ||
-            size === "pg"
-              ? "min-h-0 flex-1"
-              : "min-h-0 flex-1 overflow-y-auto p-5"
-          }
-        >
-          {children}
-        </div>
-      </dialog>
+              {/* titolo su una pennellata chiara, in alto a sinistra */}
+              <h2 className="painted-title min-w-0 truncate">{title}</h2>
+              <div className="ml-auto flex shrink-0 items-center gap-3 text-[#d9d3c4]">
+                <GrabIcon />
+                <button
+                  type="button"
+                  onClick={minimize}
+                  aria-label="Riduci a icona"
+                  title="Riduci a icona"
+                  className="leading-none hover:text-white"
+                >
+                  <MinimizeIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Chiudi"
+                  title="Chiudi"
+                  className="painted-close"
+                />
+              </div>
+            </div>
+            <div
+              className={
+                size === "xl" ||
+                size === "tall" ||
+                size === "sheet" ||
+                size === "pg"
+                  ? "min-h-0 flex-1"
+                  : "min-h-0 flex-1 overflow-y-auto p-5"
+              }
+            >
+              {children}
+            </div>
+          </dialog>,
+          document.body,
+        )}
     </>
   );
 }
@@ -201,7 +242,7 @@ function trayElement() {
     el = document.createElement("div");
     el.id = "modali-ridotte";
     el.className =
-      "fixed bottom-3 left-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-wrap-reverse gap-2";
+      "fixed bottom-3 left-3 z-[100000] flex max-w-[calc(100vw-1.5rem)] flex-wrap-reverse gap-2";
     document.body.appendChild(el);
   }
   return el;
