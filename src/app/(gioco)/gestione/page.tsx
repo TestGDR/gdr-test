@@ -67,6 +67,13 @@ const PANELS = [
       "Risorse, tipi di feudo con i loro introiti, strutture, feudi delle casate e tesoro.",
   },
   {
+    permission: "eserciti.gestire",
+    href: "/gestione/eserciti",
+    title: "Eserciti",
+    description:
+      "Tipi di truppa con forze e debolezze, truppe delle casate PG e PNG, regni e potenza.",
+  },
+  {
     permission: "oggetti.gestire",
     href: "/gestione/oggetti",
     title: "Oggetti",

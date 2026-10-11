@@ -84,6 +84,12 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
           "Risorse, tipi di feudo, strutture, feudi delle casate, tasse e tesoro",
       },
       {
+        key: "eserciti.gestire",
+        label: "Eserciti",
+        description:
+          "Tipi di truppa con forze e debolezze, eserciti delle casate, regni e potenza",
+      },
+      {
         key: "casate.gestire",
         label: "Gestione casate",
         description:
@@ -311,6 +317,7 @@ export const MANAGEMENT_PERMISSIONS = [
   "viaggi.gestire",
   "meteo.gestire",
   "economia.gestire",
+  "eserciti.gestire",
   "oggetti.gestire",
   "png.gestire",
   "regole.gestire",

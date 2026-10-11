@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import HouseArmy from "./HouseArmy";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
 import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
 
@@ -66,7 +67,17 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
   if (data === undefined) return <p className="text-center text-muted">Caricamento...</p>;
   if (data === null) return <p className="py-6 text-center text-muted">Il tuo personaggio non appartiene a una casata.</p>;
 
+  // attacco e difesa delle strutture dei feudi: entrano nella potenza della casata
+  const fiefPoints = { attack: 0, defense: 0 };
+  for (const fief of data.fiefs)
+    for (const s of fief.structures) {
+      const type = data.structureTypes.find((t) => t.id === s.structure_type_id);
+      fiefPoints.attack += type?.attack ?? 0;
+      fiefPoints.defense += type?.defense ?? 0;
+    }
+
   return (
+    <>
     <HouseEconomy
       houseName={data.house.name}
       playable={data.house.playable}
@@ -81,5 +92,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       taxes={data.taxes}
       bare
     />
+    <HouseArmy houseId={data.house.id} fief={fiefPoints} />
+    </>
   );
 }
