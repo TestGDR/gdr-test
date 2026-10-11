@@ -3,6 +3,13 @@
 import { webcrypto } from "node:crypto";
 import type { TraitModifier } from "@/lib/rules/catalog";
 import { RULES, type StatId } from "@/lib/rules/config";
+import { applyGameSettings } from "@/lib/rules/settings";
+import {
+  loadAffects,
+  loadState,
+  woundPenaltyFor,
+  type WoundRow,
+} from "@/lib/rules/condition";
 import {
   formulaVars,
   rollFormula,
@@ -232,6 +239,53 @@ export async function rollDice(
         vars.DFEDELTA = loyal.value;
         labels.DFEDELTA = loyal.value !== 0 ? loyal.label : "fedeltà";
       }
+    }
+  }
+
+  // Condizione fisica: ferite non ancora guarite e peso trasportato
+  if (needed.has("STAT") || needed.has("ABILITA")) {
+    const reader = createAdminClient() ?? supabase;
+    const now = Date.now();
+    await applyGameSettings(reader);
+    const [{ data: wounds }, { data: gear }] = await Promise.all([
+      reader
+        .from("character_wounds")
+        .select("location, severity, bleed, penalty, mutilated, created_at")
+        .eq("character_id", characterId),
+      reader
+        .from("character_items")
+        .select("item:items(weight_kg)")
+        .eq("character_id", characterId),
+    ]);
+    const notes: string[] = [];
+    let total = 0;
+    const wound = woundPenaltyFor(
+      (wounds ?? []) as WoundRow[],
+      skill?.name,
+      stat,
+      now,
+    );
+    if (wound) {
+      total += wound.value;
+      notes.push(wound.label);
+    }
+    if (loadAffects(stat)) {
+      const weight = (
+        (gear ?? []) as unknown as { item: { weight_kg: number | null } | null }[]
+      ).reduce((a, g) => a + (Number(g.item?.weight_kg) || 0), 0);
+      const load = loadState(
+        weight,
+        (Number(attrs.body) || RULES.statMin) * RULES.derived.carryPerBody,
+      );
+      if (load.penalty) {
+        total += load.penalty;
+        notes.push(load.label.toLowerCase());
+      }
+    }
+    if (total !== 0) {
+      formula += " + CONDIZIONE";
+      vars.CONDIZIONE = total;
+      labels.CONDIZIONE = notes.join(", ");
     }
   }
 

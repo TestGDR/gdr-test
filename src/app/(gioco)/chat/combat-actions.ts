@@ -31,6 +31,12 @@ import {
   type LocationId,
 } from "@/lib/rules/combat-config";
 import { RULES } from "@/lib/rules/config";
+import { applyGameSettings, getSettings } from "@/lib/rules/settings";
+import {
+  isWoundHealed,
+  loadState,
+  woundPenaltyNow,
+} from "@/lib/rules/condition";
 import {
   capTraitModifiers,
   deriveStats,
@@ -52,6 +58,7 @@ type ItemRow = {
   id: string;
   name: string;
   kind: string;
+  weight_kg: number | null;
   damage: string | null;
   weapon_category: string | null;
   weapon_skill_id: string | null;
@@ -115,7 +122,9 @@ type Wound = {
   location: string;
   severity: string;
   bleed: number;
-  penalty: number;
+  penalty: number; // quella di oggi: migliora mentre la ferita guarisce
+  mutilated: boolean;
+  created_at: string;
 };
 
 const CHAR_COLS =
@@ -147,7 +156,7 @@ async function loadFighter(admin: Admin, id: string, now: number) {
       .eq("character_id", id),
     admin
       .from("character_wounds")
-      .select("id, location, severity, bleed, penalty")
+      .select("id, location, severity, bleed, penalty, mutilated, created_at")
       .eq("character_id", id),
     admin.from("skills").select("id, name, stat"),
   ]);
@@ -187,7 +196,21 @@ async function loadFighter(admin: Admin, id: string, now: number) {
   }[];
   const skillByName = (n: string) =>
     skillList.find((s) => s.name.toLowerCase() === n.toLowerCase());
-  const w = (wounds ?? []) as Wound[];
+  // le ferite guariscono col tempo: quelle ormai guarite si tolgono
+  const allWounds = (wounds ?? []) as Wound[];
+  const healed = allWounds.filter((x) => isWoundHealed(x, now));
+  if (healed.length)
+    await admin
+      .from("character_wounds")
+      .delete()
+      .in(
+        "id",
+        healed.map((x) => x.id),
+      );
+  const w = allWounds
+    .filter((x) => !healed.includes(x))
+    .map((x) => ({ ...x, penalty: woundPenaltyNow(x, now) }));
+  // peso di tutto quello che porta, rispetto al carico
   const worst = (locs: string[]) =>
     Math.min(
       0,
@@ -202,7 +225,11 @@ async function loadFighter(admin: Admin, id: string, now: number) {
     maxStamina: d.stamina,
     hp: rec.hp,
     hpSince: rec.since,
-    stamina: currentStamina(ch, d.stamina, now),
+    stamina: currentStamina(ch, d.stamina, d.rec, now),
+    load: loadState(
+      items.reduce((a, g) => a + (Number(g.item.weight_kg) || 0), 0),
+      d.carry,
+    ),
     unarmed: d.unarmed.replace("−", "-"),
     items,
     equipped,
@@ -267,7 +294,9 @@ function combatRoll(
   const traits = f.traits(skill?.id, statId);
   if (traits) all.push({ label: "tratti", value: traits });
   if (f.stamina <= 0)
-    all.push({ label: "Stamina a 0", value: COMBAT.staminaZeroPenalty });
+    all.push({ label: "Stamina a 0", value: getSettings().staminaZeroPenalty });
+  if (f.load.penalty)
+    all.push({ label: f.load.label.toLowerCase(), value: f.load.penalty });
   const roll = rollD10(rng);
   const total =
     statVal + lvl + all.reduce((a, m) => a + m.value, 0) + roll.total;
@@ -437,6 +466,7 @@ async function me(characterId: string) {
   if (!admin)
     return { error: "Configurazione del server incompleta." } as const;
   const now = Date.now();
+  await applyGameSettings(admin); // regole di salute, fatica e peso
   const f = await loadFighter(admin, characterId, now);
   // il proprio PG, oppure un PNG che l'utente puo' muovere (lo decide il database)
   const { data: mine } = f

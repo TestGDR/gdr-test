@@ -101,9 +101,12 @@ test("Stato: illeso, ferito, morente, stabilizzato, morto", () => {
   assert.equal(hpState({ dead_at: at(0) }, 0, 60), "morto");
 });
 
-test("Stamina: piena dopo 10 minuti senza combattere", () => {
+test("Stamina: risale del Recupero ogni 30 minuti senza combattere", () => {
   const c = { stamina_current: 3, stamina_updated_at: at(0) };
-  assert.equal(currentStamina(c, 60, t0 + 9 * 60_000), 3);
-  assert.equal(currentStamina(c, 60, t0 + 10 * 60_000), 60);
-  assert.equal(currentStamina({ stamina_current: null }, 60, t0), 60);
+  assert.equal(currentStamina(c, 60, 6, t0 + 29 * 60_000), 3);
+  assert.equal(currentStamina(c, 60, 6, t0 + 30 * 60_000), 9);
+  assert.equal(currentStamina(c, 60, 6, t0 + 95 * 60_000), 21);
+  // mai oltre il massimo
+  assert.equal(currentStamina(c, 60, 6, t0 + 24 * 60 * 60_000), 60);
+  assert.equal(currentStamina({ stamina_current: null }, 60, 6, t0), 60);
 });

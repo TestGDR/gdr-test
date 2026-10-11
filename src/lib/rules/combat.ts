@@ -4,6 +4,7 @@
 // (PF, SP, AFF, ferite): le salva chi lo chiama.
 // =====================================================================
 
+import { getSettings } from "./settings.ts";
 import {
   COMBAT,
   type AttackKind,
@@ -81,10 +82,16 @@ export function location(id: LocationId) {
   return COMBAT.locations.find((l) => l.id === id)!;
 }
 
+// Ferita critica dal margine: la piu' grave tra quelle di cui si raggiunge
+// il margine (valori dal pannello Salute, ferite e peso)
 export function criticalWound(margin: number) {
-  return (
-    COMBAT.criticals.find((c) => margin >= c.min && margin <= c.max) ?? null
-  );
+  const hit = [...getSettings().criticals]
+    .sort((a, b) => b.min - a.min)
+    .find((c) => margin >= c.min);
+  if (!hit) return null;
+  // cosa succede a testa e tronco resta quello del regolamento
+  const base = COMBAT.criticals.find((c) => c.id === hit.id)!;
+  return { ...base, ...hit };
 }
 
 // ---------------------------------------------------------------------

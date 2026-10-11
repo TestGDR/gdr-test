@@ -96,6 +96,13 @@ const PANELS = [
   },
   {
     permission: "regole.gestire",
+    href: "/gestione/salute",
+    title: "Salute, ferite e peso",
+    description:
+      "Recupero della Stamina, ferite critiche con malus e guarigione, cosa ostacola ogni ferita, soglie del peso trasportato.",
+  },
+  {
+    permission: "regole.gestire",
     href: "/gestione/regole",
     title: "Statistiche, abilità e tratti",
     description:

@@ -23,6 +23,8 @@ export const DICE_VARS = {
   DABILITA: "Abilità del drago scelta (Volare, Attacco fisico...)",
   DTRATTI:
     "Pregi e difetti del drago sulla caratteristica/abilità scelta (senza condizioni)",
+  CONDIZIONE:
+    "Ferite non guarite e peso trasportato: si aggiunge da solo alle prove del personaggio",
   DFEDELTA:
     "Effetto della fedeltà del drago (bonus, malus, critici): si aggiunge da solo ai tiri del drago",
 } as const;

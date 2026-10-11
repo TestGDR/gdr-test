@@ -201,8 +201,41 @@ export const COMBAT = {
   quickReflexesBonus: 2,
   longReachBonus: 2,
 
-  // Recupero della Stamina: dopo 10 minuti senza azioni di combattimento torna piena
-  staminaRestMinutes: 10,
+  // Recupero della Stamina: ogni 30 minuti senza azioni di combattimento
+  // torna tanta Stamina quanto il Recupero (in combattimento: "Riprendi fiato")
+  staminaRestMinutes: 30,
+
+  // Ferite critiche: la penalita' migliora di 1 ogni tot giorni, finche' sparisce
+  woundHealDays: 3,
+  // Fuori dal combattimento: quali prove ostacola una ferita
+  woundSkills: {
+    arm: [
+      "Armi da impatto",
+      "Armi da taglio leggere",
+      "Armi da taglio pesanti",
+      "Armi da tiro",
+      "Armi in asta",
+      "Lotta",
+      "Atletica",
+    ],
+    leg: [
+      "Schivare",
+      "Atletica",
+      "Equitazione",
+      "Furtività",
+      "Cavalcare un Drago",
+    ],
+    headStats: ["int", "emp", "pre"], // testa: le prove di mente e parola
+    torsoStats: ["body"], // tronco: le prove di fisico
+  },
+
+  // Peso trasportato rispetto al carico (BODY x 10 kg): malus oltre le soglie
+  load: [
+    { over: 1, penalty: -2, label: "Appesantito" },
+    { over: 1.5, penalty: -4, label: "Sovraccarico" },
+    { over: 2, penalty: -6, label: "Schiacciato dal peso" },
+  ],
+  loadStats: ["ref", "body"], // il peso rallenta le prove fisiche
 } as const;
 
 // Effetti delle armi

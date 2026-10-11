@@ -123,6 +123,23 @@ export default function RulesManage({
     done(error, "Punti ferita salvati.");
   }
 
+  // Salute completa: PF e Stamina pieni, niente ferite, veleno o stordimento, di nuovo vivo
+  async function fullHeal() {
+    if (
+      !window.confirm(
+        `Ripristinare del tutto la salute di ${character.name}? PF e Stamina tornano pieni e spariscono ferite, sanguinamenti, veleno e stordimento.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.rpc("admin_full_heal", {
+      p_character: character.id,
+    });
+    if (!error) setHp({ value: "", dead: false });
+    done(error, "Salute ripristinata del tutto.");
+  }
+
   async function saveLevels() {
     if (!levels) return;
     setBusy(true);
@@ -262,10 +279,20 @@ export default function RulesManage({
           >
             Salva PF
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={fullHeal}
+            className="btn-ghost border-green-900 px-4 py-1.5 text-sm text-green-400 hover:border-green-500 hover:text-green-300"
+          >
+            Ripristina salute completa
+          </button>
           <p className="w-full text-xs text-muted">
             I PF scendono da soli negli attacchi in chat e risalgono ogni giorno
             del valore di Recupero. Togliendo &quot;Morto&quot; il personaggio
-            torna in vita con i PF scritti qui.
+            torna in vita con i PF scritti qui. &quot;Ripristina salute
+            completa&quot; riporta tutto a posto in un colpo: PF e Stamina
+            pieni, niente ferite, sanguinamenti, veleno o stordimento.
           </p>
         </div>
       )}

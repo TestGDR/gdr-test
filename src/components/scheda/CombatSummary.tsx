@@ -1,5 +1,7 @@
 "use client";
 
+import { isWoundHealed, woundDaysLeft, woundPenaltyNow } from "@/lib/rules/condition";
+import { useGameSettings } from "@/lib/rules/useGameSettings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { durability } from "@/lib/rules/combat";
 import { COMBAT, type ArmorPart } from "@/lib/rules/combat-config";
@@ -40,6 +42,7 @@ type Wound = {
   bleed: number;
   penalty: number;
   mutilated: boolean;
+  created_at: string;
 };
 
 const SEVERITY: Record<string, string> = {
@@ -60,7 +63,9 @@ export default function CombatSummary({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<Owned[] | null>(null);
+  useGameSettings(); // giorni di guarigione dal pannello di gestione
   const [wounds, setWounds] = useState<Wound[]>([]);
+  const [now, setNow] = useState(0);
   const [canHeal, setCanHeal] = useState(false);
 
   const load = useCallback(
@@ -74,12 +79,15 @@ export default function CombatSummary({
           .eq("character_id", characterId),
         supabase
           .from("character_wounds")
-          .select("id, location, severity, bleed, penalty, mutilated")
+          .select("id, location, severity, bleed, penalty, mutilated, created_at")
           .eq("character_id", characterId)
           .order("created_at"),
       ]).then(([a, b]) => {
         setItems((a.data ?? []) as unknown as Owned[]);
-        setWounds((b.data ?? []) as Wound[]);
+        // le ferite ormai guarite non si mostrano piu'
+        const t = Date.now();
+        setWounds(((b.data ?? []) as Wound[]).filter((w) => !isWoundHealed(w, t)));
+        setNow(t);
       }),
     [supabase, characterId],
   );
@@ -202,7 +210,10 @@ export default function CombatSummary({
                 </span>
                 <span className="text-muted">
                   {loc(w.location)}
-                  {w.penalty ? ` · ${w.penalty} ai tiri` : ""}
+                  {woundPenaltyNow(w, now) ? ` · ${woundPenaltyNow(w, now)} alle prove` : ""}
+                  {woundDaysLeft(w, now) !== null
+                    ? ` · guarisce in ${woundDaysLeft(w, now)} ${woundDaysLeft(w, now) === 1 ? "giorno" : "giorni"}`
+                    : ""}
                   {w.bleed ? ` · sanguina ${w.bleed} PF a round` : ""}
                   {w.mutilated ? " · mutilato" : ""}
                 </span>

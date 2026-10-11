@@ -10,6 +10,8 @@ import {
   type Trait,
 } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
+import { loadState } from "@/lib/rules/condition";
+import { useGameSettings } from "@/lib/rules/useGameSettings";
 import {
   HP_STATE_LABEL,
   currentHp,
@@ -144,18 +146,43 @@ export function DerivedPanel({ character }: { character: Character }) {
   );
   // PF attuali con il recupero dei giorni passati (calcolato al momento)
   const [now] = useState(() => Date.now());
+  useGameSettings(); // soglie di peso e Stamina dal pannello di gestione
   const hpNow = currentHp(character, d.hp, d.rec, now);
+  // peso di quello che porta (se la scheda permette di leggerne gli oggetti)
+  const [weight, setWeight] = useState<number | null>(null);
+  useEffect(() => {
+    createClient()
+      .from("character_items")
+      .select("item:items(weight_kg)")
+      .eq("character_id", character.id)
+      .then(({ data, error }) => {
+        if (error) return;
+        setWeight(
+          (
+            (data ?? []) as unknown as {
+              item: { weight_kg: number | null } | null;
+            }[]
+          ).reduce((a, g) => a + (Number(g.item?.weight_kg) || 0), 0),
+        );
+      });
+  }, [character.id]);
+  const load = weight === null ? null : loadState(weight, d.carry);
   const state = hpState(character, hpNow, d.hp);
   const rows: [string, string][] = [
     [
       "Punti Ferita",
       `${hpNow} / ${d.hp}${state === "illeso" ? "" : ` — ${HP_STATE_LABEL[state]}`}`,
     ],
-    ["Stamina", `${currentStamina(character, d.stamina, now)} / ${d.stamina}`],
+    ["Stamina", `${currentStamina(character, d.stamina, d.rec, now)} / ${d.stamina}`],
     ["Recupero", String(d.rec)],
     ["Corsa", `${d.run} m a round`],
     ["Salto", `${d.jump} m (da fermo ${d.jumpStanding} m)`],
-    ["Carico senza malus", `${d.carry} kg`],
+    [
+      "Carico",
+      load
+        ? `${load.weight} / ${d.carry} kg${load.penalty ? ` — ${load.label} (${load.penalty} alle prove fisiche)` : ""}`
+        : `${d.carry} kg senza malus`,
+    ],
     ["Danno a mani nude", d.unarmed],
   ];
   return (

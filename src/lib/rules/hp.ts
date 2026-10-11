@@ -1,4 +1,4 @@
-import { COMBAT } from "./combat-config.ts";
+import { getSettings } from "./settings.ts";
 
 // Punti ferita e Stamina attuali, calcolati al momento (documento
 // "Combattimento, armi e danni"):
@@ -6,7 +6,8 @@ import { COMBAT } from "./combat-config.ts";
 // - ogni giorno intero da hp_updated_at si recuperano tanti PF quanto il
 //   Recupero (fino al massimo); non recuperano i morti e i morenti non
 //   ancora stabilizzati
-// - la Stamina torna piena dopo 10 minuti senza azioni di combattimento
+// - la Stamina risale piano: ogni 30 minuti senza azioni di combattimento
+//   torna tanta Stamina quanto il Recupero
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type HpRecord = {
@@ -46,12 +47,24 @@ export function currentHp(
   return recoveredHp(c, maxHp, rec, now).hp;
 }
 
-export function currentStamina(c: HpRecord, maxStamina: number, now: number) {
+export function currentStamina(
+  c: HpRecord,
+  maxStamina: number,
+  rec: number,
+  now: number,
+) {
   if (c.stamina_current === null || c.stamina_current === undefined)
     return maxStamina;
-  const last = c.stamina_updated_at ? Date.parse(c.stamina_updated_at) : 0;
-  if (now - last >= COMBAT.staminaRestMinutes * 60_000) return maxStamina;
-  return Math.max(0, Math.min(maxStamina, c.stamina_current));
+  const base = Math.max(0, Math.min(maxStamina, c.stamina_current));
+  if (!c.stamina_updated_at) return maxStamina;
+  const rests = Math.max(
+    0,
+    Math.floor(
+      (now - Date.parse(c.stamina_updated_at)) /
+        (getSettings().staminaRestMinutes * 60_000),
+    ),
+  );
+  return Math.min(maxStamina, base + rests * Math.max(0, rec));
 }
 
 export type HpState =
