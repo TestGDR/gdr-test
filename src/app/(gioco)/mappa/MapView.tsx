@@ -80,12 +80,24 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
   );
 }
 
-// Puntino luminoso della macroarea
+// Segnaposto della macroarea: un castello dorato che lampeggia
+const CASTLE =
+  "M3.5 2h2.2v2h1.5V2h2.2v2h1.5V2h2.2v2h1.5V2h2.2v2h1.5V2h2.2v5.5h-1.7L20.5 22h-17L5.2 7.5H3.5Z M9.3 16.5v-3.6a2.7 2.7 0 0 1 5.4 0v3.6Z";
+
 export function MapDot() {
   return (
-    <span className="relative block h-4 w-4">
-      <span className="absolute inset-0 animate-ping rounded-full bg-accent/50" />
-      <span className="absolute inset-0 rounded-full bg-accent shadow-[0_0_10px_rgba(201,164,92,0.9)] transition group-hover:scale-125" />
+    <span className="relative block h-[1.125rem] w-[1.125rem]">
+      <svg viewBox="0 0 24 24" aria-hidden className="absolute inset-0 h-full w-full animate-ping fill-accent/50">
+        <path fillRule="evenodd" d={CASTLE} />
+      </svg>
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden
+        // ombra scura sotto la sagoma, per staccarla dalla mappa
+        className="absolute inset-0 h-full w-full overflow-visible fill-accent drop-shadow-[0_2px_2px_rgb(0_0_0/0.9)] transition group-hover:scale-125"
+      >
+        <path fillRule="evenodd" d={CASTLE} />
+      </svg>
     </span>
   );
 }

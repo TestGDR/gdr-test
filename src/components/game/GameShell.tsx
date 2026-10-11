@@ -279,7 +279,7 @@ export default function GameShell({
       <div className="flex h-dvh flex-col overflow-hidden">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
-        <header className="relative z-30 flex min-h-14 shrink-0 items-center py-2.5 justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4">
+        <header className="relative z-30 flex min-h-14 shrink-0 items-center py-2.5 justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4 lg:pt-2 lg:pb-5">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -289,7 +289,7 @@ export default function GameShell({
             <MenuIcon />
           </button>
 
-          <div className="flex items-center gap-0.5 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 lg:gap-12">
             <GuideButton
               book="ambientazione"
               label="Ambientazione"
@@ -310,7 +310,7 @@ export default function GameShell({
               trigger={
                 <>
                   <BookIcon />
-                  <TopTip>Manuale di Gioco</TopTip>
+                  <TopTip>Manuale</TopTip>
                 </>
               }
             />
@@ -330,7 +330,7 @@ export default function GameShell({
                 trigger={
                   <>
                     <ToolsIcon />
-                    <TopTip>Utility giocatore</TopTip>
+                    <TopTip>Utility</TopTip>
                   </>
                 }
               />
@@ -365,7 +365,7 @@ export default function GameShell({
               cosi' non si deforma durante la transizione */}
           <aside
             inert={!leftOpen}
-            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:z-auto lg:shrink-0 lg:translate-x-0 lg:overflow-hidden lg:bg-black/40 ${
+            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:relative lg:z-10 lg:shrink-0 lg:translate-x-0 lg:overflow-hidden lg:bg-black/40 lg:shadow-[8px_0_28px_rgb(0_0_0/0.85)] ${
               drawerOpen ? "translate-x-0" : "-translate-x-full"
             } ${leftOpen ? "lg:w-64 lg:opacity-100" : "lg:w-0 lg:border-transparent lg:opacity-0"}`}
           >
@@ -415,7 +415,7 @@ export default function GameShell({
           <nav
             aria-label="Menu di gioco"
             inert={!rightOpen}
-            className={`${inChat ? "max-lg:hidden " : ""}fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:static lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 ${
+            className={`${inChat ? "max-lg:hidden " : ""}fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:relative lg:z-10 lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 lg:shadow-[-8px_0_28px_rgb(0_0_0/0.85)] ${
               rightOpen
                 ? "lg:w-40 lg:overflow-visible lg:border-border lg:opacity-100"
                 : "lg:w-0 lg:overflow-hidden lg:border-transparent lg:opacity-0"
@@ -596,7 +596,10 @@ function EdgeToggle({
       type="button"
       onClick={onClick}
       aria-label={`${open ? "Chiudi" : "Apri"} colonna ${side === "left" ? "sinistra" : "destra"}`}
-      className="hidden w-5 shrink-0 items-center justify-center self-center rounded-sm border border-border bg-panel py-4 text-muted hover:border-accent hover:text-accent lg:flex"
+      // linguetta attaccata alla colonna: stesso fondo, nessun bordo dal lato della colonna
+      className={`relative z-20 hidden w-5 shrink-0 items-center justify-center self-center border border-border bg-[#0b0a0a] py-4 text-muted hover:text-accent lg:flex ${
+        side === "left" ? "-ml-px rounded-r-md border-l-0" : "-mr-px rounded-l-md border-r-0"
+      }`}
     >
       <ChevronIcon left={pointsLeft} />
     </button>
@@ -715,25 +718,26 @@ function LeftColumn({
 
       {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me.
           Solo computer: su cellulare c'e' l'icona dei presenti nel pannello */}
-      <div className="hidden rounded-md border border-border bg-black/40 p-3 lg:block">
-        <button
-          type="button"
-          onClick={onOpenOnline}
-          className="w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent"
-          title="Apri l'elenco di tutti i presenti"
-        >
-          <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
-        </button>
-        <h3 className="mt-3 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
-          {me?.place === "chat" ? (
+      {/* il totale sta fuori dal riquadro, sempre visibile */}
+      <button
+        type="button"
+        onClick={onOpenOnline}
+        className="hidden w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent lg:block"
+        title="Apri l'elenco di tutti i presenti"
+      >
+        <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
+      </button>
+      {/* riquadro alto 300px: con tanti presenti scorre dentro */}
+      <div className="hidden h-[300px] flex-col border border-black bg-[#1c1c1c]/80 p-3 shadow-[0_8px_18px_rgb(0_0_0/0.85)] lg:flex">
+        {/* in una chat: il nome del luogo (sulla mappa non serve) */}
+        {me?.place === "chat" && (
+          <h3 className="mb-2 shrink-0 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
             <Link href={`/chat/${me.placeKey.replace(/^chat:/, "")}`} className="hover:underline" title={`Vai in ${me.placeLabel}`}>
               {me.placeLabel}
             </Link>
-          ) : (
-            "Mappa"
-          )}
-        </h3>
-        <ul className="mt-2 space-y-1.5 text-sm">
+          </h3>
+        )}
+        <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 text-sm">
           {here.map((p) => (
             <li
               key={p.userId}
@@ -1142,19 +1146,16 @@ function PlaceInfo({ area }: { area: Area }) {
   );
 }
 
-// Ogni icona sta in un rombo rosso scuro, stoffa come lo stendardo dei messaggi (senza bordo)
+// Ogni icona sta in un rombo scuro con le punte a tacca (immagine PNG); su computer sotto c'e' il nome
 const topBtn =
-  "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[1.125rem] sm:[&_svg]:w-[1.125rem] before:absolute before:inset-[16%] before:-z-10 before:rotate-45 before:bg-[linear-gradient(135deg,#62180f_0%,#3d0d0a_35%,#5a150f_65%,#300a07_100%)] before:shadow-[0_2px_6px_rgb(0_0_0/0.7)] before:transition hover:before:brightness-125";
+  "group relative isolate flex h-9 w-9 shrink-0 sm:h-11 sm:w-11 lg:h-12 lg:w-12 items-center justify-center text-[#e2c99a] transition hover:text-accent focus-visible:text-accent focus-visible:outline-none [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[1.125rem] sm:[&_svg]:w-[1.125rem] before:absolute before:inset-0 before:-z-10 before:bg-[url('/images/ui/rombo-scuro.png')] before:bg-contain before:bg-center before:bg-no-repeat before:drop-shadow-[0_2px_5px_rgb(0_0_0/0.8)] before:transition hover:before:brightness-150";
 // Pulsante del menu (cellulare): senza rombo
 const menuBtn =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-blood/25 hover:text-accent";
 
 function TopTip({ children }: { children: ReactNode }) {
   return (
-    <span
-      role="tooltip"
-      className="pointer-events-none absolute top-full left-1/2 z-50 mt-2 hidden -translate-x-1/2 rounded border border-blood/60 bg-black/95 px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-b-blood/60 before:content-[''] lg:block"
-    >
+    <span className="pointer-events-none absolute top-full left-1/2 mt-0.5 hidden -translate-x-1/2 font-serif text-[0.625rem] leading-none tracking-[0.14em] whitespace-nowrap text-muted uppercase transition group-hover:text-accent group-focus-visible:text-accent lg:block">
       {children}
     </span>
   );
@@ -1171,7 +1172,7 @@ function TicketButton({ className, tip, caption }: { className: string; tip?: bo
       {count > 0 && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">{count}</span>
       )}
-      {tip && <TopTip>{label}</TopTip>}
+      {tip && <TopTip>Ticket</TopTip>}
     </button>
   );
 }

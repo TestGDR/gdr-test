@@ -119,7 +119,8 @@ export const ChevronIcon = ({ left }: { left?: boolean }) => (
 
 export const ToolsIcon = () => (
   <svg {...base}>
-    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z" />
+    {/* il disegno della chiave pende in basso a sinistra: lo si riporta al centro */}
+    <path transform="translate(1.4 -1.3)" d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z" />
   </svg>
 );
 
