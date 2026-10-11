@@ -59,8 +59,6 @@ type Data = {
   allPgs: PgAssignment[];
 };
 
-const NEW = "__nuova";
-
 // Esegue un'azione del server, mostra l'esito e aggiorna i dati della pagina
 function useAction() {
   const router = useRouter();
@@ -84,33 +82,92 @@ function useAction() {
   return { run, pending, feedback, clear: () => setMessage(null) };
 }
 
-// Due viste: le casate una per una, oppure l'elenco di tutti i PG con casata e ruolo
+// Quattro pagine: casate PG, casate PNG, crea casata, assegna PG.
+// Cliccando una casata la si apre per intero (dati, ruoli, albero, PNG, PG)
+type View = "pg" | "png" | "crea" | "assegna";
+
 export default function HousesManager(data: Data) {
-  const [view, setView] = useState<"casate" | "assegna">("casate");
+  const [view, setView] = useState<View>("pg");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = data.houses.find((h) => h.id === openId) ?? null;
+  // una casata aperta sta nella pagina del suo tipo
+  const current: View = open ? (open.playable ? "pg" : "png") : view;
+  const count = (playable: boolean) => data.houses.filter((h) => h.playable === playable).length;
+
   return (
     <div className="space-y-4">
-      <div role="tablist" className="flex gap-1 border-b border-border">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-border">
         {(
           [
-            ["casate", "Casate"],
-            ["assegna", "Assegna PG a casate e ruoli"],
+            ["pg", `Casate PG (${count(true)})`],
+            ["png", `Casate PNG (${count(false)})`],
+            ["crea", "+ Crea casata"],
+            ["assegna", "Assegna PG"],
           ] as const
         ).map(([id, label]) => (
           <button
             key={id}
             type="button"
             role="tab"
-            aria-selected={view === id}
-            onClick={() => setView(id)}
+            aria-selected={current === id}
+            onClick={() => {
+              setView(id);
+              setOpenId(null);
+            }}
             className={`-mb-px border-b-2 px-4 py-2.5 text-xs tracking-[0.12em] uppercase transition ${
-              view === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
+              current === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
             }`}
           >
             {label}
           </button>
         ))}
       </div>
-      {view === "casate" ? <HousesView {...data} /> : <AssignPgView houses={data.houses} roles={data.roles} pgs={data.allPgs} />}
+
+      {open ? (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => {
+              setView(open.playable ? "pg" : "png");
+              setOpenId(null);
+            }}
+            className="text-sm text-muted hover:text-accent"
+          >
+            ← {open.playable ? "Casate PG" : "Casate PNG"}
+          </button>
+          <HouseEditor
+            key={open.id}
+            house={open}
+            roles={data.roles.filter((r) => r.house_id === open.id)}
+            family={data.family.filter((x) => x.house_id === open.id)}
+            relations={data.relations.filter((r) => r.house_id === open.id)}
+            npcs={data.npcs.filter((n) => n.house_id === open.id)}
+            allNpcs={data.npcs}
+            allHouses={data.houses}
+            members={data.members.filter((m) => m.house_id === open.id)}
+            onCreated={setOpenId}
+            onDeleted={() => setOpenId(null)}
+          />
+        </div>
+      ) : view === "assegna" ? (
+        <AssignPgView houses={data.houses} roles={data.roles} pgs={data.allPgs} />
+      ) : view === "crea" ? (
+        <HouseEditor
+          house={null}
+          roles={[]}
+          family={[]}
+          relations={[]}
+          npcs={[]}
+          allNpcs={data.npcs}
+          allHouses={data.houses}
+          members={[]}
+          // appena il server la restituisce, la casata nuova si apre per intero
+          onCreated={setOpenId}
+          onDeleted={() => setOpenId(null)}
+        />
+      ) : (
+        <HousesList data={data} playable={view === "pg"} onOpen={setOpenId} onCreate={() => setView("crea")} />
+      )}
     </div>
   );
 }
@@ -233,57 +290,60 @@ function AssignPgView({ houses, roles, pgs }: { houses: House[]; roles: HouseRol
   );
 }
 
-function HousesView(data: Data) {
-  const [selectedId, setSelectedId] = useState<string>(data.houses[0]?.id ?? NEW);
-  const house = data.houses.find((h) => h.id === selectedId) ?? null;
-
+// Elenco delle casate di un tipo (PG o PNG): si clicca per aprirne una
+function HousesList({
+  data,
+  playable,
+  onOpen,
+  onCreate,
+}: {
+  data: Data;
+  playable: boolean;
+  onOpen: (id: string) => void;
+  onCreate: () => void;
+}) {
+  const houses = data.houses.filter((h) => h.playable === playable);
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="h-fit rounded-md border border-border bg-black/50 p-3">
-        <ul className="space-y-1">
-          {data.houses.map((h) => (
+    <div className="space-y-4">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {houses.map((h) => {
+          const pg = data.members.filter((m) => m.house_id === h.id).length;
+          const npc = data.npcs.filter((n) => n.house_id === h.id).length;
+          return (
             <li key={h.id}>
               <button
                 type="button"
-                onClick={() => setSelectedId(h.id)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm transition hover:bg-blood/20 ${
-                  h.id === selectedId ? "bg-blood/30" : ""
-                }`}
+                onClick={() => onOpen(h.id)}
+                className="flex w-full items-center gap-3 rounded-md border border-border bg-black/50 p-3 text-left transition hover:border-accent hover:bg-blood/20"
               >
-                <Sigil url={h.sigil_url} name={h.name} size="h-8 w-8" />
-                <span className="flex-1 truncate font-serif">{h.name}</span>
-                <span className="text-xs text-muted" title="PG membri">
-                  {data.members.filter((m) => m.house_id === h.id).length}
+                <Sigil url={h.sigil_url} name={h.name} size="h-14 w-14" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-serif text-lg text-accent">{h.name}</span>
+                  {h.motto && <span className="block truncate text-xs text-muted italic">{h.motto}</span>}
+                  <span className="mt-1 block text-xs text-muted">
+                    {pg} PG · {npc} PNG
+                  </span>
                 </span>
               </button>
             </li>
-          ))}
-          {data.houses.length === 0 && <li className="px-2 text-xs text-muted">Nessuna casata.</li>}
-        </ul>
-        <button
-          type="button"
-          onClick={() => setSelectedId(NEW)}
-          className={`btn-ghost mt-3 w-full text-sm ${selectedId === NEW ? "border-accent text-accent" : ""}`}
-        >
-          + Nuova casata
-        </button>
-        <SignupPreview />
-      </aside>
-
-      <HouseEditor
-        // riparte da zero cambiando casata (e quando una casata appena creata arriva dal server)
-        key={`${selectedId}-${house ? "pronta" : "attesa"}`}
-        house={house}
-        roles={data.roles.filter((r) => r.house_id === house?.id)}
-        family={data.family.filter((f) => f.house_id === house?.id)}
-        relations={data.relations.filter((r) => r.house_id === house?.id)}
-        npcs={data.npcs.filter((n) => n.house_id === house?.id)}
-        allNpcs={data.npcs}
-        allHouses={data.houses}
-        members={data.members.filter((m) => m.house_id === house?.id)}
-        onCreated={(id) => setSelectedId(id)}
-        onDeleted={() => setSelectedId(data.houses.find((h) => h.id !== selectedId)?.id ?? NEW)}
-      />
+          );
+        })}
+      </ul>
+      {houses.length === 0 && (
+        <p className="text-sm text-muted">
+          {playable
+            ? "Nessuna casata giocabile."
+            : "Nessuna casata PNG: creane una togliendo la spunta \"Casata giocabile (PG)\"."}{" "}
+          <button type="button" onClick={onCreate} className="text-accent hover:underline">
+            Crea casata
+          </button>
+        </p>
+      )}
+      {playable && (
+        <div className="max-w-sm rounded-md border border-border bg-black/50 px-3 pb-3">
+          <SignupPreview />
+        </div>
+      )}
     </div>
   );
 }
@@ -310,7 +370,7 @@ function SignupPreview() {
   for (const r of result ?? []) byHouse.set(r.house_name, [...(byHouse.get(r.house_name) ?? []), r]);
 
   return (
-    <form onSubmit={check} className="mt-4 space-y-2 border-t border-border pt-3">
+    <form onSubmit={check} className="space-y-2 pt-3">
       <h3 className="text-xs font-semibold tracking-[0.15em] text-muted uppercase">Simulazione iscrizione</h3>
       <div className="flex flex-wrap gap-2">
         <select value={sex} onChange={(e) => setSex(e.target.value)} className="input py-1 text-sm" aria-label="Sesso">

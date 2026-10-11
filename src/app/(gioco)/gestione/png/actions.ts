@@ -21,6 +21,7 @@ export type NpcInput = {
   house_id: string | null; // casata (crea o sposta il PNG di casata collegato)
   house_npc_id: string | null; // PNG di casata di cui questa e' la scheda
   manager_id: string | null; // affidato a (vuoto = lo muove chiunque abbia il permesso)
+  is_public: boolean; // i giocatori lo vedono nell'anagrafe e ne aprono la scheda
 };
 
 async function staff() {
@@ -128,6 +129,7 @@ export async function saveNpc(
     attributes,
     house_npc_id: houseNpcId,
     npc_manager_id: input.manager_id || null,
+    npc_public: input.is_public !== false,
   };
   if (id) {
     const { error } = await admin.from("characters").update(row).eq("id", id);

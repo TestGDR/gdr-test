@@ -1,6 +1,6 @@
-import { nextStage, stageLabel, type Dragon, type DragonStage } from "@/lib/dragons";
+import { loyaltyEffects, loyaltyTier, nextStage, stageIndex, stageLabel, type Dragon, type DragonStage } from "@/lib/dragons";
 
-// Barre del drago: maturazione (PX investiti verso la fase successiva) e
+// Barre del drago: maturazione (PX spesi in caratteristiche e abilita' in questa fase) e
 // fedelta' al cavaliere. "parchment" per il pannello di pergamena, "dark"
 // per le schede su fondo scuro.
 export default function DragonBars({
@@ -15,6 +15,7 @@ export default function DragonBars({
   const cost = stages.find((s) => s.stage === dragon.stage)?.px_to_next ?? null;
   const next = nextStage(dragon.stage, stages);
   const adult = cost === null || !next;
+  const tier = loyaltyTier(dragon.loyalty, stageIndex(dragon.stage, stages));
   return (
     <div className="space-y-2.5">
       <Bar
@@ -23,16 +24,24 @@ export default function DragonBars({
         value={adult ? 1 : Math.min(1, dragon.growth_px / Math.max(1, cost))}
         fill="bg-[linear-gradient(90deg,#8a6420,#d4a72c_60%,#f0cf6a)]"
         variant={variant}
-        hint={adult ? "Ha raggiunto l'ultima fase di crescita." : `Mancano ${Math.max(0, cost - dragon.growth_px)} PX per diventare ${next.label.toLowerCase()}.`}
+        hint={adult ? "Ha raggiunto l'ultima fase di crescita." : `Spendendo altri ${Math.max(0, cost - dragon.growth_px)} PX in caratteristiche e abilità diventa ${next.label.toLowerCase()}.`}
       />
       <Bar
-        label="Fedeltà"
-        right={`${dragon.loyalty} / 100`}
+        label={`Fedeltà — ${tier.name}`}
+        right={`${dragon.loyalty}%`}
         value={dragon.loyalty / 100}
         fill="bg-[linear-gradient(90deg,#5e1611,#a3201b_60%,#d9682a)]"
         variant={variant}
-        hint="Più il drago è fedele al suo cavaliere, più potrà avere bonus sui tiri."
+        hint="La fedeltà la costruisce il cavaliere rafforzando il legame, e pesa su ogni tiro del drago."
       />
+      <p className={`text-xs ${variant === "parchment" ? "text-[#6b4a2e]" : "text-muted"}`}>A ogni tiro del drago: {loyaltyEffects(tier)}.
+        {tier.disobeys && (
+          <strong className={variant === "parchment" ? "text-[#8b2a14]" : "text-red-400"}>
+            {" "}
+            Non ascolta ancora il cavaliere: a questo stadio serve almeno il {tier.threshold}% di fedeltà.
+          </strong>
+        )}
+      </p>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { loadStats } from "@/lib/rules/stats";
 import {
   STATS as DRAGON_STATS,
   dragonModifiers,
+  rollLoyalty,
   type TraitEffect,
 } from "@/lib/dragons";
 import { getStaffContext } from "@/lib/staff";
@@ -77,6 +78,7 @@ export async function rollDice(
   )
     return { error: "Personaggio non valido." };
 
+  let formula = dice.formula as string; // i tiri del drago aggiungono la fedelta'
   const statList = await loadStats(supabase);
   const codes = statList.map((s) => s.code);
   const needed = formulaVars(dice.formula as string, codes);
@@ -170,7 +172,7 @@ export async function rollDice(
   if (needed.has("DSTAT") || needed.has("DABILITA") || needed.has("DTRATTI")) {
     const { data: dragon } = await supabase
       .from("dragons")
-      .select("name, stats, skills, pregi, difetti")
+      .select("name, stats, skills, pregi, difetti, loyalty, stage")
       .eq("rider_id", characterId)
       .eq("status", "drago")
       .maybeSingle();
@@ -213,6 +215,24 @@ export async function rollDice(
           : 0);
       labels.DTRATTI = "pregi/difetti";
     }
+    // Fedelta': bonus o malus, successo o fallimento critico (solo quando scatta)
+    if (needed.has("DSTAT") || needed.has("DABILITA")) {
+      const { data: stage } = await supabase
+        .from("dragon_stages")
+        .select("sort_order")
+        .eq("stage", (dragon.stage as string | null) ?? "")
+        .maybeSingle();
+      const loyal = rollLoyalty(
+        Number(dragon.loyalty) || 0,
+        (stage?.sort_order as number | undefined) ?? 0,
+        secureRng,
+      );
+      if (needed.has("DFEDELTA") || loyal.value !== 0) {
+        if (!needed.has("DFEDELTA")) formula += " + DFEDELTA";
+        vars.DFEDELTA = loyal.value;
+        labels.DFEDELTA = loyal.value !== 0 ? loyal.label : "fedeltà";
+      }
+    }
   }
 
   if (needed.has("MOD")) {
@@ -227,7 +247,7 @@ export async function rollDice(
       : null;
 
   const result = rollFormula(
-    dice.formula as string,
+    formula,
     (dice.rules ?? []) as DiceRule[],
     { vars, varLabels: labels, target },
     secureRng,

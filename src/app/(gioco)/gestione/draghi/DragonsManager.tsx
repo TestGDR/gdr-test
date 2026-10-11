@@ -34,6 +34,7 @@ type Props = {
   temperaments: TemperamentRow[];
   effects: TraitEffect[];
   skillFactor?: number;
+  bondCost?: number;
 };
 
 const TABS = [
@@ -86,7 +87,7 @@ export default function DragonsManager(props: Props) {
       </div>
       <div className="p-4">
         {tab === "draghi" && <DragonsTab {...props} />}
-        {tab === "fasi" && <StagesTab stages={props.stages} skillFactor={props.skillFactor ?? 10} />}
+        {tab === "fasi" && <StagesTab stages={props.stages} skillFactor={props.skillFactor ?? 10} bondCost={props.bondCost ?? 1} />}
         {tab === "abilita" && <SkillsTab skills={props.skills} />}
         {tab === "tratti" && <TraitsTab traits={props.traits} effects={props.effects} skills={props.skills} />}
         {tab === "caratteri" && <TemperamentsTab temperaments={props.temperaments} />}
@@ -411,7 +412,7 @@ function DragonEditor({
                 className="input"
               />
             </Field>
-            <Field label="PX investiti nella fase attuale">
+            <Field label="PX spesi nella fase attuale (barra)">
               <input
                 type="number"
                 min={0}
@@ -609,15 +610,16 @@ function ImageUpload({ dragonId, hasImage }: { dragonId: string; hasImage: boole
 // ---------------------------------------------------------------------
 // Fasi: PX per crescere e mantenimento mensile
 // ---------------------------------------------------------------------
-function StagesTab({ stages, skillFactor }: { stages: DragonStage[]; skillFactor: number }) {
+function StagesTab({ stages, skillFactor, bondCost }: { stages: DragonStage[]; skillFactor: number; bondCost: number }) {
   const { supabase, run, busy, feedback } = useOp();
   const [rows, setRows] = useState(stages);
   const [factor, setFactor] = useState(skillFactor);
+  const [bond, setBond] = useState(bondCost);
   const update = (stage: string, k: "px_to_next" | "monthly_upkeep" | "stat_points" | "skill_points" | "stat_cap", v: number) =>
     setRows((r) => r.map((s) => (s.stage === stage ? { ...s, [k]: v } : s)));
 
   async function saveAll() {
-    if (!(await run(() => supabase.from("dragon_settings").update({ skill_px_factor: factor }).eq("id", true), "Impostazioni salvate."))) return;
+    if (!(await run(() => supabase.from("dragon_settings").update({ skill_px_factor: factor, bond_px_per_point: bond }).eq("id", true), "Impostazioni salvate."))) return;
     for (const s of rows) {
       const ok = await run(
         () =>
@@ -640,15 +642,19 @@ function StagesTab({ stages, skillFactor }: { stages: DragonStage[]; skillFactor
   return (
     <div className="max-w-5xl space-y-4">
       <p className="text-sm text-muted">
-        Alla generazione (schiusa o creazione) un drago riceve i punti della sua fase: le caratteristiche partono da 0 e non superano il
-        tetto, le abilità sono a caso per neonato e cucciolo e omogenee (nessuna a 0) da adolescente in su. Per passare alla fase successiva il cavaliere spende i PX indicati; a ogni passaggio il drago riceve 5 punti da distribuire tra
-        caratteristiche e abilità (massimo {MAX_VALUE} per voce). Il mantenimento sono le risorse della casata consumate ogni mese.
+        Alla generazione (schiusa o creazione) un drago riceve i punti della sua fase: ogni caratteristica parte da 1 e non supera il
+        tetto, le abilità sono a caso e mai più alte della loro caratteristica. Il cavaliere spende PX per alzare caratteristiche e
+        abilità: i PX spesi riempiono la barra della fase e, raggiunti quelli indicati, il drago passa alla fase successiva e riceve 5
+        punti da distribuire (massimo {MAX_VALUE} per voce). Da adulto le caratteristiche non crescono più. La fedeltà
+        parte da 0 e la alza solo il cavaliere con &quot;Rafforza il legame&quot;; torna a 0 quando il drago perde o cambia
+        cavaliere. La puoi correggere a mano dalla scheda del drago. Il mantenimento sono le
+        risorse della casata consumate ogni mese.
       </p>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs tracking-wider text-muted uppercase">
             <th className="py-2">Fase</th>
-            <th className="py-2">PX per crescere</th>
+            <th className="py-2">PX da spendere per crescere</th>
             <th className="py-2">Mantenimento / mese</th>
             <th className="py-2">Punti caratteristiche</th>
             <th className="py-2">Tetto caratteristica</th>
@@ -704,7 +710,7 @@ function StagesTab({ stages, skillFactor }: { stages: DragonStage[]; skillFactor
         </tbody>
       </table>
       <label className="flex flex-wrap items-center gap-3 text-sm">
-        <span>Abilità comprate con i PX dal cavaliere: costo per alzare di 1 =</span>
+        <span>Caratteristiche e abilità comprate con i PX dal cavaliere: costo per alzare di 1 =</span>
         <input
           type="number"
           min={0}
@@ -714,6 +720,18 @@ function StagesTab({ stages, skillFactor }: { stages: DragonStage[]; skillFactor
           className="input w-24! py-1"
         />
         <span>PX × il nuovo valore (es. da 3 a 4 costa {factor * 4} PX)</span>
+      </label>
+      <label className="flex flex-wrap items-center gap-3 text-sm">
+        <span>Rafforza il legame: ogni punto di fedeltà costa</span>
+        <input
+          type="number"
+          min={0}
+          max={1000}
+          value={bond}
+          onChange={(e) => setBond(Math.max(0, Number(e.target.value) || 0))}
+          className="input w-24! py-1"
+        />
+        <span>PX (da 0% a 100% servono {bond * 100} PX)</span>
       </label>
       <div className="flex items-center gap-3">
         <button type="button" onClick={saveAll} disabled={busy} className="btn">

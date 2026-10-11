@@ -18,7 +18,7 @@ export default async function DraghiPage() {
     supabase.from("dragon_temperaments").select("id, text").order("id"),
     supabase.from("dragon_trait_effects").select("*").order("id"),
     supabase.from("house_npcs").select("id, name, house_id, deceased").order("name"),
-    supabase.from("dragon_settings").select("skill_px_factor").maybeSingle(),
+    supabase.from("dragon_settings").select("*").maybeSingle(),
   ]);
 
   return (
@@ -36,6 +36,7 @@ export default async function DraghiPage() {
         pgs={(pgs.data ?? []) as PgLite[]}
         npcs={(npcs.data ?? []) as NpcLite[]}
         skillFactor={settings.data?.skill_px_factor ?? 10}
+        bondCost={settings.data?.bond_px_per_point ?? 1}
         skills={(skills.data ?? []) as DragonSkill[]}
         temperaments={(temperaments.data ?? []) as TemperamentRow[]}
         effects={(effects.data ?? []) as TraitEffect[]}

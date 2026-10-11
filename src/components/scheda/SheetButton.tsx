@@ -215,6 +215,36 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "equipaggiamento", label: "Equipaggiamento" },
 ];
 
+// pagine della scheda di un PNG che i giocatori non possono leggere
+const NPC_LOCKED: Tab[] = ["caratteristiche", "abilita", "tratti", "storia"];
+
+// Pagina oscurata: righe finte sfocate e l'avviso sopra
+function LockedPage() {
+  return (
+    <div className="relative h-full min-h-80 overflow-hidden">
+      <div
+        aria-hidden
+        className="space-y-4 p-6 opacity-70 blur-[7px] select-none"
+      >
+        {[72, 55, 88, 40, 66, 80, 48, 60, 75, 52].map((w, i) => (
+          <div key={i} className="flex items-center gap-4">
+            <div className="h-4 w-28 rounded bg-accent/40" />
+            <div
+              className="h-4 rounded bg-white/25"
+              style={{ width: w + "%" }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center p-6">
+        <p className="border border-border bg-black/80 px-6 py-4 text-center font-serif text-lg tracking-wide text-accent shadow-lg">
+          Non accessibile ai giocatori
+        </p>
+      </div>
+    </div>
+  );
+}
+
 type SheetInfo = {
   last_entry: string | null;
   last_chat_action: string | null;
@@ -252,6 +282,16 @@ function CharacterSheet({
       .rpc("can_manage_rules")
       .then(({ data }) => setCanRules(data === true));
   }, [supabase, active]);
+  // PNG: Caratteristiche, Abilita', Tratti e Storia li vede solo chi gestisce i PNG
+  const [canNpc, setCanNpc] = useState(false);
+  useEffect(() => {
+    if (!character.is_npc) return;
+    supabase
+      .rpc("has_permission", { perm: "png.gestire" })
+      .then(({ data }) => setCanNpc(data === true));
+  }, [supabase, character.is_npc]);
+  const locked = (t: Tab) =>
+    !!character.is_npc && !canNpc && NPC_LOCKED.includes(t);
   const canManage =
     active &&
     (!!info?.is_admin ||
@@ -301,6 +341,11 @@ function CharacterSheet({
             }`}
           >
             {t.label}
+            {locked(t.id) && (
+              <span aria-hidden className="ml-1.5 opacity-60">
+                🔒
+              </span>
+            )}
           </button>
         ))}
         {/* In fondo: Opzioni (propria scheda) e Gestisci (admin) */}
@@ -371,7 +416,8 @@ function CharacterSheet({
             pen={(onEdit, label) => <Pen onClick={onEdit} label={label} />}
           />
         )}
-        {active && tab === "caratteristiche" && (
+        {active && locked(tab) && <LockedPage />}
+        {active && tab === "caratteristiche" && !locked(tab) && (
           <AttributesPage character={character} />
         )}
         {active && tab === "aspetto" && (
@@ -381,7 +427,7 @@ function CharacterSheet({
             onSaved={onSaved}
           />
         )}
-        {active && tab === "storia" && (
+        {active && tab === "storia" && !locked(tab) && (
           <StoryPage character={character} info={info} isOwn={isOwn} />
         )}
         {active && isOwn && tab === "opzioni" && <SheetOptions />}
@@ -392,7 +438,7 @@ function CharacterSheet({
             onSaved={onSaved}
           />
         )}
-        {active && tab === "abilita" && (
+        {active && tab === "abilita" && !locked(tab) && (
           <SkillsPage
             character={character}
             isOwn={isOwn}
@@ -400,7 +446,7 @@ function CharacterSheet({
             onSaved={onSaved}
           />
         )}
-        {active && tab === "tratti" && (
+        {active && tab === "tratti" && !locked(tab) && (
           <TraitsPage
             character={character}
             canEdit={canRules}

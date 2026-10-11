@@ -32,7 +32,7 @@ export type Dragon = {
   rider_id: string | null; // cavaliere PG
   npc_rider_id: string | null; // oppure cavaliere PNG
   growth_px: number; // PX investiti nella fase attuale (maturazione)
-  loyalty: number; // fedelta' al cavaliere, 0-100 (per ora solo rappresentativa)
+  loyalty: number; // fedelta' al cavaliere, 0-100: la alza il cavaliere ("Rafforza il legame") e pesa sui tiri
   hatched_at: string | null;
   created_at: string;
 };
@@ -124,4 +124,76 @@ export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 export function effectLabel(e: TraitEffect, skillLabel: (key: string) => string) {
   const target = e.target_kind === "caratteristica" ? (STATS.find((s) => s.key === e.target_key)?.label ?? e.target_key) : skillLabel(e.target_key);
   return `${signed(e.modifier)} ${target}${e.condition.trim() ? ` (${e.condition.trim()})` : ""}`;
+}
+
+// ---------------------------------------------------------------------
+// Fedelta' al cavaliere (0-100). Parte da 0, la alza solo il cavaliere
+// spendendo PX ("Rafforza il legame") e torna a 0 quando il drago cambia o
+// perde il cavaliere. A ogni tiro del drago:
+//   - "chance" % di avere il modificatore "mod" (bonus o malus)
+//   - "critSuccess" % di successo critico (+1d10)
+//   - "critFail" % di fallimento critico (-1d10)
+// Piu' il drago e' grande, piu' fedelta' serve perche' ascolti: sotto la
+// soglia del suo stadio disobbedisce e i fallimenti critici aumentano.
+// ---------------------------------------------------------------------
+export type LoyaltyTier = {
+  from: number; // fedelta' minima
+  name: string;
+  chance: number;
+  mod: number;
+  critSuccess: number;
+  critFail: number;
+};
+
+export const LOYALTY_TIERS: LoyaltyTier[] = [
+  { from: 0, name: "Diffidente", chance: 20, mod: -2, critSuccess: 0, critFail: 15 },
+  { from: 25, name: "Guardingo", chance: 10, mod: -1, critSuccess: 5, critFail: 10 },
+  { from: 50, name: "Legato", chance: 15, mod: 1, critSuccess: 5, critFail: 5 },
+  { from: 75, name: "Devoto", chance: 25, mod: 2, critSuccess: 10, critFail: 3 },
+  { from: 100, name: "Un'anima sola", chance: 35, mod: 2, critSuccess: 15, critFail: 0 },
+];
+
+// Soglia di obbedienza: 20% in piu' a ogni stadio (neonato 0, adulto 80)
+export const OBEDIENCE_STEP = 20;
+export const obedienceThreshold = (stageIndex: number) => Math.min(100, Math.max(0, stageIndex) * OBEDIENCE_STEP);
+export const stageIndex = (stage: string | null, stages: DragonStage[]) => stages.find((s) => s.stage === stage)?.sort_order ?? 0;
+
+// Fascia di fedelta' con gli effetti in vigore per un drago di quello stadio
+export function loyaltyTier(loyalty: number, stageIdx = 0): LoyaltyTier & { threshold: number; disobeys: boolean } {
+  const tier = [...LOYALTY_TIERS].reverse().find((t) => loyalty >= t.from) ?? LOYALTY_TIERS[0];
+  const threshold = obedienceThreshold(stageIdx);
+  const disobeys = loyalty < threshold;
+  // sotto la soglia: mezzo punto percentuale di fallimento critico per ogni punto che manca
+  const critFail = disobeys ? Math.max(tier.critFail, Math.round((threshold - loyalty) / 2)) : tier.critFail;
+  return { ...tier, critFail, threshold, disobeys };
+}
+
+// "25% di +2 al tiro · successo critico 10% · fallimento critico 3%"
+export function loyaltyEffects(t: LoyaltyTier) {
+  return [
+    `${t.chance}% di ${signed(t.mod)} al tiro`,
+    `successo critico ${t.critSuccess}%`,
+    `fallimento critico ${t.critFail}%`,
+  ].join(" · ");
+}
+
+// Effetto della fedelta' su un tiro del drago: quanto aggiunge (o toglie) e perche'
+export function rollLoyalty(loyalty: number, stageIdx: number, rng: () => number): { value: number; label: string } {
+  const t = loyaltyTier(loyalty, stageIdx);
+  const d100 = () => Math.floor(rng() * 100) + 1;
+  let value = 0;
+  const notes: string[] = [];
+  if (d100() <= t.chance) {
+    value += t.mod;
+    notes.push(t.mod > 0 ? "slancio" : "riluttanza");
+  }
+  const crit = d100();
+  if (crit <= t.critFail) {
+    value -= Math.floor(rng() * 10) + 1;
+    notes.push(t.disobeys ? "non ascolta: fallimento critico" : "fallimento critico");
+  } else if (crit > 100 - t.critSuccess) {
+    value += Math.floor(rng() * 10) + 1;
+    notes.push("successo critico");
+  }
+  return { value, label: `fedeltà (${notes.join(", ")})` };
 }

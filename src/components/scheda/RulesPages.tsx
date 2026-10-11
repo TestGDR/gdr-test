@@ -173,7 +173,7 @@ export function DerivedPanel({ character }: { character: Character }) {
       <dl className="flex gap-3 sm:flex-col">
         {(
           [
-            ["PX", character.px ?? 0],
+            ["PX", `${character.px ?? 0}${character.px_half ? ",5" : ""}`],
             ["Risorse", character.resources ?? 0],
             [
               "Onore",

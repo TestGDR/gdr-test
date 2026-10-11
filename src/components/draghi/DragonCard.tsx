@@ -82,7 +82,7 @@ export default function DragonCard({
       <DragonBars dragon={dragon} stages={stages} />
       {rider && (
         <p className="text-xs text-muted">
-          Per investire PX nella maturazione o migliorare le abilità apri <strong className="text-foreground">Il mio drago</strong> (icona
+          Per far crescere caratteristiche e abilità con i PX apri <strong className="text-foreground">Il mio drago</strong> (icona
           del drago nella barra di destra, o nel menu su cellulare). Hai {rider.px} PX.
         </p>
       )}
@@ -240,8 +240,12 @@ function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: n
   const used = Object.values(alloc).reduce((a, b) => a + b, 0);
   const left = dragon.unspent_points - used;
   const all = { ...dragon.stats, ...dragon.skills };
-  // caratteristiche: tetto della fase; abilita': massimo generale
-  const capOf = (key: string) => (key in dragon.stats ? statCap : MAX_VALUE);
+  // caratteristiche: tetto della fase; abilita': mai oltre la loro caratteristica
+  const capOf = (key: string) => {
+    if (key in dragon.stats) return statCap;
+    const stat = skills.find((s) => s.key === key)?.stat_key ?? "";
+    return Math.min(MAX_VALUE, (dragon.stats[stat] ?? 0) + (alloc[stat] ?? 0));
+  };
 
   const control = (key: string) => (
     <span className="flex shrink-0 gap-1">
@@ -280,7 +284,7 @@ function PointsEditor({ dragon, statCap, onSaved }: { dragon: Dragon; statCap: n
     <div className="space-y-3 border border-[#c9a05a]/50 bg-[#c9a05a]/5 p-3">
       <p className="text-sm">
         Punti da distribuire: <strong className="text-[#e8cf9c]">{left}</strong> su {dragon.unspent_points}
-        <span className="text-muted"> · in questa fase ogni caratteristica arriva al massimo a {statCap}</span>
+        <span className="text-muted"> · in questa fase ogni caratteristica arriva al massimo a {statCap}; un&apos;abilità non supera la sua caratteristica</span>
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <ValueList title="Caratteristiche" items={STATS} values={dragon.stats} extra={alloc} renderControl={control} />

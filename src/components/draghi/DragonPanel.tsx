@@ -24,7 +24,7 @@ import DragonBars from "./DragonBars";
 // cornice esagonale, i valori nei cerchi e le linguette laterali per le sezioni
 
 type TraitInfo = { pregio: string; difetto: string; pregio_text?: string; difetto_text?: string };
-type Data = { dragon: Dragon | null; stages: DragonStage[]; traits: TraitInfo[]; px: number; riderName: string; skillFactor: number };
+type Data = { dragon: Dragon | null; stages: DragonStage[]; traits: TraitInfo[]; px: number; pxHalf: boolean; riderName: string; skillFactor: number; bondCost: number };
 
 const TABS = [
   { id: "scheda", label: "Scheda" },
@@ -49,16 +49,18 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
       supabase.from("dragons").select("*").eq("rider_id", characterId).maybeSingle(),
       supabase.from("dragon_stages").select("*").order("sort_order"),
       supabase.from("dragon_trait_pairs").select("*"),
-      supabase.from("characters").select("name, px").eq("id", characterId).single(),
-      supabase.from("dragon_settings").select("skill_px_factor").maybeSingle(),
+      supabase.from("characters").select("name, px, px_half").eq("id", characterId).single(),
+      supabase.from("dragon_settings").select("*").maybeSingle(),
     ]);
     return {
       dragon: (dragon.data ?? null) as Dragon | null,
       stages: (stages.data ?? []) as DragonStage[],
       traits: (traits.data ?? []) as TraitInfo[],
       px: me.data?.px ?? 0,
+      pxHalf: !!me.data?.px_half,
       riderName: me.data?.name ?? "",
       skillFactor: settings.data?.skill_px_factor ?? 10,
+      bondCost: settings.data?.bond_px_per_point ?? 1,
     };
   }, [supabase, characterId]);
 
@@ -85,7 +87,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
             {tab === "carattere" && <Character dragon={data.dragon} />}
             {tab === "tratti" && <Traits dragon={data.dragon} traits={data.traits} />}
             {tab === "crescita" && (
-              <Growth dragon={data.dragon} stages={data.stages} px={data.px} skillFactor={data.skillFactor} onChanged={reload} />
+              <Growth dragon={data.dragon} stages={data.stages} px={data.px} pxHalf={data.pxHalf} skillFactor={data.skillFactor} bondCost={data.bondCost} onChanged={reload} />
             )}
           </>
         )}
@@ -347,30 +349,37 @@ function Growth({
   dragon,
   stages,
   px,
+  pxHalf,
   skillFactor,
+  bondCost,
   onChanged,
 }: {
   dragon: Dragon;
   stages: DragonStage[];
   px: number;
+  pxHalf: boolean; // mezzo PX in sospeso (un'azione lunga vale mezzo PX)
   skillFactor: number;
+  bondCost: number; // PX per ogni punto di fedelta'
   onChanged: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const skills = useDragonSkills();
   const [name, setName] = useState(dragon.name);
   const [alloc, setAlloc] = useState<Record<string, number>>({});
-  const [invest, setInvest] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bond, setBond] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const stage = stages.find((s) => s.stage === dragon.stage);
   const next = nextStage(dragon.stage, stages);
-  const cost = stage?.px_to_next ?? null;
+  const adult = !next || (stage?.px_to_next ?? null) === null;
+  const pxLabel = pxHalf ? `${px},5` : `${px}`;
   const statCap = stage?.stat_cap ?? MAX_VALUE;
   const used = Object.values(alloc).reduce((a, b) => a + b, 0);
   const left = dragon.unspent_points - used;
   const value = (k: string) => (dragon.stats[k] ?? dragon.skills[k] ?? 0) + (alloc[k] ?? 0);
-  const cap = (k: string) => (k in dragon.stats ? statCap : MAX_VALUE);
+  // caratteristiche: tetto della fase; abilita': mai oltre la loro caratteristica
+  const cap = (k: string) =>
+    k in dragon.stats ? statCap : Math.min(MAX_VALUE, value(skills.find((s) => s.key === k)?.stat_key ?? ""));
 
   async function run(op: () => PromiseLike<{ error: { message: string } | null }>, ok: string) {
     setBusy(true);
@@ -445,97 +454,131 @@ function Growth({
       <section className={box}>
         <SectionTitle>Maturazione</SectionTitle>
         <DragonBars dragon={dragon} stages={stages} variant="parchment" />
-        {next && cost !== null ? (
-          <div className="space-y-2">
-            <p className="text-sm">
-              Investi i tuoi PX nella crescita del drago: quando la barra si riempie diventa <strong>{next.label.toLowerCase()}</strong> e
-              riceve 5 punti da distribuire. Hai <strong>{px} PX</strong>.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={px}
-                value={invest}
-                onChange={(e) => setInvest(e.target.value)}
-                placeholder="PX"
-                aria-label="PX da investire"
-                className="w-24 border-0 border-b border-[#6b4a2e] bg-transparent px-1 py-1 font-serif text-lg text-[#3b2a1a] focus:border-[#8b2a14] focus:outline-none"
-              />
-              <button
-                type="button"
-                disabled={busy || !(Number(invest) >= 1) || Number(invest) > px}
-                onClick={async () => {
-                  const n = Math.trunc(Number(invest));
-                  if (await run(() => supabase.rpc("dragon_invest_px", { p_dragon: dragon.id, p_amount: n }), `Hai investito ${n} PX nella maturazione.`)) setInvest("");
-                }}
-                className={button}
-              >
-                Investi
-              </button>
-              {(() => {
-                const missing = Math.max(0, cost - dragon.growth_px);
-                return (
+        <p className="text-sm">
+          {adult ? (
+            <>È adulto: è ormai formato e le sue caratteristiche non crescono più. Puoi ancora completare le abilità.</>
+          ) : (
+            <>
+              Ogni PX speso per far crescere il drago riempie la barra: quando è piena diventa{" "}
+              <strong>{next.label.toLowerCase()}</strong> e riceve 5 punti da distribuire.
+            </>
+          )}{" "}
+          Hai <strong>{pxLabel} PX</strong>.
+        </p>
+      </section>
+
+      <section className={box}>
+        <SectionTitle>Rafforza il legame</SectionTitle>
+        {dragon.loyalty >= 100 ? (
+          <p className="text-center text-sm italic">Il legame è completo: siete un&apos;anima sola.</p>
+        ) : (
+          (() => {
+            const points = Math.min(100 - dragon.loyalty, Math.max(0, Math.trunc(Number(bond)) || 0));
+            const price = points * bondCost;
+            return (
+              <>
+                <p className="text-sm">
+                  La fedeltà cresce solo così: ogni punto costa <strong>{bondCost} PX</strong>. Se il drago perde o cambia cavaliere,
+                  la fedeltà torna a zero. Hai <strong>{pxLabel} PX</strong>.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100 - dragon.loyalty}
+                    value={bond}
+                    onChange={(e) => setBond(e.target.value)}
+                    placeholder="Punti"
+                    aria-label="Punti di fedeltà da aggiungere"
+                    className="w-24 border-0 border-b border-[#6b4a2e] bg-transparent px-1 py-1 font-serif text-lg text-[#3b2a1a] focus:border-[#8b2a14] focus:outline-none"
+                  />
                   <button
                     type="button"
-                    disabled={busy || missing === 0 || px < missing}
-                    onClick={() =>
-                      window.confirm(`Investire ${missing} PX e far crescere ${dragonName(dragon)} a ${next.label}?`) &&
-                      run(
-                        () => supabase.rpc("dragon_invest_px", { p_dragon: dragon.id, p_amount: missing }),
-                        `${dragonName(dragon)} è cresciuto: ora è ${next.label.toLowerCase()}!`,
+                    disabled={busy || points < 1 || px < price}
+                    onClick={async () => {
+                      if (
+                        await run(
+                          () => supabase.rpc("dragon_bond", { p_dragon: dragon.id, p_points: points }),
+                          `La fedeltà sale al ${dragon.loyalty + points}%.`,
+                        )
                       )
-                    }
-                    className="text-sm text-[#8b2a14] underline disabled:no-underline disabled:opacity-40"
+                        setBond("");
+                    }}
+                    className={button}
                   >
-                    Completa la fase ({missing} PX)
+                    {points > 0 ? `+${points}% · ${price} PX` : "Rafforza"}
                   </button>
-                );
-              })()}
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm italic">È adulto: ha raggiunto l&apos;ultima fase di crescita.</p>
+                </div>
+              </>
+            );
+          })()
         )}
       </section>
 
       <section className={box}>
-        <SectionTitle>Abilità con i PX</SectionTitle>
+        <SectionTitle>Crescita con i PX</SectionTitle>
         <p className="text-center text-xs italic">
-          Alzare un&apos;abilità di 1 costa {skillFactor} PX × il nuovo valore. Hai {px} PX.
+          Alzare una voce di 1 costa {skillFactor} PX × il nuovo valore. In questa fase ogni caratteristica arriva al massimo a{" "}
+          {statCap}; un&apos;abilità non supera mai la sua caratteristica.
         </p>
-        <ul className="divide-y divide-[#6b4a2e]/25">
-          {skills.map((sk) => {
-            const cur = dragon.skills[sk.key] ?? 0;
-            const price = skillFactor * (cur + 1);
-            return (
-              <li key={sk.key} className="flex items-center gap-3 py-1.5 text-sm">
-                <span className="flex-1 font-serif">{sk.label}</span>
-                <span className="w-8 text-center font-serif text-lg">{cur}</span>
-                <button
-                  type="button"
-                  disabled={busy || cur >= MAX_VALUE || px < price}
-                  onClick={() =>
-                    run(
-                      () => supabase.rpc("dragon_buy_skill", { p_dragon: dragon.id, p_skill: sk.key }),
-                      `${sk.label} sale a ${cur + 1}.`,
-                    )
-                  }
-                  className="w-32 border border-[#6b4a2e] px-2 py-1 text-xs hover:bg-[#c9a05a]/30 disabled:opacity-35"
-                >
-                  {cur >= MAX_VALUE ? "al massimo" : `+1 · ${price} PX`}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {[
+          {
+            title: "Caratteristiche",
+            items: STATS.map((s) => ({
+              key: s.key as string,
+              label: s.label as string,
+              cur: dragon.stats[s.key] ?? 0,
+              max: adult ? 0 : statCap,
+              note: "",
+            })),
+          },
+          {
+            title: "Abilità",
+            items: skills.map((s) => ({
+              key: s.key,
+              label: s.label,
+              cur: dragon.skills[s.key] ?? 0,
+              max: Math.min(MAX_VALUE, dragon.stats[s.stat_key] ?? 0),
+              note: STATS.find((st) => st.key === s.stat_key)?.label ?? "",
+            })),
+          },
+        ].map((group) => (
+          <div key={group.title}>
+            <h4 className="mb-1 text-center text-[0.6875rem] tracking-[0.25em] text-[#6b4a2e] uppercase">{group.title}</h4>
+            <ul className="divide-y divide-[#6b4a2e]/25">
+              {group.items.map((it) => {
+                const price = skillFactor * (it.cur + 1);
+                const full = it.cur >= it.max;
+                return (
+                  <li key={it.key} className="flex items-center gap-3 py-1.5 text-sm">
+                    <span className="flex-1 font-serif">
+                      {it.label}
+                      {it.note && <span className="ml-2 text-xs text-[#6b4a2e] italic">{it.note}</span>}
+                    </span>
+                    <span className="w-8 text-center font-serif text-lg">{it.cur}</span>
+                    <button
+                      type="button"
+                      disabled={busy || full || px < price}
+                      onClick={() =>
+                        run(() => supabase.rpc("dragon_buy", { p_dragon: dragon.id, p_key: it.key }), `${it.label} sale a ${it.cur + 1}.`)
+                      }
+                      className="w-32 border border-[#6b4a2e] px-2 py-1 text-xs hover:bg-[#c9a05a]/30 disabled:opacity-35"
+                    >
+                      {full ? (group.title === "Caratteristiche" && adult ? "formato" : "al massimo") : `+1 · ${price} PX`}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </section>
 
       {dragon.unspent_points > 0 && (
         <section className={box}>
           <SectionTitle>Punti da distribuire: {left}</SectionTitle>
           <p className="text-center text-xs italic">
-            In questa fase ogni caratteristica arriva al massimo a {statCap}; le abilità a {MAX_VALUE}.
+            In questa fase ogni caratteristica arriva al massimo a {statCap}; un&apos;abilità non supera la sua caratteristica.
           </p>
           {[
             { title: "Caratteristiche", items: STATS },

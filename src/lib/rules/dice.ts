@@ -23,6 +23,8 @@ export const DICE_VARS = {
   DABILITA: "Abilità del drago scelta (Volare, Attacco fisico...)",
   DTRATTI:
     "Pregi e difetti del drago sulla caratteristica/abilità scelta (senza condizioni)",
+  DFEDELTA:
+    "Effetto della fedeltà del drago (bonus, malus, critici): si aggiunge da solo ai tiri del drago",
 } as const;
 export type DiceVar = string;
 const DEFAULT_CODES = RULES.stats.map((s) => s.code as string);
@@ -184,7 +186,8 @@ export function rollFormula(
       } else {
         const n = typeof v === "number" ? v : Number(v) || 0;
         parts.push({
-          label: `${input.varLabels?.[t.name] ?? t.name} ${n}`,
+          // un valore negativo ha gia il segno meno davanti: non lo si ripete
+          label: `${input.varLabels?.[t.name] ?? t.name} ${t.sign > 0 && n < 0 ? -n : n}`,
           value: t.sign * n,
         });
       }

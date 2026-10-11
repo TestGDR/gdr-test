@@ -31,6 +31,7 @@ export type StaffUser = { id: string; name: string; role: string };
 type Npc = Character & {
   house_npc_id?: string | null;
   npc_manager_id?: string | null;
+  npc_public?: boolean;
 };
 type Msg = { ok: boolean; text: string } | null;
 const lbl = "mb-1 block text-xs tracking-wider text-muted uppercase";
@@ -220,6 +221,7 @@ function NpcForm({
   );
   const [house, setHouse] = useState(houseId ?? "");
   const [manager, setManager] = useState(npc?.npc_manager_id ?? "");
+  const [isPublic, setIsPublic] = useState(npc?.npc_public !== false);
   const [attrs, setAttrs] = useState<Record<string, number> | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [traits, setTraits] = useState<Trait[]>([]);
@@ -306,6 +308,7 @@ function NpcForm({
       house_id: house || null,
       house_npc_id: npc?.house_npc_id ?? fromHouse?.id ?? null,
       manager_id: manager || null,
+      is_public: isPublic,
     });
     setBusy(false);
     if (res.error) return setMsg({ ok: false, text: res.error });
@@ -434,6 +437,18 @@ function NpcForm({
         l&apos;albero genealogico, i ruoli e i draghi). Se è affidato a una
         persona, in chat lo muove solo lei (e l&apos;Admin).
       </p>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={isPublic}
+          onChange={(e) => setIsPublic(e.target.checked)}
+        />
+        Visibile ai giocatori
+        <span className="text-xs text-muted">
+          (compare in Utility → Anagrafe PNG e i giocatori possono aprirne la
+          scheda; senza spunta lo vede solo chi gestisce i PNG)
+        </span>
+      </label>
       <label className="block">
         <span className={lbl}>Immagine (indirizzo https, facoltativa)</span>
         <input

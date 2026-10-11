@@ -22,6 +22,7 @@ export type Character = {
   visible_marks?: string | null; // segni visibili (cicatrici, tatuaggi...)
   custom_fields?: Record<string, string | number | boolean | string[]>; // campi personalizzati visibili a tutti
   px?: number; // punti esperienza da spendere nelle abilita'
+  px_half?: boolean; // mezzo PX in sospeso (un'azione lunga in chat vale mezzo PX)
   resources?: number; // Risorse (R)
   honor?: number; // Onore 0-10
   hp_current?: number | null; // Punti Ferita attuali (vuoto = pieni)

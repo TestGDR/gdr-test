@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import DragonRegistry from "@/components/draghi/DragonRegistry";
 import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import Bank from "./Bank";
+import { DragonIcon } from "./icons";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,13 +18,16 @@ type Pg = {
   avatar_url: string | null;
   house: { name: string; sigil_url: string | null } | null;
 };
-type PlayableHouse = { id: string; name: string; sigil_url: string | null; motto: string };
+type PlayableHouse = { id: string; name: string; sigil_url: string | null; motto: string; playable: boolean };
 
 // Box della schermata iniziale: cliccandone uno il suo contenuto prende il posto dei box
 const BOXES = [
   { id: "pg", label: "Anagrafe personaggi", icon: <AddressBookIcon />, color: "text-accent" },
   { id: "prestavolti", label: "Anagrafe prestavolti", icon: <MasksIcon />, color: "text-amber-400" },
   { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
+  { id: "png", label: "Anagrafe PNG", icon: <AddressBookIcon />, color: "text-[#9fb4c9]" },
+  { id: "casate-png", label: "Casate PNG", icon: <ShieldIcon />, color: "text-[#9fb4c9]" },
+  { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[2.2]"><DragonIcon /></span>, color: "text-orange-400" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
   { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
 ] as const;
@@ -43,22 +48,40 @@ function UtilityPanel() {
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<Section | null>(null); // null = schermata dei box
   const [houseId, setHouseId] = useState<string | null>(null); // casata aperta dentro la modale
-  const [pgs, setPgs] = useState<Pg[] | null>(null);
-  const [houses, setHouses] = useState<PlayableHouse[]>([]);
+  const [allPgs, setPgs] = useState<Pg[] | null>(null);
+  const [npcs, setNpcs] = useState<Pg[]>([]); // PNG con una scheda visibile ai giocatori
+  const [allHouses, setHouses] = useState<PlayableHouse[]>([]);
   const [query, setQuery] = useState("");
   const [letter, setLetter] = useState<string | null>(null); // lettera scelta nell'indice A-Z
   const [sheetId, setSheetId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      supabase.from("characters").select("id, name, status, face_claim, avatar_url, house:houses(name, sigil_url)").order("name"),
-      supabase.from("houses").select("id, name, sigil_url, motto").eq("playable", true).order("sort_order").order("name"),
-    ]).then(([c, h]) => {
+      supabase.from("characters").select("id, name, status, face_claim, avatar_url, house:houses(name, sigil_url)").eq("is_npc", false).order("name"),
+      supabase.from("houses").select("id, name, sigil_url, motto, playable").order("sort_order").order("name"),
+      // PNG: la casata e' quella del PNG di casata collegato
+      supabase
+        .from("characters")
+        .select("id, name, status, face_claim, avatar_url, house_npc:house_npcs(house:houses(name, sigil_url))")
+        .eq("is_npc", true)
+        .order("name"),
+    ]).then(([c, h, n]) => {
       setPgs((c.data ?? []) as unknown as Pg[]);
       setHouses((h.data ?? []) as PlayableHouse[]);
+      setNpcs(
+        ((n.data ?? []) as unknown as (Pg & { house_npc: { house: Pg["house"] } | null })[]).map((x) => ({
+          ...x,
+          house: x.house_npc?.house ?? null,
+        })),
+      );
     });
   }, [supabase]);
 
+  // l'anagrafe dei PNG usa lo stesso elenco dei personaggi; le Casate PNG sono quelle non giocabili
+  const isNpcTab = tab === "png";
+  const isHouseTab = tab === "casate" || tab === "casate-png";
+  const pgs = isNpcTab ? (allPgs === null ? null : npcs) : allPgs;
+  const houses = allHouses.filter((h) => h.playable === (tab !== "casate-png"));
   const openHouse = houses.find((h) => h.id === houseId);
   const q = query.trim().toLowerCase();
   const fullName = (p: Pg) => (p.house ? `${p.name} ${p.house.name}` : p.name);
@@ -104,7 +127,7 @@ function UtilityPanel() {
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
         {openHouse ? (
           <button type="button" onClick={() => setHouseId(null)} className="text-sm text-muted hover:text-accent">
-            ← Casate PG
+            ← {tab === "casate-png" ? "Casate PNG" : "Casate PG"}
           </button>
         ) : (
           <button type="button" onClick={() => setTab(null)} className="text-sm text-muted hover:text-accent">
@@ -114,11 +137,11 @@ function UtilityPanel() {
         <h2 className="font-serif text-lg tracking-[0.15em] text-accent uppercase">
           {openHouse ? `Casata ${openHouse.name}` : BOXES.find((b) => b.id === tab)?.label}
         </h2>
-        {(tab === "pg" || tab === "prestavolti") && (
+        {(tab === "pg" || tab === "png" || tab === "prestavolti") && (
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={tab === "pg" ? "Cerca un personaggio..." : "Cerca un prestavolto..."}
+            placeholder={tab === "pg" ? "Cerca un personaggio..." : tab === "png" ? "Cerca un PNG..." : "Cerca un prestavolto..."}
             className="input ml-auto w-full py-1.5 text-sm sm:w-64"
           />
         )}
@@ -128,7 +151,7 @@ function UtilityPanel() {
         {pgs === null && tab !== "stanze" && tab !== "banca" && <p className="text-center text-muted">Caricamento...</p>}
 
         {/* Indice A-Z (anagrafe personaggi e prestavolti) */}
-        {pgs !== null && (tab === "pg" || tab === "prestavolti") && (
+        {pgs !== null && (tab === "pg" || tab === "png" || tab === "prestavolti") && (
           <nav aria-label="Indice alfabetico" className="mb-4 flex flex-wrap justify-center gap-1">
             <LetterButton label="Tutti" active={letter === null} onClick={() => setLetter(null)} />
             {LETTERS.concat(available.has("#") ? ["#"] : []).map((l) => (
@@ -138,7 +161,7 @@ function UtilityPanel() {
         )}
 
         {/* Anagrafica giocatori: nome e cognome, cliccabili, divisi per lettera */}
-        {pgs !== null && tab === "pg" &&
+        {pgs !== null && (tab === "pg" || tab === "png") &&
           groups.map((g) => (
             <section key={g.letter} className="mb-5">
               <h3 className="mb-2 border-b border-blood/50 pb-1 font-serif text-xl text-accent">{g.letter}</h3>
@@ -156,7 +179,8 @@ function UtilityPanel() {
                       {p.name}
                       {p.house && <span className="text-foreground"> {p.house.name}</span>}
                     </span>
-                    {p.status !== "attivo" && <span className="text-xs text-amber-200">PG non ancora attivo</span>}
+                    {p.status !== "attivo" && !isNpcTab && <span className="text-xs text-amber-200">PG non ancora attivo</span>}
+                    {isNpcTab && <span className="text-xs text-muted">Personaggio non giocante</span>}
                   </span>
                   {p.house?.sigil_url && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -169,6 +193,7 @@ function UtilityPanel() {
             </section>
           ))}
         {pgs !== null && tab === "pg" && groups.length === 0 && <p className="text-muted">Nessun personaggio trovato.</p>}
+        {pgs !== null && tab === "png" && groups.length === 0 && <p className="text-muted">Nessun PNG in anagrafe.</p>}
 
         {/* Anagrafica prestavolti */}
         {pgs !== null && tab === "prestavolti" &&
@@ -198,15 +223,17 @@ function UtilityPanel() {
         {/* Stanze in affitto */}
         {tab === "stanze" && <RoomBooking />}
         {tab === "banca" && <Bank />}
+        {tab === "draghi" && <DragonRegistry />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
         {/* Pagina della casata aperta, al posto dell'elenco */}
-        {tab === "casate" && houseId && <HouseLoader key={houseId} houseId={houseId} />}
+        {isHouseTab && houseId && <HouseLoader key={houseId} houseId={houseId} />}
 
-        {pgs !== null && tab === "casate" && !houseId && (
+        {pgs !== null && isHouseTab && !houseId && (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {houses.map((h) => {
-              const members = (pgs ?? []).filter((p) => p.house?.name === h.name).length;
+              // casate PG: quanti PG; casate PNG: quanti PNG con una scheda
+              const members = (tab === "casate-png" ? npcs : (allPgs ?? [])).filter((p) => p.house?.name === h.name).length;
               return (
                 <li key={h.id}>
                   <button
@@ -226,14 +253,14 @@ function UtilityPanel() {
                       <span className="block font-serif text-lg text-accent">{h.name}</span>
                       {h.motto && <span className="block truncate text-xs text-muted italic">«{h.motto}»</span>}
                       <span className="block text-xs text-muted">
-                        {members} PG
+                        {members} {tab === "casate-png" ? "PNG" : "PG"}
                       </span>
                     </span>
                   </button>
                 </li>
               );
             })}
-            {houses.length === 0 && <li className="text-muted">Nessuna casata giocabile.</li>}
+            {houses.length === 0 && <li className="text-muted">{tab === "casate-png" ? "Nessuna casata PNG." : "Nessuna casata giocabile."}</li>}
           </ul>
         )}
       </div>
