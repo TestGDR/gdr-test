@@ -1762,7 +1762,8 @@ function DragonField({
   }, [supabase, character.id]);
 
   if (dragon === undefined) return <PaperRow label="Drago" value="..." />;
-  if (!dragon && !isOwn) return <PaperRow label="Drago" value="—" />;
+  // senza un uovo o un drago suo non c'e' niente da aprire
+  if (!dragon) return <PaperRow label="Drago" value="—" />;
 
   return (
     <>
@@ -1774,20 +1775,19 @@ function DragonField({
             onClick={() => setOpen(true)}
             className="font-semibold text-[#7a1d16] underline-offset-2 hover:underline"
           >
-            {dragon ? dragonName(dragon) : "Nessuno · uova della casata"}
+            {dragonName(dragon)}
           </button>
         }
       />
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={dragon ? `Drago di ${character.name}` : "Draghi"}
+        title={dragon.status === "uovo" ? `Uovo di ${character.name}` : `Drago di ${character.name}`}
         size="lg"
       >
         <DragonSection
           characterId={character.id}
           characterName={character.name}
-          houseId={character.house_id ?? null}
           isOwn={isOwn}
         />
       </Modal>

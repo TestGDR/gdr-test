@@ -79,6 +79,8 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
             <p className="font-serif text-2xl text-[#8b2a14]">Nessun drago</p>
             <p className="mt-2 italic">Non sei ancora il cavaliere di un drago.</p>
           </div>
+        ) : data.dragon.status === "uovo" ? (
+          <EggView dragon={data.dragon} onHatched={reload} />
         ) : (
           <>
             <Header dragon={data.dragon} stages={data.stages} />
@@ -94,7 +96,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
       </div>
 
       {/* Linguette laterali */}
-      {data?.dragon && (
+      {data?.dragon && data.dragon.status !== "uovo" && (
         <nav aria-label="Sezioni della scheda" className="flex w-9 shrink-0 flex-col gap-1.5 py-6">
           {TABS.map((t) => (
             <button
@@ -625,6 +627,43 @@ function Growth({
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+// L'uovo non ancora schiuso: al posto del nome c'e' solo "Schiudi"
+function EggView({ dragon, onHatched }: { dragon: Dragon; onHatched: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function hatch() {
+    if (!window.confirm("Far schiudere il tuo uovo? Nascerà un drago neonato con caratteristiche estratte a caso.")) return;
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase.rpc("hatch_egg", { p_dragon: dragon.id });
+    setBusy(false);
+    if (error) return setError(error.message);
+    onHatched();
+  }
+
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-12 text-center">
+      <SectionTitle>Uovo di drago</SectionTitle>
+      <div className="flex h-36 w-28 items-center justify-center rounded-[50%] border-2 border-[#6b4a2e] bg-[radial-gradient(circle_at_35%_30%,#f4e9cd,#c9a05a_55%,#6b4a2e)] shadow-[inset_-6px_-10px_18px_rgb(0_0_0/0.35),0_6px_14px_rgb(0_0_0/0.35)]" />
+      <p className="leading-relaxed italic">
+        Il tuo uovo non si è ancora schiuso. Quando nascerà, il drago avrà caratteristiche, pregi, difetti e carattere estratti a caso, e
+        potrai dargli un nome.
+      </p>
+      <button
+        type="button"
+        onClick={hatch}
+        disabled={busy}
+        className="border border-[#3a2410] bg-[#6b2a14] px-6 py-2 font-serif text-sm tracking-widest text-[#f4e9cd] uppercase shadow transition hover:bg-[#7e3218] disabled:opacity-40"
+      >
+        {busy ? "..." : "Schiudi"}
+      </button>
+      {error && <p className="text-sm font-semibold text-[#8b2a14]">{error}</p>}
     </div>
   );
 }
