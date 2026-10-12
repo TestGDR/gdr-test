@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { STATUS_LABEL, when, type Spy, type SpySettings } from "@/lib/spies";
+import { STATUS_LABEL, when, type Spy, type SpyLevel, type SpySettings } from "@/lib/spies";
 import { createClient } from "@/lib/supabase/client";
 
 type Mission = {
@@ -26,7 +26,8 @@ type SpyRow = Spy & { character: { name: string } | null };
 const TABS = [
   { id: "missioni", label: "Missioni" },
   { id: "spie", label: "Spie dei personaggi" },
-  { id: "regole", label: "Regole e costi" },
+  { id: "livelli", label: "Livelli, prezzi e riuscita" },
+  { id: "regole", label: "Regole generali" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -42,17 +43,20 @@ export default function SpiesManager({ canRules }: { canRules: boolean }) {
   const [missions, setMissions] = useState<Mission[] | null>(null);
   const [spies, setSpies] = useState<SpyRow[]>([]);
   const [settings, setSettings] = useState<SpySettings | null>(null);
+  const [levels, setLevels] = useState<SpyLevel[]>([]);
   const [missing, setMissing] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [now] = useState(() => Date.now());
 
   const load = useCallback(async () => {
-    const [m, s, st] = await Promise.all([
+    const [m, s, st, lv] = await Promise.all([
       supabase.from("spy_missions").select("*, character:characters(name)").order("started_at", { ascending: false }).limit(200),
       supabase.from("spies").select("*, character:characters(name)").order("created_at", { ascending: false }),
       supabase.from("spy_settings").select("*").maybeSingle(),
+      supabase.from("spy_levels").select("*").order("level"),
     ]);
-    setMissing(!!st.error || !st.data);
+    setMissing(!!st.error || !st.data || !!lv.error);
+    setLevels((lv.data ?? []) as SpyLevel[]);
     setMissions((m.data ?? []) as unknown as Mission[]);
     setSpies((s.data ?? []) as unknown as SpyRow[]);
     setSettings((st.data ?? null) as SpySettings | null);
@@ -62,7 +66,7 @@ export default function SpiesManager({ canRules }: { canRules: boolean }) {
   }, [load]);
 
   if (missions === null) return <p className="text-sm text-muted">Caricamento...</p>;
-  if (missing || !settings) return <p className="text-sm text-amber-200">Prima va eseguita la migrazione 0131 in Supabase.</p>;
+  if (missing || !settings) return <p className="text-sm text-amber-200">Prima vanno eseguite le migrazioni 0131 e 0134 in Supabase.</p>;
 
   const run = async (op: () => PromiseLike<{ error: { message: string } | null }>, ok: string) => {
     setMsg(null);
@@ -139,6 +143,11 @@ export default function SpiesManager({ canRules }: { canRules: boolean }) {
                       </button>
                     </>
                   )}
+                  {sp.status === "abbandonata" && (
+                    <button type="button" onClick={() => run(() => supabase.rpc("spy_set_status", { p_spy: sp.id, p_status: "libera" }), `${sp.name} è tornata dal suo padrone.`)} className="text-xs text-muted hover:text-accent" title="Il giocatore aveva rinunciato a lei">
+                      Falla tornare
+                    </button>
+                  )}
                   {sp.status === "morta" && (
                     <button type="button" onClick={() => run(() => supabase.rpc("spy_set_status", { p_spy: sp.id, p_status: "libera" }), `${sp.name} è di nuovo disponibile.`)} className="text-xs text-muted hover:text-accent">
                       Riporta in vita
@@ -148,6 +157,25 @@ export default function SpiesManager({ canRules }: { canRules: boolean }) {
               ))}
             </ul>
           ))}
+
+        {tab === "livelli" && (
+          <LevelsForm
+            key={levels.map((l) => `${l.level}:${l.cost}:${l.ok_light}:${l.ok_normal}:${l.ok_deep}`).join("|")}
+            levels={levels}
+            canEdit={canRules}
+            onSave={(next) =>
+              run(async () => {
+                // i livelli tolti dal fondo spariscono, gli altri si aggiornano
+                const drop = levels.filter((l) => !next.some((n) => n.level === l.level)).map((l) => l.level);
+                if (drop.length) {
+                  const r = await supabase.from("spy_levels").delete().in("level", drop);
+                  if (r.error) return r;
+                }
+                return supabase.from("spy_levels").upsert(next);
+              }, "Livelli salvati.")
+            }
+          />
+        )}
 
         {tab === "regole" && (
           <RulesForm
@@ -207,32 +235,134 @@ function MissionCard({ m, back, onReport }: { m: Mission; back: boolean; onRepor
   );
 }
 
-const FIELDS: { key: keyof SpySettings; label: string; hint?: string }[] = [
-  { key: "recruit_cost", label: "Costo per reclutare (monete)" },
-  { key: "train_cost", label: "Costo per addestrare (monete × nuovo livello)" },
-  { key: "max_level", label: "Livello massimo" },
-  { key: "max_spies", label: "Spie per personaggio (al massimo)" },
+const clamp = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || 0)));
+const th = "py-1.5 pr-3 text-left text-xs tracking-wide text-muted uppercase";
+
+// Un riga per livello: quanto costa arrivarci e quante probabilita' di riuscita da'
+function LevelsForm({ levels, canEdit, onSave }: { levels: SpyLevel[]; canEdit: boolean; onSave: (l: SpyLevel[]) => Promise<boolean> }) {
+  const [rows, setRows] = useState<SpyLevel[]>(levels);
+  const set = (level: number, patch: Partial<SpyLevel>) => setRows((r) => r.map((x) => (x.level === level ? { ...x, ...patch } : x)));
+  const last = rows[rows.length - 1];
+  const changed = JSON.stringify(rows) !== JSON.stringify(levels);
+  const pct = (l: SpyLevel, k: "ok_light" | "ok_normal" | "ok_deep", label: string) => (
+    <td className="py-1.5 pr-3">
+      <input
+        type="number"
+        min={0}
+        max={100}
+        value={l[k]}
+        disabled={!canEdit}
+        onChange={(e) => set(l.level, { [k]: clamp(e.target.value, 0, 100) })}
+        aria-label={`Riuscita ${label} al livello ${l.level}`}
+        className="input w-20 py-1"
+      />
+      <span className="ml-1 text-xs text-muted">%</span>
+    </td>
+  );
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        Ogni riga è un livello della spia. Il prezzo è quello che si paga per arrivarci: al livello 1 è il costo per reclutarla, dal 2
+        in su è l&apos;addestramento. Le percentuali sono la probabilità che la missione riesca; il resto è la probabilità che la spia
+        venga catturata o uccisa.
+      </p>
+      {!canEdit && <p className="text-sm text-muted">Per cambiare questi numeri serve il permesso &quot;Statistiche, abilità e tratti&quot;.</p>}
+      <div className="overflow-x-auto">
+        <table className="text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className={th}>Livello</th>
+              <th className={th}>Prezzo (monete)</th>
+              <th className={th}>Riuscita: superficiale</th>
+              <th className={th}>Riuscita: normale</th>
+              <th className={th}>Riuscita: approfondita</th>
+              <th className={th}>Totale speso fin qui</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((l, i) => (
+              <tr key={l.level} className="border-b border-border/50">
+                <td className="py-1.5 pr-3 font-serif text-accent">
+                  {l.level}
+                  <span className="ml-2 text-xs text-muted">{l.level === 1 ? "reclutare" : "addestrare"}</span>
+                </td>
+                <td className="py-1.5 pr-3">
+                  <input
+                    type="number"
+                    min={0}
+                    value={l.cost}
+                    disabled={!canEdit}
+                    onChange={(e) => set(l.level, { cost: clamp(e.target.value, 0, 10000000) })}
+                    aria-label={`Prezzo del livello ${l.level}`}
+                    className="input w-28 py-1"
+                  />
+                </td>
+                {pct(l, "ok_light", "superficiale")}
+                {pct(l, "ok_normal", "normale")}
+                {pct(l, "ok_deep", "approfondita")}
+                <td className="py-1.5 pr-3 text-muted">{rows.slice(0, i + 1).reduce((n, x) => n + x.cost, 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-2">
+          {rows.length < 20 && (
+            <button
+              type="button"
+              onClick={() =>
+                setRows((r) => [
+                  ...r,
+                  last
+                    ? { level: last.level + 1, cost: last.cost, ok_light: Math.min(100, last.ok_light + 5), ok_normal: Math.min(100, last.ok_normal + 5), ok_deep: Math.min(100, last.ok_deep + 5) }
+                    : { level: 1, cost: 100, ok_light: 85, ok_normal: 70, ok_deep: 55 },
+                ])
+              }
+              className="btn-ghost px-3 py-1 text-xs"
+            >
+              + Aggiungi un livello
+            </button>
+          )}
+          {rows.length > 1 && (
+            <button type="button" onClick={() => setRows((r) => r.slice(0, -1))} className="btn-ghost px-3 py-1 text-xs">
+              Togli l&apos;ultimo livello
+            </button>
+          )}
+          <button type="button" disabled={!changed} onClick={() => onSave(rows)} className="btn px-4">
+            Salva i livelli
+          </button>
+        </div>
+      )}
+      <p className="text-xs text-muted">
+        Se togli un livello che qualche spia ha già raggiunto, quella spia resta al suo livello ma non riesce più in nessuna missione:
+        meglio non scendere sotto il livello più alto già in gioco.
+      </p>
+    </div>
+  );
+}
+
+const FIELDS: { key: keyof SpySettings; label: string }[] = [
+  { key: "max_spies", label: "Spie per personaggio" },
+  { key: "max_spies_trait", label: "Spie per chi ha il tratto" },
   { key: "hours_light", label: "Ore di ricerca: superficiale" },
   { key: "hours_normal", label: "Ore di ricerca: normale" },
   { key: "hours_deep", label: "Ore di ricerca: approfondita" },
-  { key: "fail_light", label: "Fallimento %: superficiale" },
-  { key: "fail_normal", label: "Fallimento %: normale" },
-  { key: "fail_deep", label: "Fallimento %: approfondita" },
-  { key: "level_bonus", label: "Punti % in meno per ogni livello oltre il primo" },
-  { key: "min_fail", label: "Fallimento % minimo" },
-  { key: "killed_pct", label: "Tra i fallimenti: % di spie uccise (le altre catturate)" },
+  { key: "killed_pct", label: "Quando fallisce: % di spie uccise (le altre catturate)" },
 ];
 
 function RulesForm({ settings, canEdit, onSave }: { settings: SpySettings; canEdit: boolean; onSave: (s: Partial<SpySettings>) => Promise<boolean> }) {
   const [s, setS] = useState(settings);
-  const levels = Array.from({ length: s.max_level }, (_, i) => i + 1);
-  const chance = (base: number, level: number) => Math.max(s.min_fail, base - s.level_bonus * (level - 1));
   return (
     <div className="space-y-4">
       {!canEdit && <p className="text-sm text-muted">Per cambiare questi numeri serve il permesso &quot;Statistiche, abilità e tratti&quot;.</p>}
+      <p className="text-sm text-muted">
+        Nessuno parte con una spia: si reclutano tutte. Chi ha il tratto indicato qui sotto può averne di più. Il tempo di una missione è
+        quello di una staffetta fino al luogo, più le ore della ricerca.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block space-y-1 sm:col-span-2">
-          <span className="block text-xs tracking-wide text-muted uppercase">Tratto che dà la prima spia</span>
+          <span className="block text-xs tracking-wide text-muted uppercase">Tratto che alza il numero di spie</span>
           <input value={s.trait_name} disabled={!canEdit} onChange={(e) => setS({ ...s, trait_name: e.target.value })} maxLength={60} className="input max-w-xs" />
         </label>
         {FIELDS.map((f) => (
@@ -249,33 +379,22 @@ function RulesForm({ settings, canEdit, onSave }: { settings: SpySettings; canEd
           </label>
         ))}
       </div>
-      <div className="overflow-x-auto">
-        <table className="text-sm">
-          <caption className="mb-1 text-left text-xs tracking-wide text-muted uppercase">Probabilità di fallire con questi numeri</caption>
-          <thead>
-            <tr className="border-b border-border text-xs text-muted">
-              <th className="py-1 pr-4 text-left">Livello</th>
-              <th className="py-1 pr-4 text-left">Superficiale</th>
-              <th className="py-1 pr-4 text-left">Normale</th>
-              <th className="py-1 pr-4 text-left">Approfondita</th>
-              <th className="py-1 pr-4 text-left">Addestrarla a questo livello</th>
-            </tr>
-          </thead>
-          <tbody>
-            {levels.map((l) => (
-              <tr key={l} className="border-b border-border/50">
-                <td className="py-1 pr-4">{l}</td>
-                <td className="py-1 pr-4">{chance(s.fail_light, l)}%</td>
-                <td className="py-1 pr-4">{chance(s.fail_normal, l)}%</td>
-                <td className="py-1 pr-4">{chance(s.fail_deep, l)}%</td>
-                <td className="py-1 pr-4 text-muted">{l === 1 ? `reclutata: ${s.recruit_cost}` : `${s.train_cost * l}`} monete</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
       {canEdit && (
-        <button type="button" onClick={() => onSave(s)} className="btn px-4">
+        <button
+          type="button"
+          onClick={() =>
+            onSave({
+              trait_name: s.trait_name.trim() || "Spie",
+              max_spies: Math.max(1, s.max_spies),
+              max_spies_trait: Math.max(1, s.max_spies_trait),
+              hours_light: s.hours_light,
+              hours_normal: s.hours_normal,
+              hours_deep: s.hours_deep,
+              killed_pct: Math.min(100, s.killed_pct),
+            })
+          }
+          className="btn px-4"
+        >
           Salva le regole
         </button>
       )}

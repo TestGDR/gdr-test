@@ -152,8 +152,11 @@ const PANELS = [
 
 export default async function GestionePage() {
   const { isAdmin, role, permissions } = await getStaffContext();
+  // sempre in ordine alfabetico, anche quando se ne aggiungono di nuove
   const visible = PANELS.filter((p) =>
     [p.permission].flat().some((k) => permissions.has(k)),
+  ).sort((x, y) =>
+    x.title.localeCompare(y.title, "it", { sensitivity: "base" }),
   );
   // Senza nessun pannello (giocatori, master) la pagina "non esiste"
   if (visible.length === 0) notFound();

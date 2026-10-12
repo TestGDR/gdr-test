@@ -7,10 +7,15 @@ import {
   depthHours,
   duration,
   failChance,
+  isLost,
+  maxLevel,
+  recruitCost,
   trainCost,
   when,
   type Depth,
   type Spy,
+  type SpyLevel,
+  type SpyRules,
   type SpySettings,
 } from "@/lib/spies";
 import { createClient } from "@/lib/supabase/client";
@@ -34,7 +39,7 @@ type Mission = {
 };
 type Pay = "personale" | "casata";
 type Data = {
-  settings: SpySettings;
+  settings: SpyRules;
   spies: Spy[];
   missions: Mission[];
   places: { id: string; name: string }[];
@@ -47,6 +52,7 @@ const STATUS_COLOR: Record<Spy["status"], string> = {
   missione: "text-[#e8cf9c]",
   catturata: "text-amber-300",
   morta: "text-red-400",
+  abbandonata: "text-red-400",
 };
 
 // Pannello Spie del giocatore: reclutare, addestrare, mandare in missione, leggere i rapporti
@@ -61,20 +67,25 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    await supabase.rpc("spy_init", { p_character: characterId });
-    const [settings, missions, spies, places, me] = await Promise.all([
+    const [settings, levels, limit, missions, spies, places, me] = await Promise.all([
       supabase.from("spy_settings").select("*").maybeSingle(),
+      supabase.from("spy_levels").select("*").order("level"),
+      supabase.rpc("spy_limit", { p_character: characterId }),
       // legge le missioni e, per quelle finite, applica l'esito alla spia
       supabase.rpc("spy_my_missions", { p_character: characterId }),
       supabase.from("spies").select("*").eq("character_id", characterId).order("created_at"),
       supabase.from("locations").select("id, name").eq("kind", "luogo").eq("in_game", true).order("name"),
       supabase.from("characters").select("coins, house_role:house_roles(can_build)").eq("id", characterId).maybeSingle(),
     ]);
-    if (settings.error || !settings.data) return setMissing(true);
+    if (settings.error || !settings.data || levels.error) return setMissing(true);
     // le spie si rileggono dopo le missioni: lo stato e' gia' aggiornato
     const fresh = await supabase.from("spies").select("*").eq("character_id", characterId).order("created_at");
     setData({
-      settings: settings.data as SpySettings,
+      settings: {
+        ...(settings.data as SpySettings),
+        levels: (levels.data ?? []) as SpyLevel[],
+        limit: (limit.data as number | null) ?? 1,
+      },
       spies: ((fresh.data ?? spies.data ?? []) as Spy[]),
       missions: (missions.data ?? []) as Mission[],
       places: (places.data ?? []) as { id: string; name: string }[],
@@ -86,7 +97,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
     Promise.resolve().then(load);
   }, [load]);
 
-  if (missing) return <p className="text-amber-200">Per le spie va eseguita la migrazione 0131 in Supabase.</p>;
+  if (missing) return <p className="text-amber-200">Per le spie vanno eseguite le migrazioni 0131 e 0134 in Supabase.</p>;
   if (!data) return <p className="text-muted">Caricamento...</p>;
   const { settings: s, spies, missions } = data;
 
@@ -122,7 +133,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
       />
     );
 
-  const alive = spies.filter((x) => x.status !== "morta");
+  const alive = spies.filter((x) => !isLost(x.status));
   const running = missions.filter((m) => !m.finished);
   const past = missions.filter((m) => m.finished);
 
@@ -147,14 +158,14 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
 
       <section className="space-y-2">
         <h3 className="font-serif text-lg tracking-wide text-accent">
-          Le tue spie <span className="text-sm text-muted">({alive.length} su {s.max_spies})</span>
+          Le tue spie <span className="text-sm text-muted">({alive.length} su {s.limit})</span>
         </h3>
         {spies.length === 0 ? (
           <p className="text-sm text-muted">Non hai ancora nessuna spia: reclutane una qui sotto.</p>
         ) : (
           <ul className="space-y-2">
             {spies.map((spy) => (
-              <li key={spy.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 border border-border bg-black/50 px-3 py-2 ${spy.status === "morta" ? "opacity-50" : ""}`}>
+              <li key={spy.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 border border-border bg-black/50 px-3 py-2 ${isLost(spy.status) ? "opacity-50" : ""}`}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-serif text-accent">{spy.name}</span>
                   <span className="block text-xs text-muted">
@@ -164,7 +175,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
                 </span>
                 {spy.status === "libera" && (
                   <>
-                    {spy.level < s.max_level ? (
+                    {spy.level < maxLevel(s) ? (
                       <button
                         type="button"
                         disabled={busy}
@@ -182,16 +193,37 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
                     </button>
                   </>
                 )}
-                {spy.status === "catturata" && <span className="text-xs text-muted">La sua sorte è nelle mani di chi l&apos;ha presa.</span>}
+                {spy.status === "catturata" && (
+                  <>
+                    <span className="text-xs text-muted">La sua sorte è nelle mani di chi l&apos;ha presa.</span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        window.confirm(`Rinunciare a ${spy.name}? La perdi per sempre, ma il suo posto si libera e potrai reclutare un'altra spia.`) &&
+                        run(() => supabase.rpc("spy_abandon", { p_spy: spy.id }), `Hai rinunciato a ${spy.name}: il suo posto è libero.`)
+                      }
+                      className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400 hover:border-red-500"
+                      title="La spia è persa per sempre, ma il posto si libera"
+                    >
+                      Abbandonala al suo destino
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
         )}
-        {alive.length < s.max_spies && (
+        {alive.length >= s.limit && s.limit < s.max_spies_trait && (
+          <p className="text-xs text-muted">
+            Puoi avere {s.limit} {s.limit === 1 ? "spia" : "spie"}. Con il tratto &quot;{s.trait_name}&quot; il limite sale a {s.max_spies_trait}.
+          </p>
+        )}
+        {alive.length < s.limit && (
           <form onSubmit={recruit} className="flex flex-wrap items-center gap-2 pt-1">
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nome della nuova spia" className="input min-w-0 flex-1" />
             <button className="btn px-4" disabled={busy || !name.trim()}>
-              Recluta · {s.recruit_cost} monete
+              Recluta · {recruitCost(s)} monete
             </button>
           </form>
         )}
@@ -256,7 +288,7 @@ function SendForm({
   onSent,
 }: {
   spy: Spy;
-  settings: SpySettings;
+  settings: SpyRules;
   places: { id: string; name: string }[];
   onCancel: () => void;
   onSent: () => void;
