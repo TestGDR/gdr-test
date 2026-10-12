@@ -17,7 +17,7 @@ import type { Character } from "@/lib/types";
 const label = "mb-1 block text-xs tracking-wider text-muted uppercase";
 
 // Modifica di una parte del regolamento del PG (non legata ai limiti della creazione):
-// - "progress": PX, Risorse e Onore (Gestisci, solo admin)
+// - "progress": PX, Punti ferita e Monete (Gestisci, solo admin)
 // - "skills": livelli delle abilita' (pagina Abilita', pennina di admin e moderatori)
 // - "traits": vantaggi e svantaggi (pagina Tratti, pennina di admin e moderatori)
 export default function RulesManage({
@@ -101,13 +101,14 @@ export default function RulesManage({
     const { error } = await supabase.rpc("admin_set_progress", {
       p_character: character.id,
       p_px: Math.max(0, Math.trunc(Number(progress.px)) || 0),
+      // "Risorse" non si usa piu: resta il valore che aveva
       p_resources: Math.max(0, Math.trunc(Number(progress.resources)) || 0),
       p_honor: Math.min(
         RULES.honor.max,
         Math.max(RULES.honor.min, Math.trunc(Number(progress.honor)) || 0),
       ),
     });
-    done(error, "PX, Risorse e Onore salvati.");
+    done(error, "PX salvati.");
   }
 
   // PF attuali: vuoto = pieni; il recupero giornaliero riparte da adesso
@@ -121,6 +122,26 @@ export default function RulesManage({
       p_dead: hp.dead,
     });
     done(error, "Punti ferita salvati.");
+  }
+
+  // Monete: l'admin ne aggiunge o ne toglie dal conto (resta scritto nell'estratto conto)
+  const [coins, setCoins] = useState({ amount: "", reason: "" });
+  const [balance, setBalance] = useState<number | null>(character.coins ?? null);
+  async function adjustCoins(sign: 1 | -1) {
+    const n = Math.abs(Math.trunc(Number(coins.amount)) || 0);
+    if (!n) return;
+    setBusy(true);
+    setMsg(null);
+    const { data, error } = await supabase.rpc("admin_adjust_coins", {
+      p_character: character.id,
+      p_amount: sign * n,
+      p_reason: coins.reason,
+    });
+    if (!error) {
+      setBalance(data as number);
+      setCoins({ amount: "", reason: "" });
+    }
+    done(error, sign > 0 ? `Aggiunte ${n} monete.` : `Tolte ${n} monete.`);
   }
 
   // Salute completa: PF e Stamina pieni, niente ferite, veleno o stordimento, di nuovo vivo
@@ -210,7 +231,7 @@ export default function RulesManage({
     >
       {section === "progress" && (
         <h4 className="font-serif text-lg text-accent">
-          PX, Risorse, Onore e Punti ferita
+          PX, Punti ferita e Monete
         </h4>
       )}
       {msg && (
@@ -224,8 +245,6 @@ export default function RulesManage({
           {(
             [
               ["px", "PX"],
-              ["resources", "Risorse"],
-              ["honor", `Onore (${RULES.honor.min}-${RULES.honor.max})`],
             ] as const
           ).map(([k, l]) => (
             <label key={k} className="block">
@@ -293,6 +312,62 @@ export default function RulesManage({
             torna in vita con i PF scritti qui. &quot;Ripristina salute
             completa&quot; riporta tutto a posto in un colpo: PF e Stamina
             pieni, niente ferite, sanguinamenti, veleno o stordimento.
+          </p>
+        </div>
+      )}
+
+      {section === "progress" && (
+        <div className="flex flex-wrap items-end gap-3 border-t border-border/50 pt-3">
+          <label className="block">
+            <span className={label}>Monete</span>
+            <input
+              type="number"
+              min={1}
+              value={coins.amount}
+              onChange={(e) =>
+                setCoins((c) => ({ ...c, amount: e.target.value }))
+              }
+              placeholder="Quante"
+              className="input w-28! py-1.5"
+            />
+          </label>
+          <label className="block min-w-48 flex-1">
+            <span className={label}>Causale (facoltativa)</span>
+            <input
+              value={coins.reason}
+              onChange={(e) =>
+                setCoins((c) => ({ ...c, reason: e.target.value }))
+              }
+              maxLength={120}
+              placeholder="Es. premio per la giocata"
+              className="input py-1.5"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || !(Number(coins.amount) > 0)}
+            onClick={() => adjustCoins(1)}
+            className="btn px-4 py-1.5 text-sm"
+          >
+            Dai
+          </button>
+          <button
+            type="button"
+            disabled={busy || !(Number(coins.amount) > 0)}
+            onClick={() => adjustCoins(-1)}
+            className="btn-ghost px-4 py-1.5 text-sm"
+          >
+            Togli
+          </button>
+          <p className="w-full text-xs text-muted">
+            {balance !== null && (
+              <>
+                Sul conto ha <strong className="text-foreground">{balance}</strong>{" "}
+                monete.{" "}
+              </>
+            )}
+            Il movimento compare nel suo estratto conto in banca, con la
+            causale.
           </p>
         </div>
       )}

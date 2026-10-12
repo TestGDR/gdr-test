@@ -56,7 +56,6 @@ const SAMPLE: Partial<Record<DiceVar, number | string>> = {
   TRATTI: 1,
   ARMA: "2d5",
   MOD: 0,
-  ONORE: 5,
   DSTAT: 4,
   DABILITA: 3,
   DTRATTI: 0,

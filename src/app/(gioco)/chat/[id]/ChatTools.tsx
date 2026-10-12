@@ -14,7 +14,7 @@ export type RoomInfo = {
 };
 
 // Notepad: appunti personali (restano su questo dispositivo); "Invia in chat"
-// copia il testo nella barra di scrittura e lo manda in chat
+// manda il testo in chat e svuota il notepad
 export function ChatNotepad({
   characterId,
   sendAs,
@@ -41,8 +41,10 @@ export function ChatNotepad({
   const length = text.trim().length;
   async function send() {
     setSending(true);
-    await onSend(text.trim());
+    const sent = await onSend(text.trim());
     setSending(false);
+    // inviato: il notepad si svuota (se l'invio non riesce il testo resta)
+    if (sent) save("");
   }
   function save(v: string) {
     setText(v);

@@ -19,6 +19,7 @@ import {
   hpState,
 } from "@/lib/rules/hp";
 import CombatSummary from "./CombatSummary";
+import FameBox from "./FameBox";
 import { useStats } from "@/lib/rules/useStats";
 import {
   skillLevelCap,
@@ -136,7 +137,7 @@ function Title({
 }
 
 // ---------------------------------------------------------------------
-// Statistiche derivate, PX, Risorse e Onore (pagina Caratteristiche)
+// Statistiche derivate, PX e Fama (pagina Caratteristiche)
 // ---------------------------------------------------------------------
 export function DerivedPanel({ character }: { character: Character }) {
   const { data } = useRulesData(character.id);
@@ -201,11 +202,6 @@ export function DerivedPanel({ character }: { character: Character }) {
         {(
           [
             ["PX", `${character.px ?? 0}${character.px_half ? ",5" : ""}`],
-            ["Risorse", character.resources ?? 0],
-            [
-              "Onore",
-              `${character.honor ?? RULES.honor.start} / ${RULES.honor.max}`,
-            ],
           ] as const
         ).map(([k, v]) => (
           <div
@@ -218,6 +214,7 @@ export function DerivedPanel({ character }: { character: Character }) {
             <dd className="font-serif text-xl text-accent">{v}</dd>
           </div>
         ))}
+        <FameBox character={character} />
       </dl>
       <CombatSummary
         characterId={character.id}

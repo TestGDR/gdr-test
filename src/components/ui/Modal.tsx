@@ -11,7 +11,16 @@ import {
 import { createPortal } from "react-dom";
 
 export type ModalSize =
-  "md" | "lg" | "xl" | "tall" | "area" | "sheet" | "panel" | "pg" | "panel600";
+  | "md"
+  | "lg"
+  | "xl"
+  | "tall"
+  | "area"
+  | "sheet"
+  | "panel"
+  | "pg"
+  | "panel600"
+  | "faq";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
@@ -32,6 +41,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   // voci e pettegolezzi: sempre alta 600px (meno su schermi bassi), il contenuto scorre dentro
   panel600:
     "w-[min(46rem,calc(100vw-2rem))] h-[min(37.5rem,calc(100dvh-1rem))]",
+  // FAQ: alta al massimo 600px, il contenuto scorre dentro (su cellulare quasi a tutta larghezza)
+  faq: "w-[min(46rem,calc(100vw-1rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
 };
 
 // Le finestre stanno una sopra l'altra: quella aperta o toccata per ultima
@@ -41,6 +52,18 @@ const raise = (el: HTMLElement | null) => {
   if (el) el.style.zIndex = String(++topZ);
 };
 const noSubscribe = () => () => {};
+// Tiene la finestra tutta dentro la scheda del browser: lo spostamento dal
+// centro non puo' superare lo spazio libero attorno (se e' piu' grande dello
+// schermo resta centrata)
+function clampInside(el: HTMLElement, x: number, y: number) {
+  const rect = el.getBoundingClientRect();
+  const maxX = Math.max(0, (window.innerWidth - rect.width) / 2);
+  const maxY = Math.max(0, (window.innerHeight - rect.height) / 2);
+  return {
+    x: Math.min(maxX, Math.max(-maxX, x)),
+    y: Math.min(maxY, Math.max(-maxY, y)),
+  };
+}
 // Scalino per ogni finestra gia aperta (su cellulare no: non ci sarebbe spazio)
 function cascade() {
   if (typeof document === "undefined" || window.innerWidth < 640)
@@ -109,6 +132,26 @@ export default function Modal({
     if ((!open || minimized) && dialog.open) dialog.close();
   }, [dialog, open, minimized]);
 
+  // Appena aperta (lo scalino potrebbe portarla fuori), quando il contenuto la
+  // allarga e quando si ridimensiona il browser: torna dentro i bordi
+  useEffect(() => {
+    if (!dialog || !open || minimized) return;
+    const fit = () =>
+      setOffset((o) => {
+        const c = clampInside(dialog, o.x, o.y);
+        return c.x === o.x && c.y === o.y ? o : c;
+      });
+    const frame = requestAnimationFrame(fit);
+    const watcher = new ResizeObserver(fit);
+    watcher.observe(dialog);
+    window.addEventListener("resize", fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      watcher.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [dialog, open, minimized]);
+
   function minimize() {
     setTray(trayElement());
   }
@@ -126,19 +169,10 @@ export default function Modal({
 
   function onDragMove(e: PointerEvent<HTMLDivElement>) {
     if (!drag.current || !dialog) return;
-    const rect = dialog.getBoundingClientRect();
-    // Limiti: la barra del titolo resta sempre raggiungibile dentro la finestra
-    const centerLeft = (window.innerWidth - rect.width) / 2;
-    const centerTop = (window.innerHeight - rect.height) / 2;
+    // Limiti: la finestra non esce dai bordi della scheda del browser
     const x = drag.current.baseX + e.clientX - drag.current.startX;
     const y = drag.current.baseY + e.clientY - drag.current.startY;
-    setOffset({
-      x: Math.min(
-        window.innerWidth - centerLeft - 120,
-        Math.max(-centerLeft - rect.width + 120, x),
-      ),
-      y: Math.min(window.innerHeight - centerTop - 48, Math.max(-centerTop, y)),
-    });
+    setOffset(clampInside(dialog, x, y));
   }
 
   function close() {

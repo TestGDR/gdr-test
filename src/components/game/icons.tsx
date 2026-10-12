@@ -235,3 +235,11 @@ export const FaqIcon = () => (
     <path d="M9.8 8.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6M12 14.4v.1" />
   </svg>
 );
+
+// Spie: un occhio
+export const SpyIcon = () => (
+  <svg {...base}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </svg>
+);

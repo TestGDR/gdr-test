@@ -59,6 +59,26 @@ export async function saveGame(
   return error ? { error: error.message } : {};
 }
 
+// Correzione della propria azione: una sola volta, entro 5 minuti (lo controlla il database)
+export async function editMessage(
+  id: number,
+  content: string,
+): Promise<{ error?: string }> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("edit_chat_message", {
+    p_id: id,
+    p_content: content,
+  });
+  return error ? { error: error.message } : {};
+}
+
+// Cancella un'azione dalla chat: solo moderatori e admin (lo controlla il database)
+export async function deleteMessage(id: number): Promise<{ error?: string }> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("delete_chat_message", { p_id: id });
+  return error ? { error: error.message } : {};
+}
+
 // Staff: accende o spegne l'invisibilita' (serve il permesso "staff.invisibile")
 export async function setInvisible(on: boolean): Promise<{ error?: string }> {
   const { supabase } = await getStaffContext();

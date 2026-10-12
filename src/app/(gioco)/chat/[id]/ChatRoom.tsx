@@ -17,6 +17,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
 import { combatAlerts } from "../combat-actions";
 import {
+  deleteMessage,
+  editMessage,
   joinChat,
   leaveChat,
   saveGame,
@@ -32,6 +34,7 @@ type Props = {
   initialMessages: Message[];
   maxLen: number; // limite di caratteri di un'azione (Gestione -> Chat, o modalita' master)
   canMaster: boolean; // master, moderatori e admin: possono usare la modalita' master
+  canModerate: boolean; // moderatori e admin: possono cancellare le singole azioni
   master: { min: number; max: number; by: string } | null; // modalita' master attiva
   presence: Present[]; // personaggi in giocata
   npcs: { id: string; name: string }[]; // PNG che l'utente puo' muovere (vuoto per i giocatori)
@@ -48,6 +51,7 @@ const KIND_LABEL: Partial<Record<MessageKind, string>> = {
   azione: "Parlato / Azione",
   fuori_gioco: "Fuori gioco (OFF)",
   master: "Narrazione master",
+  sussurro: "Sussurro privato",
 };
 
 export default function ChatRoom({
@@ -57,6 +61,7 @@ export default function ChatRoom({
   initialMessages,
   maxLen: MAX_LEN,
   canMaster,
+  canModerate,
   master,
   presence,
   npcs,
@@ -182,6 +187,32 @@ export default function ChatRoom({
           addMessage(msg, own);
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          // un'azione corretta dal suo autore
+          const msg = payload.new as Message;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages" },
+        (payload) => {
+          // un'azione cancellata da chi modera (arriva solo il suo numero)
+          const id = (payload.old as { id?: number }).id;
+          if (id !== undefined)
+            setMessages((prev) => prev.filter((m) => m.id !== id));
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -189,9 +220,11 @@ export default function ChatRoom({
   }, [supabase, roomId, mine, router]);
 
   // Dopo un'ora dall'invio l'azione sparisce dalla chat (resta nel database)
+  const [clock, setClock] = useState(() => Date.now()); // per i 5 minuti in cui un'azione si puo' correggere
   useEffect(() => {
     const t = setInterval(() => {
       const now = Date.now();
+      setClock(now);
       setMessages((prev) =>
         prev.every((m) => isFresh(m.created_at, now))
           ? prev
@@ -303,6 +336,15 @@ export default function ChatRoom({
     }
     router.refresh(); // ricarica la chat con le azioni da leggere
   }
+  // Correzione della propria azione (una volta, entro 5 minuti) e cancellazione (chi modera)
+  const [editing, setEditing] = useState<Message | null>(null);
+  async function removeMessage(m: Message) {
+    if (!window.confirm(`Cancellare dalla chat questa azione di ${m.character_name}? Non si può recuperare.`)) return;
+    const res = await deleteMessage(m.id);
+    if (res.error) return setError(res.error);
+    setMessages((prev) => prev.filter((x) => x.id !== m.id));
+  }
+
   // "Esci dalla chat" chiede prima se salvare la giocata nell'archivio
   const [exitAsk, setExitAsk] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
@@ -337,6 +379,21 @@ export default function ChatRoom({
       );
       return false;
     }
+    // sussurro: il destinatario dev'essere uno dei presenti (lo leggeranno solo lui e chi scrive)
+    const whisperTo =
+      kind === "sussurro"
+        ? others.find(
+            (o) => o.name.toLowerCase() === recipient.trim().toLowerCase(),
+          )
+        : null;
+    if (kind === "sussurro" && !whisperTo) {
+      setError(
+        others.length
+          ? "Per sussurrare scrivi nel Destinatario il nome di uno dei presenti in chat."
+          : "Non c'è nessun altro in chat a cui sussurrare.",
+      );
+      return false;
+    }
     setSending(true);
     setError(null);
     const { data, error } = await supabase
@@ -346,7 +403,8 @@ export default function ChatRoom({
         character_id: actorId,
         kind,
         content,
-        recipient: recipient.trim() || null,
+        recipient: whisperTo ? whisperTo.name : recipient.trim() || null,
+        ...(whisperTo ? { recipient_id: whisperTo.id } : {}),
       })
       .select()
       .single<Message>();
@@ -431,7 +489,7 @@ export default function ChatRoom({
         onChange={(e) => setRecipient(e.target.value)}
         list={`dest-${roomId}`}
         maxLength={60}
-        placeholder="Tag libero / PG"
+        placeholder={kind === "sussurro" ? "Nome di un presente" : "Tag libero / PG"}
         className="input py-0.5 text-xs"
       />
       <datalist id={`dest-${roomId}`}>
@@ -451,6 +509,7 @@ export default function ChatRoom({
       >
         <option value="azione">{KIND_LABEL.azione}</option>
         <option value="fuori_gioco">{KIND_LABEL.fuori_gioco}</option>
+        <option value="sussurro">{KIND_LABEL.sussurro}</option>
         {canNarrate && <option value="master">{KIND_LABEL.master}</option>}
       </select>
     </label>
@@ -529,6 +588,35 @@ export default function ChatRoom({
           </div>
         </div>
       </Modal>
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Modifica l'azione"
+        size="lg"
+      >
+        {editing && (
+          <EditAction
+            key={editing.id}
+            message={editing}
+            min={master?.min ?? 0}
+            max={MAX_LEN}
+            onSave={async (text) => {
+              const res = await editMessage(editing.id, text);
+              if (res.error) return res.error;
+              const now = new Date().toISOString();
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === editing.id
+                    ? { ...m, content: text, edited_at: now }
+                    : m,
+                ),
+              );
+              setEditing(null);
+              return null;
+            }}
+          />
+        )}
+      </Modal>
       {canMaster && (
         <Modal
           open={masterOpen}
@@ -579,9 +667,49 @@ export default function ChatRoom({
                   La lista è silenziosa... inizia tu la giocata.
                 </p>
               )}
-              {messages.map((m) => (
-                <MessageRow key={m.id} message={m} who={cast[m.character_id]} />
-              ))}
+              {messages.map((m) => {
+                const editable =
+                  m.kind === "azione" &&
+                  ownIds.has(m.character_id) &&
+                  !m.edited_at &&
+                  clock - Date.parse(m.created_at) < EDIT_WINDOW_MS;
+                const removable =
+                  canModerate && (m.kind === "azione" || m.kind === "master");
+                return (
+                  <MessageRow
+                    key={m.id}
+                    message={m}
+                    who={cast[m.character_id]}
+                    tools={
+                      (editable || removable) && (
+                        <span className="flex shrink-0 items-center gap-2 text-xs">
+                          {editable && (
+                            <button
+                              type="button"
+                              onClick={() => setEditing(m)}
+                              title="Puoi correggere l'azione una sola volta, entro 5 minuti dall'invio"
+                              className="text-muted underline-offset-2 hover:text-accent hover:underline"
+                            >
+                              Modifica
+                            </button>
+                          )}
+                          {removable && (
+                            <button
+                              type="button"
+                              onClick={() => removeMessage(m)}
+                              aria-label={`Cancella l'azione di ${m.character_name}`}
+                              title="Cancella dalla chat"
+                              className="text-muted hover:text-red-400"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      )
+                    }
+                  />
+                );
+              })}
             </>
           )}
         </div>
@@ -713,7 +841,7 @@ export default function ChatRoom({
                 onChange={(e) => setRecipient(e.target.value)}
                 list={`dest-pc-${roomId}`}
                 maxLength={60}
-                placeholder="Tag libero / PG"
+                placeholder={kind === "sussurro" ? "Nome di un presente" : "Tag libero / PG"}
                 aria-label="Destinatario"
                 title="Destinatario"
                 className="input w-48! py-1 text-xs"
@@ -732,6 +860,7 @@ export default function ChatRoom({
               >
                 <option value="azione">{KIND_LABEL.azione}</option>
                 <option value="fuori_gioco">{KIND_LABEL.fuori_gioco}</option>
+                <option value="sussurro">{KIND_LABEL.sussurro}</option>
                 {canNarrate && (
                   <option value="master">{KIND_LABEL.master}</option>
                 )}
@@ -956,7 +1085,15 @@ type Who = {
   house: string | null;
 };
 
-function MessageRow({ message, who }: { message: Message; who?: Who }) {
+function MessageRow({
+  message,
+  who,
+  tools,
+}: {
+  message: Message;
+  who?: Who;
+  tools?: ReactNode; // modifica (autore) e cancella (chi modera)
+}) {
   const time = new Date(message.created_at).toLocaleTimeString("it-IT", {
     hour: "2-digit",
     minute: "2-digit",
@@ -1002,6 +1139,7 @@ function MessageRow({ message, who }: { message: Message; who?: Who }) {
             Master
             {to && <span className="text-sm font-normal">{to}</span>}
           </span>
+          {tools}
           <span className="shrink-0 text-xs text-muted">{time}</span>
         </div>
         <p className="chat-text whitespace-pre-line">
@@ -1019,6 +1157,21 @@ function MessageRow({ message, who }: { message: Message; who?: Who }) {
         <strong className="mr-1 text-xs font-bold tracking-wide text-foreground uppercase">
           {message.character_name}
         </strong>{" "}
+        {message.content}
+      </p>
+    );
+  }
+
+  // Sussurro privato tra due personaggi: lo vedono solo loro (e gli admin)
+  if (message.kind === "sussurro") {
+    return (
+      <p className="rounded-md border border-[#6d4a8c]/50 bg-gradient-to-r from-black/80 via-[#3a2352]/60 to-black/80 px-3 py-1.5 text-sm text-[#d9c8ea] shadow shadow-black/60 max-lg:mt-2">
+        <span className="mr-2 text-xs text-muted">{time}</span>
+        <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
+          <span aria-hidden>🔒 </span>
+          {message.character_name} sussurra in privato a{" "}
+          {message.recipient || "…"}
+        </strong>
         {message.content}
       </p>
     );
@@ -1066,7 +1219,13 @@ function MessageRow({ message, who }: { message: Message; who?: Who }) {
           {message.character_name}
           {to && <span className="text-sm font-normal">{to}</span>}
         </span>
-        <span className="shrink-0 text-xs text-muted">{time}</span>
+        {tools}
+        <span className="shrink-0 text-xs text-muted">
+          {time}
+          {message.edited_at && (
+            <span title="L'autore ha corretto questa azione"> · modificata</span>
+          )}
+        </span>
       </div>
       <p className="chat-text whitespace-pre-line">
         {/* colore dell'azione scelto nelle Opzioni della scheda */}
@@ -1231,6 +1390,63 @@ function PresenceBar({
           Esci dalla chat
         </button>
       )}
+    </div>
+  );
+}
+
+// Per quanto tempo dall'invio un'azione si puo' correggere (lo impone anche il database)
+const EDIT_WINDOW_MS = 5 * 60 * 1000;
+
+// Correzione della propria azione: una volta sola, entro 5 minuti
+function EditAction({
+  message,
+  min,
+  max,
+  onSave,
+}: {
+  message: Message;
+  min: number;
+  max: number;
+  onSave: (text: string) => Promise<string | null>;
+}) {
+  const [text, setText] = useState(message.content);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const clean = text.trim();
+  const valid = clean.length > 0 && clean.length >= min && clean.length <= max;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">
+        Puoi correggere l&apos;azione una sola volta, entro 5 minuti da quando
+        l&apos;hai inviata. Dopo il salvataggio non si potrà più modificare.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={max}
+        rows={10}
+        autoFocus
+        className="input chat-text max-h-[50dvh] w-full resize-y"
+      />
+      <p className={`text-xs ${valid ? "text-muted" : "text-amber-200"}`}>
+        {clean.length} / {max} caratteri
+        {min > 0 ? ` (minimo ${min})` : ""}
+      </p>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <button
+        type="button"
+        disabled={busy || !valid || clean === message.content}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const err = await onSave(clean);
+          setBusy(false);
+          if (err) setError(err);
+        }}
+        className="btn px-4 py-1.5 text-sm"
+      >
+        {busy ? "Salvataggio..." : "Salva la correzione"}
+      </button>
     </div>
   );
 }

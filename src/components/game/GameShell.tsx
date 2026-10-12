@@ -36,6 +36,7 @@ import {
   GossipIcon,
   CalendarIcon,
   FaqIcon,
+  SpyIcon,
   CastleIcon,
   ChevronIcon,
   DragonIcon,
@@ -60,6 +61,7 @@ import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
 import CalendarPanel, { useEventsUnseen } from "./CalendarPanel";
 import FaqPanel from "./FaqPanel";
+import SpiesPanel from "./SpiesPanel";
 import TravelPanel from "./TravelPanel";
 import FiefsPanel from "@/components/houses/FiefsPanel";
 import MarketPanel from "./MarketPanel";
@@ -127,7 +129,7 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci" | "calendario" | "faq";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci" | "calendario" | "faq" | "spie";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -140,6 +142,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   voci: "Voci e pettegolezzi",
   calendario: "Calendario degli eventi",
   faq: "FAQ",
+  spie: "Spie",
 };
 
 export default function GameShell({
@@ -508,6 +511,8 @@ export default function GameShell({
         size={
           panel === "ricerca" || panel === "assenze" || panel === "viaggio"
             ? "panel"
+            : panel === "faq"
+              ? "faq"
             : panel === "voci"
               ? "panel600"
               : panel === "notizie-on" || panel === "forum"
@@ -557,6 +562,12 @@ export default function GameShell({
           />
         )}
         {panel === "faq" && <FaqPanel key={panelSession} canEdit={canEditDocs} />}
+        {panel === "spie" &&
+          (character && character.status === "attivo" ? (
+            <SpiesPanel key={panelSession} characterId={character.id} />
+          ) : (
+            <p className="py-6 text-center text-muted">Per avere delle spie serve un personaggio attivo.</p>
+          ))}
       </Modal>
         );
       })}
@@ -860,6 +871,7 @@ const PANEL_SHORT: Record<Panel, string> = {
   voci: "Voci",
   calendario: "Calendario",
   faq: "FAQ",
+  spie: "Spie",
 };
 
 function MobileTools({
@@ -1267,6 +1279,7 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "viaggio", icon: <CompassIcon /> },
   { id: "feudi", icon: <FiefIcon /> },
   { id: "mercato", icon: <MarketIcon /> },
+  { id: "spie", icon: <SpyIcon /> },
   // OFF game
   { id: "notizie-off", icon: <HornIcon /> },
   { id: "forum", icon: <ForumIcon /> },
@@ -1283,7 +1296,7 @@ const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feud
 
 // Le icone dei pannelli divise in due zone: quello che riguarda il gioco (ON)
 // e quello che riguarda i giocatori e la comunita' (OFF)
-const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato"];
+const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato", "spie"];
 const ZONE_OFF: Panel[] = ["notizie-off", "forum", "ricerca", "assenze", "calendario", "faq"];
 const zonePanels = (zone: Panel[], inHouse: boolean) => {
   const icons = panelsFor(inHouse);

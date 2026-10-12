@@ -17,7 +17,6 @@ export const DICE_VARS = {
     "Modificatori dei tratti sempre attivi per statistica/abilità scelte (tra −3 e +3)",
   ARMA: "Danno dell'oggetto scelto (es. 2d5+1), tirato",
   MOD: "Modificatore libero scritto dal giocatore",
-  ONORE: "Onore del personaggio",
   DSTAT:
     "Caratteristica del drago scelta (Vigore, Destrezza, Intelletto, Percezione)",
   DABILITA: "Abilità del drago scelta (Volare, Attacco fisico...)",

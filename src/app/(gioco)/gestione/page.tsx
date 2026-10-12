@@ -123,6 +123,12 @@ const PANELS = [
       "Data ON che scorre da sola (1 giorno reale = 1 giorno ON): correzione dell'anno e dei giorni.",
   },
   {
+    permission: ["chat.narrazione", "chat.moderare"],
+    href: "/gestione/spie",
+    title: "Spie",
+    description: "Missioni delle spie dei personaggi: richieste, esito del dado, rapporto per il giocatore, spie catturate, regole e costi.",
+  },
+  {
     permission: "png.gestire",
     href: "/gestione/png",
     title: "PNG",

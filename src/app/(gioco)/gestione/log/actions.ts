@@ -97,6 +97,8 @@ async function buildQuery(admin: Admin, f: LogFilters, withCount: boolean) {
     let q = admin
       .from("messages")
       .select("id, created_at, character_name, kind, content, room:rooms(name, location:locations(name))", opts);
+    // i sussurri privati li leggono solo i due personaggi e gli admin
+    if (!(await getStaffContext()).isAdmin) q = q.neq("kind", "sussurro");
     if (f.roomId) q = q.eq("room_id", f.roomId);
     if (f.character?.trim()) q = q.ilike("character_name", like(f.character));
     if (f.text?.trim()) q = q.ilike("content", like(f.text));

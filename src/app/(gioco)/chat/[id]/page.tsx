@@ -305,6 +305,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
             permissions.has("chat.moderare")
           }
           master={master}
+          canModerate={permissions.has("chat.moderare")}
           maxLen={maxLen}
           characters={(characters ?? []) as Character[]}
           initialMessages={

@@ -71,7 +71,7 @@ export async function rollDice(
       .maybeSingle(),
     supabase
       .from("characters")
-      .select("id, owner_id, status, attributes, honor")
+      .select("id, owner_id, status, attributes")
       .eq("id", characterId)
       .maybeSingle(),
   ]);
@@ -94,7 +94,6 @@ export async function rollDice(
   const labels: Partial<Record<DiceVar, string>> = {};
 
   for (const s of statList) vars[s.code] = Number(attrs[s.id]) || RULES.statMin;
-  vars.ONORE = (character.honor as number | null) ?? RULES.honor.start;
 
   // Abilita' scelta (e la sua statistica, se non se ne sceglie un'altra)
   type SkillRow = { id: string; name: string; stat: StatId };

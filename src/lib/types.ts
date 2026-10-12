@@ -24,7 +24,8 @@ export type Character = {
   px?: number; // punti esperienza da spendere nelle abilita'
   px_half?: boolean; // mezzo PX in sospeso (un'azione lunga in chat vale mezzo PX)
   resources?: number; // Risorse (R)
-  honor?: number; // Onore 0-10
+  honor?: number; // (non piu' usato: sostituito dalla Fama)
+  fame?: number; // Fama da -100 a +100 (0 = sconosciuto): la cambia lo staff
   hp_current?: number | null; // Punti Ferita attuali (vuoto = pieni)
   hp_updated_at?: string | null; // da quando conta il recupero giornaliero
   dead_at?: string | null; // morto in combattimento (o per scelta dello staff)
@@ -107,7 +108,8 @@ export type RoomGroup = {
 };
 
 // dado e sistema (entrate, uscite, modalita' master) li scrive solo il server
-export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema";
+// sussurro: privato tra due personaggi (lo leggono solo loro e gli admin)
+export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema" | "sussurro";
 
 export type Message = {
   id: number;
@@ -120,4 +122,6 @@ export type Message = {
   created_at: string;
   roll_data?: unknown; // dettagli del tiro (messaggi "dado")
   recipient?: string | null; // a chi e' rivolta l'azione ("→ Nome")
+  recipient_id?: string | null; // sussurro: il personaggio che lo riceve
+  edited_at?: string | null; // l'autore l'ha corretta (una volta sola, entro 5 minuti)
 };

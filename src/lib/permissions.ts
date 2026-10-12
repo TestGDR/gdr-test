@@ -310,6 +310,8 @@ export function isPermissionKey(key: string) {
 
 // Permessi che aprono un pannello di Gestione: chi non ne ha nessuno non vede la rotella
 export const MANAGEMENT_PERMISSIONS = [
+  "chat.narrazione", // Gestione -> Spie (rapporti delle missioni)
+  "chat.moderare",
   "gestione.ruoli",
   "gestione.accessi",
   "casate.gestire",
