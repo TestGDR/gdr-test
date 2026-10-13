@@ -117,7 +117,7 @@ function Title({
           onClick={onEdit}
           title={`Modifica: ${children}`}
           aria-label={`Modifica: ${children}`}
-          className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-black/60 text-muted transition hover:border-accent hover:text-accent"
+          className="flex h-8 shrink-0 items-center justify-center gap-1.5 border border-border bg-black/60 px-2.5 font-sans text-xs tracking-wider text-muted uppercase transition hover:border-accent hover:text-accent"
         >
           <svg
             width="16"
@@ -130,6 +130,7 @@ function Title({
           >
             <path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" />
           </svg>
+          Modifica
         </button>
       )}
     </h3>

@@ -370,11 +370,15 @@ export async function rollFreeDice(
 
 // ---------------------------------------------------------------------
 // Raggira: prova contrapposta nascosta (regolamento, "Ingannare"):
-// EMP + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
+// PRE + Persuadere + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
 // A parita' vince chi difende. In chat non compare nulla: se il bersaglio
 // scopre l'inganno riceve, lui solo, il testo scritto da chi ha tentato il
 // raggiro. Chi raggira non viene a sapere com'e' andata
 // ---------------------------------------------------------------------
+// DEBUG TEMPORANEO: con true, l esito del raggiro compare anche in chat, visibile a tutti,
+// per verificare che il sistema funzioni. Va rimesso a false finite le prove
+const RAGGIRA_DEBUG = false;
+
 const PROVA_RULES: DiceRule[] = [
   {
     when: "naturale",
@@ -422,7 +426,7 @@ export async function rollRaggira(
     supabase
       .from("skills")
       .select("id, name")
-      .in("name", ["Dissimulare", "Percepire Intenzioni"]),
+      .in("name", ["Persuadere", "Percepire Intenzioni"]),
   ]);
   if (!me || !(await controls(supabase, me.id)) || me.status !== "attivo")
     return { error: "Personaggio non valido." };
@@ -442,8 +446,8 @@ export async function rollRaggira(
       .maybeSingle();
     return (data?.level as number | undefined) ?? 0;
   };
-  const emp = (c: { attributes: unknown }) =>
-    Number((c.attributes as Record<string, number> | null)?.emp) ||
+  const stat = (c: { attributes: unknown }, id: string) =>
+    Number((c.attributes as Record<string, number> | null)?.[id]) ||
     RULES.statMin;
 
   const def = rollFormula(
@@ -451,7 +455,7 @@ export async function rollRaggira(
     PROVA_RULES,
     {
       vars: {
-        EMP: emp(target),
+        EMP: stat(target, "emp"),
         ABILITA: await levelOf(targetId, "Percepire Intenzioni"),
       },
       varLabels: { ABILITA: "Percepire Intenzioni" },
@@ -460,19 +464,20 @@ export async function rollRaggira(
     ["EMP"],
   );
   if ("error" in def) return { error: def.error };
+  // chi raggira usa Persuadere, che dipende dalla Presenza
   const att = rollFormula(
-    "EMP + ABILITA + 1d10",
+    "PRE + ABILITA + 1d10",
     PROVA_RULES,
     {
       vars: {
-        EMP: emp(me),
-        ABILITA: await levelOf(characterId, "Dissimulare"),
+        PRE: stat(me, "pre"),
+        ABILITA: await levelOf(characterId, "Persuadere"),
       },
-      varLabels: { ABILITA: "Dissimulare" },
+      varLabels: { ABILITA: "Persuadere" },
       target: def.total,
     },
     secureRng,
-    ["EMP"],
+    ["PRE"],
   );
   if ("error" in att) return { error: att.error };
   const won = att.total > def.total; // a parita' vince chi difende
@@ -488,6 +493,17 @@ export async function rollRaggira(
     p_content: text,
     p_discovered: !won,
   });
+  if (!error && RAGGIRA_DEBUG) {
+    const margin = att.total - def.total;
+    return postRoll(
+      user.id,
+      roomId,
+      characterId,
+      `[DEBUG, visibile a tutti] tira Raggira ${target.name}: ${att.text.replace(/ contro DV.*$/, "")} contro ` +
+        `${def.text} — ${won ? "raggiro riuscito: nessun messaggio al bersaglio" : "raggiro scoperto: messaggio segreto inviato al bersaglio"} (margine ${margin >= 0 ? "+" : ""}${margin})`,
+      { dice: "raggira", target: target.name, attack: att, defense: def, success: won, margin },
+    );
+  }
   if (!error) return {};
   if (error.code === "PGRST202")
     return { error: "Per il raggiro nascosto va eseguita la migrazione 0140 in Supabase." };

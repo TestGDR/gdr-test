@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cinzel, Dosis, Lora, Open_Sans } from "next/font/google";
+import { Cinzel, Lora, Mukta, Open_Sans } from "next/font/google";
 import "./globals.css";
 
 // Titoli, sezioni e nomi: Cinzel. Tutti gli altri testi: Open Sans (sans-serif
@@ -8,7 +8,7 @@ const title = Cinzel({ variable: "--font-title", subsets: ["latin"] });
 const body = Open_Sans({ variable: "--font-body", subsets: ["latin"] });
 const lora = Lora({ variable: "--font-lora", subsets: ["latin"] });
 // testo delle azioni in chat
-const chat = Dosis({ variable: "--font-chat", subsets: ["latin"] });
+const chat = Mukta({ variable: "--font-chat", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "Westeros GDR",

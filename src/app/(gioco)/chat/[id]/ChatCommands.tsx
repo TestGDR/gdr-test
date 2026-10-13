@@ -181,7 +181,7 @@ function Raggira({
     <div className="space-y-2 border border-accent/40 bg-black/40 p-3">
       <p className="text-sm text-muted">
         Prova contrapposta nascosta:{" "}
-        <strong>EMP + Dissimulare + d10</strong> contro{" "}
+        <strong>PRE + Persuadere + d10</strong> contro{" "}
         <strong>EMP + Percepire Intenzioni + d10</strong> del bersaglio (a
         parità vince chi difende). In chat non compare nulla e nemmeno tu
         saprai com&apos;è andata: se il bersaglio si accorge dell&apos;inganno,

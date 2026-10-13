@@ -1242,7 +1242,8 @@ function MessageRow({
           )}
         </span>
       </div>
-      <p className="chat-text whitespace-pre-line">
+      {/* testo giustificato e continuo: gli a capo scritti dal giocatore diventano spazi */}
+      <p className="chat-text text-justify">
         {/* colore dell'azione scelto nelle Opzioni della scheda */}
         <span style={{ color: "var(--chat-action, inherit)" }}>
           <FormattedText text={message.content} />

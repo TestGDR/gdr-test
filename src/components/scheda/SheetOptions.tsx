@@ -191,6 +191,36 @@ export default function SheetOptions() {
         <h4 className="font-serif text-lg text-[#d8c39a]">
           Grandezza del testo
         </h4>
+        {/* regolazione fine: 2% alla volta, da 80% a 160% */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              set({ text_scale: Math.max(80, prefs.text_scale - 2) })
+            }
+            disabled={prefs.text_scale <= 80}
+            aria-label="Testo più piccolo"
+            title="Più piccolo (2% alla volta)"
+            className="h-8 w-8 border border-border text-lg leading-none text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+          >
+            −
+          </button>
+          <span className="w-14 text-center text-sm text-accent">
+            {prefs.text_scale}%
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              set({ text_scale: Math.min(160, prefs.text_scale + 2) })
+            }
+            disabled={prefs.text_scale >= 160}
+            aria-label="Testo più grande"
+            title="Più grande (2% alla volta)"
+            className="h-8 w-8 border border-border text-lg leading-none text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           {TEXT_SCALES.map((s) => (
             <button
@@ -208,7 +238,8 @@ export default function SheetOptions() {
           ))}
         </div>
         <p className="text-xs text-muted">
-          Ingrandisce tutto il sito, finestre comprese.
+          Ingrandisce tutto il sito, finestre comprese. Con − e + regoli di
+          precisione; i pulsanti sotto sono misure già pronte.
         </p>
       </section>
 
