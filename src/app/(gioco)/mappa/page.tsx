@@ -9,11 +9,13 @@ import MapView from "./MapView";
 
 export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
   const { supabase, user } = await requireUser();
-  const character = await getMainCharacter(supabase, user.id);
   const { id, luogo } = await searchParams;
 
   // Solo le mappe attive (anche lo staff qui vede la mappa di gioco)
-  const { data: maps } = await supabase.from("maps").select("*").eq("active", true).order("sort_order").order("name");
+  const [character, { data: maps }] = await Promise.all([
+    getMainCharacter(supabase, user.id),
+    supabase.from("maps").select("*").eq("active", true).order("sort_order").order("name"),
+  ]);
   const allMaps = (maps ?? []) as GameMap[];
   const map = allMaps.find((m) => m.id === id) ?? allMaps[0];
 
@@ -26,13 +28,12 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
     );
   }
 
-  const { data: locs } = await supabase.from("locations").select("*").eq("map_id", map.id).order("name");
-  const locations = (locs ?? []) as Location[];
-  const locationIds = locations.map((l) => l.id);
-
-  const [{ data: rooms }, { data: groups }, { data: houses }, { data: rentals }] = await Promise.all([
-    supabase.from("rooms").select("*").in("location_id", locationIds).order("sort_order").order("name"),
-    supabase.from("room_groups").select("*").in("location_id", locationIds).order("sort_order").order("name"),
+  // tutto insieme: chat e gruppi si scelgono dal luogo (che e' di questa mappa),
+  // senza aspettare prima l'elenco dei luoghi
+  const [{ data: locs }, { data: roomRows }, { data: groupRows }, { data: houses }, { data: rentals }] = await Promise.all([
+    supabase.from("locations").select("*").eq("map_id", map.id).order("name"),
+    supabase.from("rooms").select("*, locations!inner(map_id)").eq("locations.map_id", map.id).order("sort_order").order("name"),
+    supabase.from("room_groups").select("*, locations!inner(map_id)").eq("locations.map_id", map.id).order("sort_order").order("name"),
     supabase.from("houses").select("id, name"),
     supabase
       .from("room_rentals")
@@ -40,6 +41,11 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
       .gt("ends_at", new Date().toISOString())
       .order("ends_at", { ascending: false }),
   ]);
+  const locations = (locs ?? []) as Location[];
+  // via il campo di appoggio usato per filtrare
+  const strip = <T,>(rows: unknown[] | null) => (rows ?? []).map((r) => ({ ...(r as object), locations: undefined }) as T);
+  const rooms = strip<Room>(roomRows);
+  const groups = strip<RoomGroup>(groupRows);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -64,8 +70,8 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
         key={map.id}
         map={map}
         locations={locations}
-        rooms={(rooms ?? []) as Room[]}
-        groups={(groups ?? []) as RoomGroup[]}
+        rooms={rooms}
+        groups={groups}
         houses={houses ?? []}
         rentals={(rentals ?? []) as unknown as ActiveRental[]}
         userId={user.id}

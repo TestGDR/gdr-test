@@ -105,7 +105,7 @@ body {
   border-style: solid;
   border-color: transparent;
   border-width: calc(var(--k) * 135px) calc(var(--k) * 30px) calc(var(--k) * 90px);
-  border-image: url("/images/ui/pannello-presenti-cupo.png") 135 30 90 30 fill / calc(var(--k) * 135px)
+  border-image: url("/images/ui/pannello-presenti-cupo.webp") 135 30 90 30 fill / calc(var(--k) * 135px)
     calc(var(--k) * 30px) calc(var(--k) * 90px) stretch;
   filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.75));
 }

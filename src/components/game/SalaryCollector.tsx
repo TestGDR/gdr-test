@@ -2,21 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isDue, markDone } from "@/lib/throttle";
 
 type Paid = { pg_name: string; collected: number };
 
 // Stipendio giornaliero: si ritira da solo entrando nel gioco.
 // Il database paga una sola volta al giorno, anche se la pagina si ricarica.
 // L'avviso "Stipendio ritirato" sparisce da solo dopo 6 secondi.
-export default function SalaryCollector() {
+export default function SalaryCollector({ userId }: { userId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [paid, setPaid] = useState<Paid[]>([]);
 
+  // non a ogni caricamento di pagina: al massimo una volta ogni mezz'ora
   useEffect(() => {
-    supabase.rpc("collect_daily_salary").then(({ data }) => {
+    const key = `stipendio:${userId}`;
+    if (!isDue(key)) return;
+    supabase.rpc("collect_daily_salary").then(({ data, error }) => {
+      if (error) return;
+      markDone(key);
       if (data?.length) setPaid(data as Paid[]);
     });
-  }, [supabase]);
+  }, [supabase, userId]);
 
   // l'avviso sparisce da solo dopo qualche secondo
   useEffect(() => {

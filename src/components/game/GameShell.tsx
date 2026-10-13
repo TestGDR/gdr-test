@@ -26,6 +26,7 @@ import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
 import { everyEvenInBackground, playEvent, playMessageChime } from "@/lib/notify-sound";
 import { applyPrefs, cachedPrefs, loadPrefs } from "@/lib/prefs";
+import { isDue, markDone } from "@/lib/throttle";
 import defaultAreaImage from "../../../public/images/home-bg.jpg";
 import {
   BookIcon,
@@ -226,9 +227,13 @@ export default function GameShell({
   const unread = useUnread(character?.id ?? null);
   // Gravidanze: controllo giornaliero dei sintomi (e parto) al primo accesso del giorno
   const tickId = character?.status === "attivo" ? character.id : null;
+  // non a ogni caricamento di pagina: al massimo una volta ogni mezz'ora
   useEffect(() => {
-    if (tickId) supabase.rpc("pregnancy_tick", { p_character: tickId }).then(() => {});
-    supabase.rpc("refresh_ages").then(() => {}); // compleanni: eta' aggiornate
+    const pregnancy = `gravidanza:${tickId}`;
+    if (tickId && isDue(pregnancy))
+      supabase.rpc("pregnancy_tick", { p_character: tickId }).then(({ error }) => !error && markDone(pregnancy));
+    // compleanni: eta' aggiornate
+    if (isDue("eta")) supabase.rpc("refresh_ages").then(({ error }) => !error && markDone("eta"));
   }, [supabase, tickId]);
   // Pannelli aperti (anche piu' d'uno insieme): 0 = chiuso; a ogni apertura il numero sale e il pannello si ricarica
   const [panels, setPanels] = useState<Partial<Record<Panel, number>>>({});
@@ -461,7 +466,7 @@ export default function GameShell({
         />
       )}
       <SheetModal characterId={sheetId} onClose={() => setSheetId(null)} />
-      <SalaryCollector />
+      <SalaryCollector userId={userId} />
       {ticketToast && (
         <div
           role="alert"

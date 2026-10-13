@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 export type MainCharacter = {
   id: string;
@@ -8,8 +9,9 @@ export type MainCharacter = {
   house: { name: string; sigil_url: string | null } | null;
 };
 
-// Il personaggio principale dell'account: quello creato all'iscrizione (il piu' vecchio)
-export async function getMainCharacter(
+// Il personaggio principale dell'account: quello creato all'iscrizione (il piu' vecchio).
+// cache(): layout e pagina della stessa richiesta lo leggono una volta sola
+export const getMainCharacter = cache(async function getMainCharacter(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<MainCharacter | null> {
@@ -21,4 +23,4 @@ export async function getMainCharacter(
     .limit(1)
     .maybeSingle<MainCharacter>();
   return data;
-}
+});

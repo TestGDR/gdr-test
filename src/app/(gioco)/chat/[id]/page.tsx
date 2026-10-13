@@ -14,33 +14,97 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const { id } = await params;
   const { supabase, user, permissions, isAdmin } = await getStaffContext();
 
+  const since = freshSince();
+  const canNpc = permissions.has("png.gestire");
+  // Primo giro: tutto cio' che dipende solo dalla chat e dall'utente, insieme.
   // Le chat delle mappe spente non si vedono (regole del database)
-  const { data: room } = await supabase
-    .from("rooms")
-    .select("*, location:locations(*)")
-    .eq("id", id)
-    .maybeSingle<Room & { location: Location }>();
+  const [
+    { data: room },
+    { data: canEnter },
+    { data: presence },
+    { data: hiddenCount },
+    { data: npcRows },
+    { data: recentMessages },
+    { data: characters },
+    { data: invisibleNow },
+    { data: chatSettings },
+  ] = await Promise.all([
+    supabase
+      .from("rooms")
+      .select("*, location:locations(*)")
+      .eq("id", id)
+      .maybeSingle<Room & { location: Location }>(),
+    supabase.rpc("can_enter_room", { r: id }),
+    // Chi e' in giocata (attivo nell'ultima ora). Le azioni le legge solo chi e'
+    // entrato (o lo staff): lo impone il database
+    supabase.rpc("chat_present", { p_room: id }),
+    supabase.rpc("chat_hidden_count", { p_room: id }),
+    // PNG che l'utente puo' portare in giocata e muovere
+    canNpc
+      ? supabase
+          .from("characters")
+          .select("id, name")
+          .eq("is_npc", true)
+          .eq("status", "attivo")
+          .or(
+            isAdmin
+              ? "is_npc.eq.true"
+              : `npc_manager_id.is.null,npc_manager_id.eq.${user.id}`,
+          )
+          .order("name")
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", id)
+      // solo le azioni dell'ultima ora (quelle prima dell'ultima pulizia si tolgono sotto)
+      .gt("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_SIZE),
+    // Solo i personaggi attivi possono giocare (lo impone anche il database)
+    supabase
+      .from("characters")
+      .select("*")
+      .eq("owner_id", user.id)
+      .eq("status", "attivo")
+      .order("created_at"),
+    // staff invisibile: gioca senza entrare in giocata e senza comparire tra i presenti
+    supabase.rpc("i_am_invisible"),
+    // limite di caratteri delle azioni (Gestione -> Chat)
+    supabase.from("chat_settings").select("max_length").maybeSingle(),
+  ]);
   if (!room) notFound();
 
   const back = `/mappa?id=${room.location.map_id}&luogo=${room.location.id}`;
-  // meteo: quello della regione della mappa a cui appartiene la chat
-  const { data: mapInfo } = await supabase
-    .from("maps")
-    .select("weather_region_id")
-    .eq("id", room.location.map_id)
-    .maybeSingle();
-  const weatherRegionId = (mapInfo?.weather_region_id as string | null) ?? null;
   const image = room.image_url ?? room.location.image_url;
   const isPrivate = room.access !== "pubblica";
+  const myIds = ((characters ?? []) as Character[]).map((c) => c.id);
 
+  // Secondo giro: cio' che dipende dalla chat appena letta
   const [
-    { data: canEnter },
+    { data: mapInfo },
+    { data: busy },
     { data: controller },
     { data: house },
     { data: rental },
     { data: guests },
   ] = await Promise.all([
-    supabase.rpc("can_enter_room", { r: id }),
+    // meteo: quello della regione della mappa a cui appartiene la chat
+    supabase
+      .from("maps")
+      .select("weather_region_id")
+      .eq("id", room.location.map_id)
+      .maybeSingle(),
+    // Giocate in corso in altre chat: prima di entrare qui bisogna uscire da li'
+    myIds.length
+      ? supabase
+          .from("chat_presence")
+          .select("character_id, room_id, room:rooms(name)")
+          .in("character_id", myIds)
+          .neq("room_id", id)
+          .gt("last_active_at", since)
+          .order("last_active_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
     isPrivate
       ? supabase.rpc("room_controller", { r: id })
       : Promise.resolve({ data: null }),
@@ -72,6 +136,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           .order("created_at")
       : Promise.resolve({ data: [] }),
   ]);
+  const weatherRegionId = (mapInfo?.weather_region_id as string | null) ?? null;
 
   // Cellulare: solo "‹ Torna alla mappa" (il nome della chat e' nel menu)
   const header = (
@@ -142,31 +207,12 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     );
   }
 
-  // Chi e' in giocata (attivo nell'ultima ora). Le azioni le legge solo chi e'
-  // entrato (o lo staff): lo impone il database
-  const since = freshSince();
+  // le azioni di prima dell'ultima pulizia della chat non si mostrano
   const cleared = (room as Room & { cleared_at?: string | null }).cleared_at;
-  const cutoff = cleared && cleared > since ? cleared : since;
-  const canNpc = permissions.has("png.gestire");
-  const [{ data: presence }, { data: hiddenCount }, { data: npcRows }] =
-    await Promise.all([
-      supabase.rpc("chat_present", { p_room: id }),
-      supabase.rpc("chat_hidden_count", { p_room: id }),
-      // PNG che l'utente puo' portare in giocata e muovere
-      canNpc
-        ? supabase
-            .from("characters")
-            .select("id, name")
-            .eq("is_npc", true)
-            .eq("status", "attivo")
-            .or(
-              isAdmin
-                ? "is_npc.eq.true"
-                : `npc_manager_id.is.null,npc_manager_id.eq.${user.id}`,
-            )
-            .order("name")
-        : Promise.resolve({ data: [] }),
-    ]);
+  const cutoffTime = cleared && cleared > since ? Date.parse(cleared) : 0;
+  const messages = ((recentMessages ?? []) as Message[]).filter(
+    (m) => Date.parse(m.created_at) > cutoffTime,
+  );
   const present = (
     (presence ?? []) as {
       character_id: string;
@@ -176,35 +222,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   ).map((p) => ({ id: p.character_id, name: p.name, isNpc: p.is_npc }));
   const npcs = (npcRows ?? []) as { id: string; name: string }[];
 
-  const [{ data: messages }, { data: characters }] = await Promise.all([
-    supabase
-      .from("messages")
-      .select("*")
-      .eq("room_id", id)
-      // solo le azioni dell'ultima ora (e dopo l'ultima pulizia della chat)
-      .gt("created_at", cutoff)
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_SIZE),
-    // Solo i personaggi attivi possono giocare (lo impone anche il database)
-    supabase
-      .from("characters")
-      .select("*")
-      .eq("owner_id", user.id)
-      .eq("status", "attivo")
-      .order("created_at"),
-  ]);
-
-  // Giocate in corso in altre chat: prima di entrare qui bisogna uscire da li'
-  const myIds = ((characters ?? []) as Character[]).map((c) => c.id);
-  const { data: busy } = myIds.length
-    ? await supabase
-        .from("chat_presence")
-        .select("character_id, room_id, room:rooms(name)")
-        .in("character_id", myIds)
-        .neq("room_id", id)
-        .gt("last_active_at", since)
-        .order("last_active_at", { ascending: false })
-    : { data: [] };
   const elsewhere = (
     (busy ?? []) as unknown as {
       character_id: string;
@@ -217,8 +234,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
     roomName: b.room?.name ?? "un'altra chat",
   }));
 
-  // staff invisibile: gioca senza entrare in giocata e senza comparire tra i presenti
-  const { data: invisibleNow } = await supabase.rpc("i_am_invisible");
   // Le azioni arrivano alla pagina solo a chi e' in giocata (con il proprio PG o
   // con un PNG che muove) o e' invisibile: vale anche per lo staff
   const canRead =
@@ -227,11 +242,6 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
       (p) => myIds.includes(p.id) || npcs.some((n) => n.id === p.id),
     );
 
-  // limite di caratteri delle azioni (Gestione -> Chat)
-  const { data: chatSettings } = await supabase
-    .from("chat_settings")
-    .select("max_length")
-    .maybeSingle();
   // modalita' master: i limiti della chat sostituiscono quelli generali
   const master =
     typeof room.master_max === "number"

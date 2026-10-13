@@ -4,7 +4,6 @@ import type { FamilyMember, FamilyRelation, House, HouseNpc, HouseRole } from "@
 import { requireUser } from "@/lib/supabase/server";
 import HouseView, { type HouseMemberPg } from "./HouseView";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "@/components/houses/HouseEconomy";
-import { getMainCharacter } from "@/lib/main-character";
 import { loadHouseTaxes } from "@/lib/taxes-load";
 
 // Pagina di una casata, aperta da Utility giocatore -> Casate PG
@@ -12,10 +11,15 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
   const { id } = await params;
   const { supabase, user } = await requireUser();
 
-  const { data: house } = await supabase.from("houses").select("*").eq("id", id).maybeSingle<House>();
-  if (!house) notFound();
-
-  const [roles, npcs, members, family, relations, allNpcs, allHouses] = await Promise.all([
+  // Tutte le letture partono insieme (dipendono solo dalla casata e dall utente)
+  const [
+    { data: house },
+    roles, npcs, members, family, relations, allNpcs, allHouses,
+    fiefs, fiefTypes, structureTypes, resources, treasury,
+    { data: meRow },
+    taxes,
+  ] = await Promise.all([
+    supabase.from("houses").select("*").eq("id", id).maybeSingle<House>(),
     supabase.from("house_roles").select("*").eq("house_id", id).order("sort_order").order("name"),
     supabase.from("house_npcs").select("*").eq("house_id", id).order("sort_order").order("name"),
     supabase
@@ -28,10 +32,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     // per l'albero: PNG e casate di provenienza dei membri collegati
     supabase.from("house_npcs").select("*"),
     supabase.from("houses").select("*"),
-  ]);
-
-  // Economia: feudi (li vedono tutti), tesoro (solo i membri: le regole del database), chi puo' costruire
-  const [fiefs, fiefTypes, structureTypes, resources, treasury, me] = await Promise.all([
+    // Economia: feudi (li vedono tutti), tesoro (solo i membri: le regole del database), chi puo' costruire
     supabase
       .from("fiefs")
       .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
@@ -45,17 +46,19 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
       .order("name"),
     supabase.from("resources").select("id, name").order("sort_order").order("name"),
     supabase.from("house_resources").select("resource_id, amount").eq("house_id", id),
-    getMainCharacter(supabase, user.id),
+    // il mio personaggio principale (il piu' vecchio), con casata e ruolo
+    supabase
+      .from("characters")
+      .select("id, house_id, house_role:house_roles(can_build)")
+      .eq("owner_id", user.id)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle(),
+    loadHouseTaxes(supabase, id),
   ]);
-  const { data: meRow } = me
-    ? await supabase.from("characters").select("id, house_id, house_role_id").eq("id", me.id).maybeSingle()
-    : { data: null };
+  if (!house) notFound();
   const isMember = meRow?.house_id === id;
-  const taxes = await loadHouseTaxes(supabase, id);
-  const canBuild =
-    isMember && meRow?.house_role_id
-      ? !!(await supabase.from("house_roles").select("can_build").eq("id", meRow.house_role_id).maybeSingle()).data?.can_build
-      : false;
+  const canBuild = isMember && !!(meRow?.house_role as unknown as { can_build: boolean } | null)?.can_build;
 
   return (
     <div className="mx-auto max-w-6xl">

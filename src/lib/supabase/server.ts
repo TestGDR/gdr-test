@@ -27,13 +27,14 @@ export async function createClient() {
 }
 
 // Restituisce client + utente loggato, altrimenti rimanda al login.
-// cache(): layout e pagina della stessa richiesta lo chiedono una volta sola
-// (una sola verifica della sessione invece di due)
+// cache(): layout e pagina della stessa richiesta lo chiedono una volta sola.
+// getClaims() controlla la firma del token qui sul server, senza una chiamata
+// di rete a Supabase a ogni pagina (come gia' fa il proxy); dell'utente serve
+// solo l'id. I dati li protegge comunque il database, che rifa' i suoi controlli.
 export const requireUser = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  return { supabase, user };
+  const { data } = await supabase.auth.getClaims();
+  const id = data?.claims?.sub;
+  if (!id) redirect("/login");
+  return { supabase, user: { id } };
 });
