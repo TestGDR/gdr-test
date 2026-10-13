@@ -749,17 +749,17 @@ function LeftColumn({
 
       {/* Presenti: totale (apre l'elenco esteso) + chi e' qui con me.
           Solo computer: su cellulare c'e' l'icona dei presenti nel pannello */}
-      {/* il totale sta fuori dal riquadro, sempre visibile */}
-      <button
-        type="button"
-        onClick={onOpenOnline}
-        className="hidden w-full text-center font-serif text-sm tracking-[0.15em] uppercase hover:text-accent lg:block"
-        title="Apri l'elenco di tutti i presenti"
-      >
-        <span className="text-accent">{online.length}</span> present{online.length === 1 ? "e" : "i"} online
-      </button>
-      {/* riquadro alto 300px: con tanti presenti scorre dentro */}
-      <div className="hidden h-[300px] flex-col border border-black bg-[#1c1c1c]/80 p-3 shadow-[0_8px_18px_rgb(0_0_0/0.85)] lg:flex">
+      {/* Pannello ornato (immagine): altezza fissa, con tanti presenti l elenco scorre dentro */}
+      <div className="ornate-panel relative hidden h-[300px] flex-col lg:flex">
+        {/* il totale sta scritto nella testata, sopra il divisorio */}
+        <button
+          type="button"
+          onClick={onOpenOnline}
+          className="ornate-panel-count flex items-center justify-center font-serif text-xs font-semibold tracking-[0.14em] whitespace-nowrap text-[#ecdcb4] uppercase hover:text-white"
+          title="Apri l&apos;elenco di tutti i presenti"
+        >
+          {online.length} present{online.length === 1 ? "e" : "i"} online
+        </button>
         {/* in una chat: il nome del luogo (sulla mappa non serve) */}
         {me?.place === "chat" && (
           <h3 className="mb-2 shrink-0 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
@@ -768,7 +768,7 @@ function LeftColumn({
             </Link>
           </h3>
         )}
-        <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 text-sm">
+        <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-1 text-sm [text-shadow:0_2px_2px_#000,0_0_6px_#000,0_0_10px_rgb(0_0_0/0.8)]">
           {here.map((p) => (
             <li
               key={p.userId}

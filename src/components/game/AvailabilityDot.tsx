@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AVAILABILITY, type Availability } from "@/lib/availability";
 
 const OPTIONS: Availability[] = ["disponibile", "cerca", "occupato"];
@@ -15,20 +16,48 @@ export default function AvailabilityDot({
   onChange?: (value: Availability) => void;
   align?: "left" | "right"; // lato verso cui si apre il menu
 }) {
-  const [open, setOpen] = useState(false);
+  // punto dello schermo in cui si apre il menu (null = chiuso)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const open = pos !== null;
   const ref = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLSpanElement>(null);
 
   // Il menu si chiude cliccando altrove
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !menuRef.current?.contains(target))
+        setPos(null);
     };
+    // il menu sta fermo sullo schermo: se la pagina o un elenco scorre, si chiude
+    const away = () => setPos(null);
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("scroll", away, true);
+    window.addEventListener("resize", away);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", away, true);
+      window.removeEventListener("resize", away);
+    };
   }, [open]);
 
-  const dot = <span className={`block h-2.5 w-2.5 rounded-full ${AVAILABILITY[value].dot}`} />;
+  // Il menu si apre sotto il pallino, senza uscire dallo schermo (192 = larghezza del menu)
+  function toggle() {
+    if (open || !ref.current) return setPos(null);
+    const box = ref.current.getBoundingClientRect();
+    const left = align === "left" ? box.left : box.right - 192;
+    setPos({
+      top: box.bottom + 8,
+      left: Math.max(8, Math.min(left, window.innerWidth - 200)),
+    });
+  }
+
+  const dot = (
+    <span
+      className={`block h-2.5 w-2.5 rounded-full ${AVAILABILITY[value].dot}`}
+    />
+  );
 
   if (!onChange) {
     return (
@@ -42,7 +71,7 @@ export default function AvailabilityDot({
     <span ref={ref} className="relative inline-flex shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         title={`${AVAILABILITY[value].label} — clicca per cambiare`}
         aria-label={`Disponibilità: ${AVAILABILITY[value].label}. Cambia`}
         aria-expanded={open}
@@ -50,30 +79,37 @@ export default function AvailabilityDot({
       >
         {dot}
       </button>
-      {open && (
-        <span
-          role="menu"
-          className={`absolute top-6 z-50 ${align === "left" ? "left-0" : "right-0"} w-48 rounded-md border border-border bg-panel p-1 shadow-xl shadow-black`}
-        >
-          {OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-blood/25 ${
-                option === value ? "text-accent" : ""
-              }`}
-            >
-              <span className={`h-2.5 w-2.5 rounded-full ${AVAILABILITY[option].dot}`} />
-              {AVAILABILITY[option].label}
-            </button>
-          ))}
-        </span>
-      )}
+      {/* disegnato in fondo alla pagina: sta sopra a tutto e non allarga i riquadri che scorrono */}
+      {pos &&
+        createPortal(
+          <span
+            ref={menuRef}
+            role="menu"
+            style={{ top: pos.top, left: pos.left }}
+            className="fixed z-[100001] block w-48 rounded-md border border-border bg-panel p-1 shadow-xl shadow-black"
+          >
+            {OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onChange(option);
+                  setPos(null);
+                }}
+                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-blood/25 ${
+                  option === value ? "text-accent" : ""
+                }`}
+              >
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${AVAILABILITY[option].dot}`}
+                />
+                {AVAILABILITY[option].label}
+              </button>
+            ))}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

@@ -97,6 +97,25 @@ body {
     #0d0b0b;
   border: 1px solid #2c2624;
 }
+/* Pannello ornato dei presenti: l immagine rossa (arco e divisorio in alto, fondo al
+   centro, cornice in basso) fa da cornice e da sfondo, e si allunga con il riquadro.
+   --k = larghezza del riquadro / 440 (larghezza dell immagine): tiene le proporzioni */
+.ornate-panel {
+  --k: 0.527;
+  border-style: solid;
+  border-color: transparent;
+  border-width: calc(var(--k) * 135px) calc(var(--k) * 30px) calc(var(--k) * 90px);
+  border-image: url("/images/ui/pannello-presenti-cupo.png") 135 30 90 30 fill / calc(var(--k) * 135px)
+    calc(var(--k) * 30px) calc(var(--k) * 90px) stretch;
+  filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.75));
+}
+/* il totale dei presenti: scritto nella testata, tra il fregio e il divisorio */
+.ornate-panel-count {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--k) * -82px);
+  height: calc(var(--k) * 64px);
+}
 .painted-title {
   max-width: min(28rem, 100%);
   padding: 0.55rem 2.4rem 0.55rem 1.4rem;
@@ -370,6 +389,12 @@ body {
 }
 .guide-content.on-parchment td {
   border-color: rgb(138 106 62 / 0.35);
+}
+/* Documentazione: grassetto e corsivo cambiano solo spessore e stile, il colore
+   resta quello del testo (o quello scelto con l editor) */
+.guide-content.doc-text strong,
+.guide-content.doc-text em {
+  color: inherit;
 }
 .guide-content.on-parchment > p:first-of-type::first-letter,
 .guide-content.on-parchment > div > p:first-of-type::first-letter {

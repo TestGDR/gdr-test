@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { supabaseKey, supabaseUrl } from "./env";
 
 // Client Supabase da usare in Server Components, Server Actions e Route Handlers
@@ -25,12 +26,14 @@ export async function createClient() {
   });
 }
 
-// Restituisce client + utente loggato, altrimenti rimanda al login
-export async function requireUser() {
+// Restituisce client + utente loggato, altrimenti rimanda al login.
+// cache(): layout e pagina della stessa richiesta lo chiedono una volta sola
+// (una sola verifica della sessione invece di due)
+export const requireUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   return { supabase, user };
-}
+});

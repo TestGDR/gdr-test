@@ -11,7 +11,13 @@ import {
   TextStyle,
 } from "@tiptap/extension-text-style";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { uploadGuideImage } from "./actions";
+import {
+  addEditorColor,
+  listEditorColors,
+  removeEditorColor,
+  uploadGuideImage,
+  type EditorColor,
+} from "./actions";
 
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
 export default function RichEditor({
@@ -19,11 +25,13 @@ export default function RichEditor({
   onChange,
   textClassName = "",
   scroll = false,
+  managePalette = false,
 }: {
   value: string;
   onChange: (html: string) => void;
   textClassName?: string; // stile di base del testo (es. "forum-text": quello del forum)
   scroll?: boolean; // altezza fissa di 400px: il testo lungo scorre dentro
+  managePalette?: boolean; // documentazione: selettore visivo e tavolozza della gestione
 }) {
   const [mode, setMode] = useState<"visuale" | "html">("visuale");
 
@@ -81,7 +89,9 @@ export default function RichEditor({
   return (
     <div className="rounded-md border border-border bg-background">
       <div className="flex flex-wrap items-center gap-1 border-b border-border p-1.5">
-        {mode === "visuale" && editor && <Toolbar editor={editor} />}
+        {mode === "visuale" && editor && (
+          <Toolbar editor={editor} managePalette={managePalette} />
+        )}
         <div className="ml-auto flex gap-1 text-xs">
           {(["visuale", "html"] as const).map((m) => (
             <button
@@ -114,7 +124,13 @@ export default function RichEditor({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({
+  editor,
+  managePalette,
+}: {
+  editor: Editor;
+  managePalette: boolean;
+}) {
   const chain = () => editor.chain().focus();
   const btn = (
     label: ReactNode,
@@ -162,7 +178,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       {btn(<u>S</u>, "Sottolineato", editor.isActive("underline"), () =>
         chain().toggleUnderline().run(),
       )}
-      <ColorPicker editor={editor} />
+      <ColorPicker editor={editor} manage={managePalette} />
       <FontFamilySelect editor={editor} />
       <FontSizeSelect editor={editor} />
       <span className="mx-1 h-5 w-px bg-border" />
@@ -287,11 +303,89 @@ const PALETTE = [
   { label: "Viola", value: "#a77bd1" },
 ];
 
-function ColorPicker({ editor }: { editor: Editor }) {
+// Legge un colore scritto a mano: #fff, #ffffff, #ffffff80, rgb(...) o rgba(...).
+// "css" e' la forma con cui viene applicato e salvato
+function parseColor(
+  input: string,
+): { css: string; rgb: [number, number, number] } | null {
+  const text = input.trim().toLowerCase();
+  const hex = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(text);
+  if (hex) {
+    const h =
+      hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join("") : hex[1];
+    return {
+      css: `#${h}`,
+      rgb: [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [
+        number,
+        number,
+        number,
+      ],
+    };
+  }
+  const fn =
+    /^rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*(?:[,/]\s*(\d*\.?\d+%?)\s*)?\)$/.exec(
+      text,
+    );
+  if (!fn) return null;
+  const rgb = [fn[1], fn[2], fn[3]].map((n) => Math.min(255, Number(n))) as [
+    number,
+    number,
+    number,
+  ];
+  const alpha =
+    fn[4] === undefined
+      ? 1
+      : Math.min(
+          1,
+          fn[4].endsWith("%") ? parseFloat(fn[4]) / 100 : parseFloat(fn[4]),
+        );
+  if (!(alpha < 1)) return { css: rgbToHex(rgb), rgb };
+  return {
+    css: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${Math.round(alpha * 100) / 100})`,
+    rgb,
+  };
+}
+
+const rgbToHex = (rgb: [number, number, number]) =>
+  `#${rgb.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+
+type Hsv = { h: number; s: number; v: number }; // h 0-360, s e v 0-1
+
+function rgbToHsv([r, g, b]: [number, number, number], fallbackHue = 0): Hsv {
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    d = max - min;
+  let h = fallbackHue; // i grigi non hanno una tinta: resta quella di prima
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+  }
+  return { h, s: max === 0 ? 0 : d / max, v: max / 255 };
+}
+
+function hsvToHex({ h, s, v }: Hsv) {
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return Math.round((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255);
+  };
+  return rgbToHex([f(5), f(3), f(1)]);
+}
+
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+function ColorPicker({ editor, manage }: { editor: Editor; manage: boolean }) {
   const [open, setOpen] = useState(false);
+  // tavolozza della gestione: letta la prima volta che si apre il menu
+  const [saved, setSaved] = useState<EditorColor[] | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
   const current =
     (editor.getAttributes("textStyle").color as string | undefined) ?? null;
+  // stesso colore scritto in modi diversi (#abc, rgb(...)): si confronta la forma unica
+  const same = (a: string | null, b: string) =>
+    !!a && (parseColor(a)?.css ?? a) === (parseColor(b)?.css ?? b);
 
   // Il menu si chiude cliccando altrove
   useEffect(() => {
@@ -302,11 +396,37 @@ function ColorPicker({ editor }: { editor: Editor }) {
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  const toggle = () => {
+    if (!open && manage && saved === null)
+      listEditorColors().then((r) => setSaved(r.colors));
+    setNote(null);
+    setOpen((v) => !v);
+  };
+
   const apply = (color: string | null) => {
     if (color) editor.chain().focus().setColor(color).run();
     else editor.chain().focus().unsetColor().run();
     setOpen(false);
   };
+
+  async function save(color: string) {
+    setNote(null);
+    if ((saved ?? []).some((c) => same(c.color, color)))
+      return setNote("Questo colore è già nella tavolozza.");
+    const res = await addEditorColor(color);
+    if (res.error || !res.color)
+      return setNote(res.error ?? "Salvataggio non riuscito.");
+    const added = res.color;
+    setSaved((list) => [...(list ?? []), added]);
+    setNote("Colore salvato nella tavolozza.");
+  }
+
+  async function remove(id: string) {
+    setNote(null);
+    const res = await removeEditorColor(id);
+    if (res.error) return setNote(res.error);
+    setSaved((list) => (list ?? []).filter((c) => c.id !== id));
+  }
 
   return (
     <span ref={ref} className="relative">
@@ -316,7 +436,7 @@ function ColorPicker({ editor }: { editor: Editor }) {
         aria-label="Colore del testo"
         aria-expanded={open}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="flex h-8 min-w-8 flex-col items-center justify-center rounded px-1.5 text-sm text-muted hover:bg-white/5 hover:text-foreground"
       >
         <span className="leading-none font-bold">A</span>
@@ -326,8 +446,12 @@ function ColorPicker({ editor }: { editor: Editor }) {
         />
       </button>
       {open && (
-        <span className="absolute top-9 left-0 z-50 w-44 rounded-md border border-border bg-panel p-2 shadow-xl shadow-black">
-          <span className="grid grid-cols-4 gap-1.5">
+        <span
+          className={`absolute top-9 left-0 z-50 rounded-md border border-border bg-panel p-2 shadow-xl shadow-black ${manage ? "w-60" : "w-44"}`}
+        >
+          <span
+            className={`grid gap-1.5 ${manage ? "grid-cols-6" : "grid-cols-4"}`}
+          >
             {PALETTE.map((c) => (
               <button
                 key={c.value}
@@ -336,23 +460,76 @@ function ColorPicker({ editor }: { editor: Editor }) {
                 aria-label={c.label}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => apply(c.value)}
-                className={`h-7 w-7 rounded border-2 ${current === c.value ? "border-white" : "border-transparent hover:border-white/50"}`}
+                className={`h-7 w-7 rounded border-2 ${same(current, c.value) ? "border-white" : "border-transparent hover:border-white/50"}`}
                 style={{ background: c.value }}
               />
             ))}
           </span>
-          <span className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input
-                type="color"
-                value={current ?? "#e4dfdb"}
-                onChange={(e) =>
-                  editor.chain().focus().setColor(e.target.value).run()
-                }
-                className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent"
+          {manage && (
+            <span className="mt-2 block border-t border-border pt-2">
+              <span className="mb-1.5 block text-[0.625rem] tracking-wider text-muted uppercase">
+                Colori della gestione
+              </span>
+              {saved === null ? (
+                <span className="block text-xs text-muted">Caricamento...</span>
+              ) : saved.length === 0 ? (
+                <span className="block text-xs text-muted">
+                  Ancora nessun colore salvato: scegline uno qui sotto e premi
+                  «Salva».
+                </span>
+              ) : (
+                <span className="grid grid-cols-6 gap-1.5">
+                  {saved.map((c) => (
+                    <span key={c.id} className="group relative h-7 w-7">
+                      <button
+                        type="button"
+                        title={c.color}
+                        aria-label={`Colore salvato ${c.color}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => apply(c.color)}
+                        className={`h-7 w-7 rounded border-2 ${same(current, c.color) ? "border-white" : "border-black/40 hover:border-white/50"}`}
+                        style={{ background: c.color }}
+                      />
+                      <button
+                        type="button"
+                        title={`Togli ${c.color} dalla tavolozza`}
+                        aria-label={`Togli ${c.color} dalla tavolozza`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => remove(c.id)}
+                        className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full border border-border bg-background text-[0.625rem] leading-none text-muted group-hover:flex hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </span>
+              )}
+              <VisualPicker
+                initial={current}
+                onApply={(color) => apply(color)}
+                onSave={save}
               />
-              Altro
-            </label>
+              {note && (
+                <span className="mt-1.5 block text-xs text-muted">{note}</span>
+              )}
+            </span>
+          )}
+          <span className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+            {manage ? (
+              <span />
+            ) : (
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="color"
+                  value={current ?? "#e4dfdb"}
+                  onChange={(e) =>
+                    editor.chain().focus().setColor(e.target.value).run()
+                  }
+                  className="h-6 w-8 cursor-pointer rounded border border-border bg-transparent"
+                />
+                Altro
+              </label>
+            )}
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
@@ -365,6 +542,144 @@ function ColorPicker({ editor }: { editor: Editor }) {
         </span>
       )}
     </span>
+  );
+}
+
+// Selettore visivo: riquadro delle sfumature, barra delle tinte, anteprima e
+// codice scritto a mano (HEX, oppure rgb/rgba)
+function VisualPicker({
+  initial,
+  onApply,
+  onSave,
+}: {
+  initial: string | null;
+  onApply: (color: string) => void;
+  onSave: (color: string) => void;
+}) {
+  const [hsv, setHsv] = useState<Hsv>(() =>
+    rgbToHsv((parseColor(initial ?? "") ?? parseColor("#c9a45c")!).rgb),
+  );
+  const [text, setText] = useState(
+    () => (parseColor(initial ?? "") ?? parseColor("#c9a45c")!).css,
+  );
+  const parsed = parseColor(text);
+
+  // scelta con il mouse: aggiorna anche il codice scritto
+  const choose = (next: Hsv) => {
+    setHsv(next);
+    setText(hsvToHex(next));
+  };
+  // codice scritto a mano: se e' valido sposta anche i cursori
+  const type = (value: string) => {
+    setText(value);
+    const color = parseColor(value);
+    if (color) setHsv((old) => rgbToHsv(color.rgb, old.h));
+  };
+
+  // trascinamento dentro un riquadro: x e y da 0 a 1
+  const drag = (move: (x: number, y: number) => void) => {
+    const at = (e: React.PointerEvent<HTMLDivElement>) => {
+      const box = e.currentTarget.getBoundingClientRect();
+      move(
+        clamp01((e.clientX - box.left) / box.width),
+        clamp01((e.clientY - box.top) / box.height),
+      );
+    };
+    return {
+      onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+        e.preventDefault(); // non perdere la selezione nel testo
+        e.currentTarget.setPointerCapture(e.pointerId);
+        at(e);
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) at(e);
+      },
+    };
+  };
+
+  return (
+    <div className="mt-2 space-y-2">
+      <div
+        {...drag((x, y) => choose({ h: hsv.h, s: x, v: 1 - y }))}
+        role="presentation"
+        title="Scegli la sfumatura"
+        data-picker="sfumatura"
+        className="relative h-28 w-full cursor-crosshair touch-none rounded border border-border"
+        style={{
+          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))`,
+        }}
+      >
+        <span
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_#000]"
+          style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%` }}
+        />
+      </div>
+      <div
+        {...drag((x) => choose({ ...hsv, h: Math.round(x * 359) }))}
+        role="presentation"
+        title="Scegli la tinta"
+        data-picker="tinta"
+        className="relative h-3 w-full cursor-pointer touch-none rounded border border-border"
+        style={{
+          background:
+            "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)",
+        }}
+      >
+        <span
+          className="pointer-events-none absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-black bg-white"
+          style={{ left: `${(hsv.h / 359) * 100}%` }}
+        />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span
+          title="Anteprima"
+          className="h-7 w-7 shrink-0 rounded border border-border"
+          style={{ background: parsed?.css ?? "transparent" }}
+        />
+        <input
+          value={text}
+          onChange={(e) => type(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (parsed) onApply(parsed.css);
+            }
+          }}
+          spellCheck={false}
+          maxLength={30}
+          placeholder="#FFFFFF"
+          aria-label="Codice del colore (HEX, rgb o rgba)"
+          title="Codice HEX (es. #FFFFFF), oppure rgb(...) o rgba(...)"
+          className="input min-w-0 flex-1 py-1 font-mono text-xs"
+        />
+      </div>
+      {!parsed && (
+        <p className="text-xs text-red-400">
+          Codice non valido: es. #FFFFFF o rgb(255, 255, 255).
+        </p>
+      )}
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => parsed && onApply(parsed.css)}
+          disabled={!parsed}
+          className="btn flex-1 py-1 text-xs"
+        >
+          Applica
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => parsed && onSave(parsed.css)}
+          disabled={!parsed}
+          title="Salva questo colore nella tavolozza della gestione"
+          className="btn-ghost flex-1 py-1 text-xs"
+        >
+          Salva
+        </button>
+      </div>
+    </div>
   );
 }
 

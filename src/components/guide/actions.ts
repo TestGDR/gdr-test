@@ -170,3 +170,36 @@ export async function saveOrder(
   const results = await Promise.all(updates);
   return results.some((r) => r.error) ? { error: "Salvataggio dell'ordine non riuscito." } : {};
 }
+
+// ---------------------------------------------------------------------
+// Tavolozza dei colori della gestione: colori salvati per l'editor della
+// documentazione (li vede solo chi puo' scriverla)
+// ---------------------------------------------------------------------
+export type EditorColor = { id: string; color: string };
+const COLOR_FORMAT = /^(#[0-9a-f]{6}([0-9a-f]{2})?|rgba\(\d{1,3}, \d{1,3}, \d{1,3}, (0|1|0?\.\d{1,3})\))$/;
+const MAX_EDITOR_COLORS = 48;
+
+export async function listEditorColors(): Promise<{ colors: EditorColor[] }> {
+  const ctx = await authorized();
+  if (!ctx) return { colors: [] };
+  const { data } = await ctx.supabase.from("editor_colors").select("id, color").order("created_at");
+  return { colors: data ?? [] };
+}
+
+export async function addEditorColor(color: string): Promise<{ color?: EditorColor; error?: string }> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  if (!COLOR_FORMAT.test(color)) return { error: "Colore non valido." };
+  const { count } = await ctx.supabase.from("editor_colors").select("id", { count: "exact", head: true });
+  if ((count ?? 0) >= MAX_EDITOR_COLORS) return { error: `La tavolozza è piena (massimo ${MAX_EDITOR_COLORS} colori).` };
+  const { data, error } = await ctx.supabase.from("editor_colors").insert({ color }).select("id, color").single();
+  if (error) return { error: error.code === "23505" ? "Questo colore è già nella tavolozza." : "Salvataggio non riuscito." };
+  return { color: data };
+}
+
+export async function removeEditorColor(id: string): Promise<GuideResult> {
+  const ctx = await authorized();
+  if (!ctx) return DENIED;
+  const { error } = await ctx.supabase.from("editor_colors").delete().eq("id", id);
+  return error ? { error: "Eliminazione non riuscita." } : {};
+}

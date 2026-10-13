@@ -5,39 +5,29 @@ import { getMainCharacter } from "@/lib/main-character";
 import { MANAGEMENT_PERMISSIONS } from "@/lib/permissions";
 import { getStaffContext } from "@/lib/staff";
 
-type Profile = {
-  username: string | null;
-  role: string;
-  status_text: string | null;
-  staff_role: { name: string; color: string } | null;
-};
-
 // Mondo di gioco: barra con titolo e icone, colonna sinistra (luogo, data,
 // personaggio, presenti), area centrale e colonna destra con le icone
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
-  const { supabase, user, permissions } = await getStaffContext();
-  const [{ data: profile }, character, cookieStore] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("username, role, status_text, staff_role:staff_roles(name, color)")
-      .eq("id", user.id)
-      .single<Profile>(),
-    getMainCharacter(supabase, user.id),
-    cookies(),
-  ]);
+  // il profilo (nome, stato, invisibilita', ruolo) arriva gia' con i permessi:
+  // una sola lettura di "profiles" invece di tre
+  const { supabase, user, permissions, profile } = await getStaffContext();
+  const [character, cookieStore] = await Promise.all([getMainCharacter(supabase, user.id), cookies()]);
   const savedAvailability = cookieStore.get(AVAILABILITY_COOKIE)?.value;
   // "Il mio drago" compare solo a chi cavalca un drago
   const hasDragon = character
     ? !!(await supabase.from("dragons").select("id").eq("rider_id", character.id).limit(1).maybeSingle()).data
     : false;
 
-  // Invisibilita' dello staff (colonna aggiunta dalla migrazione 0112)
-  const { data: inv } = await supabase.from("profiles").select("invisible").eq("id", user.id).maybeSingle();
-  const invisible = !!(inv as { invisible?: boolean } | null)?.invisible;
+  // Invisibilita' dello staff
+  const invisible = !!profile?.invisible;
 
   // L'admin e' staff anche senza un ruolo assegnato
-  const staffRole =
-    profile?.staff_role ?? (profile?.role === "admin" ? { name: "Admin", color: "#c9a45c" } : null);
+  // alla pagina arrivano solo nome e colore del ruolo, come prima
+  const staffRole = profile?.staff_role
+    ? { name: profile.staff_role.name, color: profile.staff_role.color }
+    : profile?.role === "admin"
+      ? { name: "Admin", color: "#c9a45c" }
+      : null;
 
   return (
     <GameShell
