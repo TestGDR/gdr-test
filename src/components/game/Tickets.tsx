@@ -179,6 +179,11 @@ export default function Tickets({
               key={view.id}
               ticket={tickets?.find((t) => t.id === view.id) ?? null}
               isStaff={isStaff}
+              isAdmin={isAdmin}
+              onDeleted={() => {
+                setView({ page: "archivio" });
+                refresh();
+              }}
               onRead={() => {
                 setUnread((u) => {
                   const n = new Set(u);
@@ -585,7 +590,19 @@ function NewTicket({
 }
 
 // ---------------------------------------------------------------------
-function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaff: boolean; onRead: () => void }) {
+function TicketView({
+  ticket,
+  isStaff,
+  isAdmin,
+  onDeleted,
+  onRead,
+}: {
+  ticket: Ticket | null;
+  isStaff: boolean;
+  isAdmin: boolean; // solo l'admin puo' eliminare un ticket in archivio
+  onDeleted: () => void;
+  onRead: () => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [reply, setReply] = useState("");
@@ -659,7 +676,19 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
     if (error) setError("Stato non cambiato.");
   }
 
+  // Eliminazione definitiva (solo admin, solo ticket in archivio): via anche tutti i messaggi
+  async function remove() {
+    if (!ticket) return;
+    if (!window.confirm(`Eliminare definitivamente il ticket "${ticket.title}"?\n\nVerranno cancellati anche tutti i suoi messaggi. Non si può recuperare.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("delete_ticket", { p_ticket: ticket.id });
+    setBusy(false);
+    if (error) return setError("Ticket non eliminato.");
+    onDeleted();
+  }
+
   const closed = ticket.status === "chiuso";
+  const archived = closed || ticket.status === "sospeso";
   const names = ticket.participants.map((p) => p.character?.name).filter(Boolean).join(", ");
 
   return (
@@ -690,6 +719,17 @@ function TicketView({ ticket, isStaff, onRead }: { ticket: Ticket | null; isStaf
             {!closed && (
               <button type="button" onClick={() => window.confirm("Chiudere il ticket?") && setStatus("chiuso")} className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400">
                 Chiudi
+              </button>
+            )}
+            {isAdmin && archived && (
+              <button
+                type="button"
+                onClick={remove}
+                disabled={busy}
+                title="Cancella per sempre il ticket e i suoi messaggi"
+                className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400 hover:border-red-500"
+              >
+                Elimina
               </button>
             )}
           </div>

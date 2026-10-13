@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import HouseArmy from "./HouseArmy";
+import HouseTrade from "./HouseTrade";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
 import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
 
@@ -92,6 +93,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       taxes={data.taxes}
       bare
     />
+    <HouseTrade houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
     <HouseArmy houseId={data.house.id} fief={fiefPoints} />
     </>
   );

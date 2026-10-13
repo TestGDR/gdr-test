@@ -109,7 +109,8 @@ export type RoomGroup = {
 
 // dado e sistema (entrate, uscite, modalita' master) li scrive solo il server
 // sussurro: privato tra due personaggi (lo leggono solo loro e gli admin)
-export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema" | "sussurro";
+// intuizione: raggiro scoperto, lo leggono solo il bersaglio e gli admin (lo scrive il server)
+export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema" | "sussurro" | "intuizione";
 
 export type Message = {
   id: number;
@@ -122,6 +123,6 @@ export type Message = {
   created_at: string;
   roll_data?: unknown; // dettagli del tiro (messaggi "dado")
   recipient?: string | null; // a chi e' rivolta l'azione ("→ Nome")
-  recipient_id?: string | null; // sussurro: il personaggio che lo riceve
+  recipient_id?: string | null; // sussurro e intuizione: il personaggio che lo riceve
   edited_at?: string | null; // l'autore l'ha corretta (una volta sola, entro 5 minuti)
 };

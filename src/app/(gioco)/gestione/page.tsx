@@ -61,6 +61,13 @@ const PANELS = [
   },
   {
     permission: "economia.gestire",
+    href: "/gestione/commerci",
+    title: "Commerci",
+    description:
+      "Tratte commerciali delle casate: proponi, accetta, annulla e rinnova per conto delle casate PNG.",
+  },
+  {
+    permission: "economia.gestire",
     href: "/gestione/economia",
     title: "Economia",
     description:

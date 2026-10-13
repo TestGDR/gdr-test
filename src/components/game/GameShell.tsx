@@ -509,7 +509,7 @@ export default function GameShell({
         onClose={() => setPanels((x) => ({ ...x, [panel]: 0 }))}
         title={PANEL_TITLE[panel]}
         size={
-          panel === "ricerca" || panel === "assenze" || panel === "viaggio"
+          panel === "ricerca" || panel === "assenze" || panel === "viaggio" || panel === "spie"
             ? "panel"
             : panel === "faq"
               ? "faq"

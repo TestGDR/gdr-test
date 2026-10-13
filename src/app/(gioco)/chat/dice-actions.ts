@@ -369,9 +369,11 @@ export async function rollFreeDice(
 }
 
 // ---------------------------------------------------------------------
-// Raggira: prova contrapposta (regolamento, "Ingannare"):
+// Raggira: prova contrapposta nascosta (regolamento, "Ingannare"):
 // EMP + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
-// A parita' vince chi difende
+// A parita' vince chi difende. In chat non compare nulla: se il bersaglio
+// scopre l'inganno riceve, lui solo, il testo scritto da chi ha tentato il
+// raggiro. Chi raggira non viene a sapere com'e' andata
 // ---------------------------------------------------------------------
 const PROVA_RULES: DiceRule[] = [
   {
@@ -397,8 +399,11 @@ export async function rollRaggira(
   roomId: string,
   characterId: string,
   targetId: string,
+  reveal: string, // che cosa scopre il bersaglio se si accorge dell'inganno
 ): Promise<{ error?: string }> {
-  const { supabase, user, permissions } = await getStaffContext();
+  const { supabase, user } = await getStaffContext();
+  const text = reveal.trim().slice(0, 1000);
+  if (!text) return { error: "Scrivi che cosa scopre il bersaglio se si accorge dell'inganno." };
   // il bersaglio puo' essere un PNG, che i giocatori non leggono: lo legge il server
   const reader = createAdminClient() ?? supabase;
   if (characterId === targetId)
@@ -471,18 +476,22 @@ export async function rollRaggira(
   );
   if ("error" in att) return { error: att.error };
   const won = att.total > def.total; // a parita' vince chi difende
-  const margin = att.total - def.total;
-  const content =
-    `tira Raggira ${target.name}: ${att.text.replace(/ contro DV.*$/, "")} contro ` +
-    `${def.text} — ${won ? "riuscito" : "fallito"} (margine ${margin >= 0 ? "+" : ""}${margin})`;
-  return postRoll(user.id, roomId, characterId, content, {
-    dice: "raggira",
-    target: target.name,
-    attack: att,
-    defense: def,
-    success: won,
-    margin,
+  const admin = createAdminClient();
+  if (!admin) return { error: "Configurazione del server incompleta." };
+  // i controlli (presenza in chat di entrambi) valgono sempre; il messaggio
+  // segreto parte solo se il bersaglio ha scoperto l'inganno
+  const { error } = await admin.rpc("post_secret_insight", {
+    p_user: user.id,
+    p_room: roomId,
+    p_character: characterId,
+    p_recipient: targetId,
+    p_content: text,
+    p_discovered: !won,
   });
+  if (!error) return {};
+  if (error.code === "PGRST202")
+    return { error: "Per il raggiro nascosto va eseguita la migrazione 0140 in Supabase." };
+  return { error: error.message.length < 200 ? error.message : "Tentativo non riuscito." };
 }
 
 async function postRoll(

@@ -1,5 +1,6 @@
 "use client";
 
+import DOMPurify from "dompurify";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   DEPTHS,
@@ -37,11 +38,15 @@ type Mission = {
   outcome: "riuscita" | "catturata" | "uccisa" | null;
   report: string;
 };
+// Risposta dello staff nel ticket della missione (si legge a missione finita)
+type Reply = { mission_id: string; author_name: string; body: string; created_at: string };
+const clean = (html: string) => (typeof window === "undefined" ? "" : DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }));
 type Pay = "personale" | "casata";
 type Data = {
   settings: SpyRules;
   spies: Spy[];
   missions: Mission[];
+  replies: Reply[];
   places: { id: string; name: string }[];
   coins: number;
   canHouse: boolean; // ha un ruolo che gestisce le risorse della casata
@@ -63,16 +68,22 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
   const [pay, setPay] = useState<Pay>("personale");
   const [name, setName] = useState("");
   const [sending, setSending] = useState<Spy | null>(null);
+  // due pagine: le spie (con le missioni in corso) e l'archivio dei resoconti
+  const [tab, setTab] = useState<"spie" | "archivio">("spie");
+  const [only, setOnly] = useState<Spy | null>(null); // archivio di una sola spia
+  const [opened, setOpened] = useState<string | null>(null); // missione aperta nell'archivio
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const [settings, levels, limit, missions, spies, places, me] = await Promise.all([
+    const [settings, levels, limit, missions, replies, spies, places, me] = await Promise.all([
       supabase.from("spy_settings").select("*").maybeSingle(),
       supabase.from("spy_levels").select("*").order("level"),
       supabase.rpc("spy_limit", { p_character: characterId }),
       // legge le missioni e, per quelle finite, applica l'esito alla spia
       supabase.rpc("spy_my_missions", { p_character: characterId }),
+      // le risposte dello staff nei ticket delle missioni finite
+      supabase.rpc("spy_my_replies", { p_character: characterId }),
       supabase.from("spies").select("*").eq("character_id", characterId).order("created_at"),
       supabase.from("locations").select("id, name").eq("kind", "luogo").eq("in_game", true).order("name"),
       supabase.from("characters").select("coins, house_role:house_roles(can_build)").eq("id", characterId).maybeSingle(),
@@ -88,6 +99,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
       },
       spies: ((fresh.data ?? spies.data ?? []) as Spy[]),
       missions: (missions.data ?? []) as Mission[],
+      replies: (replies.data ?? []) as Reply[],
       places: (places.data ?? []) as { id: string; name: string }[],
       coins: (me.data?.coins as number | undefined) ?? 0,
       canHouse: !!(me.data?.house_role as unknown as { can_build: boolean } | null)?.can_build,
@@ -136,11 +148,35 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
   const alive = spies.filter((x) => !isLost(x.status));
   const running = missions.filter((m) => !m.finished);
   const past = missions.filter((m) => m.finished);
+  const shown = only ? past.filter((m) => m.spy_id === only.id) : past;
+  const repliesOf = (id: string) => data.replies.filter((r) => r.mission_id === id);
 
   return (
     <div className="space-y-5">
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            ["spie", "Le tue spie"],
+            ["archivio", `Archivio${past.length ? ` (${past.length})` : ""}`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setTab(id);
+              setOnly(null);
+            }}
+            className={`-mb-px border-b-2 px-4 py-2 font-serif text-sm tracking-wide uppercase ${tab === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
 
+      {tab === "spie" && (
+        <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-border bg-black/40 px-3 py-2 text-sm">
         <span>
           Conto: <strong className="text-accent">{data.coins}</strong> monete
@@ -167,7 +203,17 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
             {spies.map((spy) => (
               <li key={spy.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 border border-border bg-black/50 px-3 py-2 ${isLost(spy.status) ? "opacity-50" : ""}`}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-serif text-accent">{spy.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnly(spy);
+                      setTab("archivio");
+                    }}
+                    title={`Leggi i resoconti di ${spy.name}`}
+                    className="block max-w-full truncate text-left font-serif text-accent hover:underline"
+                  >
+                    {spy.name}
+                  </button>
                   <span className="block text-xs text-muted">
                     Livello {spy.level} · <span className={STATUS_COLOR[spy.status]}>{STATUS_LABEL[spy.status]}</span>
                     {spy.status === "libera" && ` · rischio ${failChance(s, spy.level, "superficiale")}% / ${failChance(s, spy.level, "normale")}% / ${failChance(s, spy.level, "approfondita")}%`}
@@ -247,31 +293,100 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
         </section>
       )}
 
-      {past.length > 0 && (
+        </>
+      )}
+
+      {tab === "archivio" && (
         <section className="space-y-2">
-          <h3 className="font-serif text-lg tracking-wide text-accent">Missioni concluse</h3>
+          {only && (
+            <p className="flex flex-wrap items-center gap-2 text-sm">
+              Solo le missioni di <strong className="text-accent">{only.name}</strong>
+              <button type="button" onClick={() => setOnly(null)} className="btn-ghost px-2 py-0.5 text-xs">
+                Mostra tutte
+              </button>
+            </p>
+          )}
+          <p className="text-sm text-muted">
+            {shown.length === 0
+              ? only
+                ? "Questa spia non ha ancora concluso nessuna missione."
+                : "Ancora nessuna missione conclusa: qui troverai i resoconti delle tue spie, dal più recente."
+              : "Clicca su una missione per leggere il resoconto e le risposte dei master."}
+          </p>
           <ul className="space-y-2">
-            {past.map((m) => (
-              <li key={m.id} className={`border border-border border-l-2 bg-black/50 px-3 py-2 text-sm ${m.outcome === "riuscita" ? "border-l-green-600" : "border-l-red-700"}`}>
-                <p>
-                  <strong className="text-accent">{m.spy_name}</strong> → {m.place_name}: {m.target}
-                </p>
-                <p className="text-xs text-muted">
-                  {when(m.ends_at)} · ricerca {m.depth} · dado {m.roll} su 100 (falliva fino a {m.fail_chance})
-                </p>
-                {m.outcome === "riuscita" ? (
-                  m.report ? (
-                    <p className="mt-2 border-t border-border/60 pt-2 leading-relaxed whitespace-pre-wrap">{m.report}</p>
-                  ) : (
-                    <p className="mt-1 text-green-400">La spia è tornata sana e salva: il suo rapporto arriverà a breve.</p>
-                  )
-                ) : (
-                  <p className="mt-1 text-red-400">
-                    {m.outcome === "uccisa" ? "La missione è fallita: la spia è stata uccisa." : "La missione è fallita: la spia è stata catturata."}
-                  </p>
-                )}
-              </li>
-            ))}
+            {shown.map((m) => {
+              const answers = repliesOf(m.id);
+              const isOpen = opened === m.id;
+              return (
+                <li key={m.id} className={`border border-border border-l-2 bg-black/50 text-sm ${m.outcome === "riuscita" ? "border-l-green-600" : "border-l-red-700"}`}>
+                  <button type="button" onClick={() => setOpened(isOpen ? null : m.id)} aria-expanded={isOpen} className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-white/5">
+                    <span className="min-w-0 flex-1">
+                      <span className="block">
+                        <strong className="text-accent">{m.spy_name}</strong> → {m.place_name}: {m.target}
+                      </span>
+                      <span className="block text-xs text-muted">
+                        {when(m.ends_at)} · ricerca {m.depth} ·{" "}
+                        {m.outcome === "riuscita"
+                          ? m.report || answers.length
+                            ? `${(m.report ? 1 : 0) + answers.length} ${(m.report ? 1 : 0) + answers.length === 1 ? "risposta" : "risposte"}`
+                            : "in attesa del resoconto"
+                          : m.outcome === "uccisa"
+                            ? "spia uccisa"
+                            : "spia catturata"}
+                      </span>
+                    </span>
+                    <span className="text-muted" aria-hidden>
+                      {isOpen ? "▾" : "▸"}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="space-y-2 border-t border-border/60 px-3 py-2">
+                      <p className="text-xs text-muted">
+                        Dado {m.roll} su 100 (falliva fino a {m.fail_chance})
+                      </p>
+                      <p className="text-xs whitespace-pre-wrap text-muted">
+                        <span className="tracking-wide uppercase">Avevi chiesto:</span> {m.request}
+                      </p>
+                      {m.outcome !== "riuscita" && (
+                        <p className="text-red-400">
+                          {m.outcome === "uccisa" ? "La missione è fallita: la spia è stata uccisa." : "La missione è fallita: la spia è stata catturata."}
+                        </p>
+                      )}
+                      {m.outcome === "riuscita" && !m.report && answers.length === 0 && (
+                        <p className="text-green-400">La spia è tornata sana e salva: il suo rapporto arriverà a breve.</p>
+                      )}
+                      {m.report && (
+                        <div className="border-t border-border/60 pt-2">
+                          <p className="mb-1 text-[0.625rem] tracking-[0.15em] text-muted uppercase">Rapporto della spia</p>
+                          <p className="leading-relaxed whitespace-pre-wrap">{m.report}</p>
+                        </div>
+                      )}
+                      {answers.map((r, i) => (
+                        <div key={i} className="border-t border-border/60 pt-2">
+                          <p className="mb-1 text-[0.625rem] tracking-[0.15em] text-muted uppercase">
+                            {r.author_name} · {when(r.created_at)}
+                          </p>
+                          <div className="guide-content text-sm break-words" dangerouslySetInnerHTML={{ __html: clean(r.body) }} />
+                        </div>
+                      ))}
+                      <div className="flex justify-end border-t border-border/60 pt-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            window.confirm("Eliminare questo resoconto dal tuo archivio? Non potrai più rileggerlo.") &&
+                            run(() => supabase.rpc("spy_hide_mission", { p_mission: m.id }), "Resoconto eliminato dall'archivio.")
+                          }
+                          className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400 hover:border-red-500"
+                        >
+                          Elimina dall&apos;archivio
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

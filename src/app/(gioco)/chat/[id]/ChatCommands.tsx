@@ -166,12 +166,13 @@ function Raggira({
   onDone: () => void;
 }) {
   const [target, setTarget] = useState("");
+  const [reveal, setReveal] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   function roll() {
     setError(null);
     startTransition(async () => {
-      const res = await rollRaggira(roomId, characterId, target);
+      const res = await rollRaggira(roomId, characterId, target, reveal);
       if (res.error) setError(res.error);
       else onDone();
     });
@@ -179,18 +180,19 @@ function Raggira({
   return (
     <div className="space-y-2 border border-accent/40 bg-black/40 p-3">
       <p className="text-sm text-muted">
-        Prova contrapposta del regolamento:{" "}
+        Prova contrapposta nascosta:{" "}
         <strong>EMP + Dissimulare + d10</strong> contro{" "}
         <strong>EMP + Percepire Intenzioni + d10</strong> del bersaglio (a
-        parità vince chi difende). I dadi si tirano per entrambi e il risultato
-        compare in chat.
+        parità vince chi difende). In chat non compare nulla e nemmeno tu
+        saprai com&apos;è andata: se il bersaglio si accorge dell&apos;inganno,
+        riceve lui solo il testo che scrivi qui sotto.
       </p>
       {others.length === 0 ? (
         <p className="text-sm text-[#f0c75e]">
           In questa chat non ci sono altri personaggi con cui giocare.
         </p>
       ) : (
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-2">
           <label className="block">
             <span className="mb-1 block text-[0.7rem] tracking-wider text-muted uppercase">
               Bersaglio
@@ -208,13 +210,26 @@ function Raggira({
               ))}
             </select>
           </label>
+          <label className="block">
+            <span className="mb-1 block text-[0.7rem] tracking-wider text-muted uppercase">
+              Che cosa scopre il bersaglio se si accorge dell&apos;inganno
+            </span>
+            <textarea
+              value={reveal}
+              onChange={(e) => setReveal(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="Es. Ti accorgi che sta mentendo: il suo sguardo evita il tuo quando parla del carico."
+              className="input text-sm"
+            />
+          </label>
           <button
             type="button"
-            disabled={pending || !target}
+            disabled={pending || !target || !reveal.trim()}
             onClick={roll}
             className="btn px-4 py-1.5 text-sm"
           >
-            {pending ? "..." : "🎲 Raggira"}
+            {pending ? "..." : "🎲 Raggira (tiro nascosto)"}
           </button>
         </div>
       )}

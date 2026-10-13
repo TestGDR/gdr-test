@@ -1177,6 +1177,21 @@ function MessageRow({
     );
   }
 
+  // Raggiro scoperto: lo vede solo il bersaglio (e gli admin), nemmeno chi ha tentato l'inganno
+  if (message.kind === "intuizione") {
+    return (
+      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 text-sm text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
+        <span className="mr-2 text-xs text-muted">{time}</span>
+        <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
+          <span aria-hidden>👁 </span>
+          {message.recipient || "…"} intuisce le intenzioni di{" "}
+          {message.character_name} (lo vedi solo tu)
+        </strong>
+        {message.content}
+      </p>
+    );
+  }
+
   // Sussurro OFF: una riga, con una sfumatura sui toni del rosso
   if (message.kind === "fuori_gioco") {
     return (
