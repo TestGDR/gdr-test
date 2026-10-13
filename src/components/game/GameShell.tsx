@@ -789,7 +789,7 @@ function LeftColumn({
                 onClick={() => p.characterId && onOpenSheet(p.characterId)}
                 disabled={!p.characterId}
                 title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
-                className="font-name truncate text-left hover:underline disabled:no-underline"
+                className="font-name truncate text-left text-[0.8125rem] hover:underline disabled:no-underline"
               >
                 {p.name}
               </button>
