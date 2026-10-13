@@ -520,6 +520,10 @@ export default function GameShell({
                 : "lg"
         }
       >
+        {/* il contenuto esiste solo a finestra aperta (anche ridotta a icona): un pannello
+            chiuso non carica dati e non apre collegamenti in tempo reale */}
+        {panelSession > 0 && (
+          <>
         {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
         {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
         {panel === "ricerca" && (
@@ -568,6 +572,8 @@ export default function GameShell({
           ) : (
             <p className="py-6 text-center text-muted">Per avere delle spie serve un personaggio attivo.</p>
           ))}
+          </>
+        )}
       </Modal>
         );
       })}
