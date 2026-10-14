@@ -179,11 +179,12 @@ export type EditorColor = { id: string; color: string };
 const COLOR_FORMAT = /^(#[0-9a-f]{6}([0-9a-f]{2})?|rgba\(\d{1,3}, \d{1,3}, \d{1,3}, (0|1|0?\.\d{1,3})\))$/;
 const MAX_EDITOR_COLORS = 48;
 
-export async function listEditorColors(): Promise<{ colors: EditorColor[] }> {
+// canManage: solo chi scrive la documentazione vede e usa la tavolozza della gestione
+export async function listEditorColors(): Promise<{ colors: EditorColor[]; canManage: boolean }> {
   const ctx = await authorized();
-  if (!ctx) return { colors: [] };
+  if (!ctx) return { colors: [], canManage: false };
   const { data } = await ctx.supabase.from("editor_colors").select("id, color").order("created_at");
-  return { colors: data ?? [] };
+  return { colors: data ?? [], canManage: true };
 }
 
 export async function addEditorColor(color: string): Promise<{ color?: EditorColor; error?: string }> {

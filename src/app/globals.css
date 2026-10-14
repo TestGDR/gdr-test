@@ -160,11 +160,14 @@ body {
 .guide-content ol {
   @apply my-3 list-decimal pl-6;
 }
+/* grassetto e corsivo cambiano solo spessore e stile: il colore resta quello del
+   testo (o quello scelto con l editor) */
 .guide-content strong {
-  @apply font-bold text-foreground;
+  @apply font-bold;
+  color: inherit;
 }
 .guide-content em {
-  @apply text-amber-100;
+  color: inherit;
 }
 .guide-content a {
   @apply text-accent underline;
@@ -205,9 +208,6 @@ body {
 .forum-text {
   font-size: 14px; /* fisso: non cresce con lo zoom del sito sugli schermi grandi */
   color: #fff;
-}
-.forum-text strong {
-  color: inherit;
 }
 
 /* Caratteri: i testi sono in Open Sans (vedi layout); titoli e nomi restano
@@ -376,12 +376,6 @@ body {
 .guide-content.on-parchment h3 {
   color: #7a1f10;
 }
-.guide-content.on-parchment strong {
-  color: #1f140b;
-}
-.guide-content.on-parchment em {
-  color: #5a3b1c;
-}
 .guide-content.on-parchment a {
   color: #8b2a14;
 }
@@ -397,12 +391,6 @@ body {
 }
 .guide-content.on-parchment td {
   border-color: rgb(138 106 62 / 0.35);
-}
-/* Documentazione: grassetto e corsivo cambiano solo spessore e stile, il colore
-   resta quello del testo (o quello scelto con l editor) */
-.guide-content.doc-text strong,
-.guide-content.doc-text em {
-  color: inherit;
 }
 .guide-content.on-parchment > p:first-of-type::first-letter,
 .guide-content.on-parchment > div > p:first-of-type::first-letter {

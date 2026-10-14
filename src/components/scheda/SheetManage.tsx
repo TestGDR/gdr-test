@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { STORY_MAX } from "@/lib/character-creation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { resetCharacter } from "@/app/scheda/actions";
 import { AGE_MAX, AGE_MIN, SEXES } from "@/lib/character-creation";
@@ -312,7 +313,7 @@ export default function SheetManage({
             <textarea
               value={story}
               onChange={(e) => setStory(e.target.value)}
-              maxLength={4000}
+              maxLength={STORY_MAX}
               rows={10}
               className="input resize-y text-sm"
             />

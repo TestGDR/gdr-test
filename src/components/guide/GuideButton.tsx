@@ -427,7 +427,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
               </ul>
             </div>
           ) : selected ? (
-            <article className="guide-content on-parchment doc-text">
+            <article className="guide-content on-parchment">
               <h2>{selected.title}</h2>
               {bodies[selected.id] === undefined ? (
                 <p>Caricamento...</p>
@@ -509,7 +509,7 @@ function PageEditorForm({
         className="input font-serif text-xl"
         aria-label="Titolo della sezione"
       />
-      <RichEditor value={html} onChange={setHtml} textClassName="doc-text" managePalette />
+      <RichEditor value={html} onChange={setHtml} />
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={save} disabled={saving} className="btn">
           {saving ? "Salvataggio..." : "Salva sezione"}

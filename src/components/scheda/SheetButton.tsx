@@ -17,6 +17,7 @@ import ModalButton from "@/components/ui/ModalButton";
 import {
   SEXES,
   APPEARANCE_MAX,
+  STORY_MAX,
   labelOf,
   type CreationData,
 } from "@/lib/character-creation";
@@ -1610,7 +1611,7 @@ function StoryPage({
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                maxLength={4000}
+                maxLength={STORY_MAX}
                 rows={14}
                 className="input resize-y text-sm"
               />

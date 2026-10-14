@@ -13,6 +13,7 @@ import { finalizeCharacter, saveCreationProgress } from "@/app/scheda/actions";
 import {
   SEXES,
   TEXT_MAX,
+  STORY_MAX,
   labelOf,
   type CreationData,
   type CustomValue,
@@ -441,7 +442,7 @@ function BlockView({ block, data, update, skills, traits }: BlockProps) {
               value={value}
               onChange={(e) => update({ [key]: e.target.value })}
               rows={block.kind === "storia" ? 8 : 4}
-              maxLength={TEXT_MAX}
+              maxLength={block.kind === "storia" ? STORY_MAX : TEXT_MAX}
               placeholder={c.placeholder}
               className="input resize-none"
             />

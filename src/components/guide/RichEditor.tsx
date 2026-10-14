@@ -25,13 +25,13 @@ export default function RichEditor({
   onChange,
   textClassName = "",
   scroll = false,
-  managePalette = false,
+  managePalette = true,
 }: {
   value: string;
   onChange: (html: string) => void;
   textClassName?: string; // stile di base del testo (es. "forum-text": quello del forum)
   scroll?: boolean; // altezza fissa di 400px: il testo lungo scorre dentro
-  managePalette?: boolean; // documentazione: selettore visivo e tavolozza della gestione
+  managePalette?: boolean; // selettore visivo dei colori (la tavolozza salvata la vede solo la gestione)
 }) {
   const [mode, setMode] = useState<"visuale" | "html">("visuale");
 
@@ -379,6 +379,7 @@ function ColorPicker({ editor, manage }: { editor: Editor; manage: boolean }) {
   const [open, setOpen] = useState(false);
   // tavolozza della gestione: letta la prima volta che si apre il menu
   const [saved, setSaved] = useState<EditorColor[] | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
   const current =
@@ -398,7 +399,10 @@ function ColorPicker({ editor, manage }: { editor: Editor; manage: boolean }) {
 
   const toggle = () => {
     if (!open && manage && saved === null)
-      listEditorColors().then((r) => setSaved(r.colors));
+      listEditorColors().then((r) => {
+        setSaved(r.colors);
+        setCanManage(r.canManage);
+      });
     setNote(null);
     setOpen((v) => !v);
   };
@@ -467,47 +471,53 @@ function ColorPicker({ editor, manage }: { editor: Editor; manage: boolean }) {
           </span>
           {manage && (
             <span className="mt-2 block border-t border-border pt-2">
-              <span className="mb-1.5 block text-[0.625rem] tracking-wider text-muted uppercase">
-                Colori della gestione
-              </span>
-              {saved === null ? (
-                <span className="block text-xs text-muted">Caricamento...</span>
-              ) : saved.length === 0 ? (
-                <span className="block text-xs text-muted">
-                  Ancora nessun colore salvato: scegline uno qui sotto e premi
-                  «Salva».
-                </span>
-              ) : (
-                <span className="grid grid-cols-6 gap-1.5">
-                  {saved.map((c) => (
-                    <span key={c.id} className="group relative h-7 w-7">
-                      <button
-                        type="button"
-                        title={c.color}
-                        aria-label={`Colore salvato ${c.color}`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => apply(c.color)}
-                        className={`h-7 w-7 rounded border-2 ${same(current, c.color) ? "border-white" : "border-black/40 hover:border-white/50"}`}
-                        style={{ background: c.color }}
-                      />
-                      <button
-                        type="button"
-                        title={`Togli ${c.color} dalla tavolozza`}
-                        aria-label={`Togli ${c.color} dalla tavolozza`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => remove(c.id)}
-                        className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full border border-border bg-background text-[0.625rem] leading-none text-muted group-hover:flex hover:text-red-400"
-                      >
-                        ✕
-                      </button>
+              {canManage && (
+                <>
+                  <span className="mb-1.5 block text-[0.625rem] tracking-wider text-muted uppercase">
+                    Colori della gestione
+                  </span>
+                  {saved === null ? (
+                    <span className="block text-xs text-muted">
+                      Caricamento...
                     </span>
-                  ))}
-                </span>
+                  ) : saved.length === 0 ? (
+                    <span className="block text-xs text-muted">
+                      Ancora nessun colore salvato: scegline uno qui sotto e
+                      premi «Salva».
+                    </span>
+                  ) : (
+                    <span className="grid grid-cols-6 gap-1.5">
+                      {saved.map((c) => (
+                        <span key={c.id} className="group relative h-7 w-7">
+                          <button
+                            type="button"
+                            title={c.color}
+                            aria-label={`Colore salvato ${c.color}`}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => apply(c.color)}
+                            className={`h-7 w-7 rounded border-2 ${same(current, c.color) ? "border-white" : "border-black/40 hover:border-white/50"}`}
+                            style={{ background: c.color }}
+                          />
+                          <button
+                            type="button"
+                            title={`Togli ${c.color} dalla tavolozza`}
+                            aria-label={`Togli ${c.color} dalla tavolozza`}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => remove(c.id)}
+                            className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full border border-border bg-background text-[0.625rem] leading-none text-muted group-hover:flex hover:text-red-400"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </>
               )}
               <VisualPicker
                 initial={current}
                 onApply={(color) => apply(color)}
-                onSave={save}
+                onSave={canManage ? save : undefined}
               />
               {note && (
                 <span className="mt-1.5 block text-xs text-muted">{note}</span>
@@ -554,7 +564,7 @@ function VisualPicker({
 }: {
   initial: string | null;
   onApply: (color: string) => void;
-  onSave: (color: string) => void;
+  onSave?: (color: string) => void; // salva nella tavolozza della gestione (solo chi la gestisce)
 }) {
   const [hsv, setHsv] = useState<Hsv>(() =>
     rgbToHsv((parseColor(initial ?? "") ?? parseColor("#c9a45c")!).rgb),
@@ -668,16 +678,18 @@ function VisualPicker({
         >
           Applica
         </button>
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => parsed && onSave(parsed.css)}
-          disabled={!parsed}
-          title="Salva questo colore nella tavolozza della gestione"
-          className="btn-ghost flex-1 py-1 text-xs"
-        >
-          Salva
-        </button>
+        {onSave && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => parsed && onSave(parsed.css)}
+            disabled={!parsed}
+            title="Salva questo colore nella tavolozza della gestione"
+            className="btn-ghost flex-1 py-1 text-xs"
+          >
+            Salva
+          </button>
+        )}
       </div>
     </div>
   );

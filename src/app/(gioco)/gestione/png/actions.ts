@@ -1,6 +1,7 @@
 "use server";
 
 import { RULES } from "@/lib/rules/config";
+import { STORY_MAX } from "@/lib/character-creation";
 import { skillLevelCap } from "@/lib/rules/engine";
 import { loadStats } from "@/lib/rules/stats";
 import { getStaffContext } from "@/lib/staff";
@@ -197,7 +198,7 @@ export async function saveNpc(
   }
 
   // storia (per i PNG e' subito approvata: la scrive lo staff)
-  const story = input.story.trim().slice(0, 4000);
+  const story = input.story.trim().slice(0, STORY_MAX);
   const now = new Date().toISOString();
   const { error: storyError } = await admin
     .from("character_backgrounds")

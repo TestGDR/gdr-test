@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { STORY_MAX } from "@/lib/character-creation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import { loadCatalog, type Skill, type Trait } from "@/lib/rules/catalog";
@@ -676,7 +677,7 @@ function NpcForm({
         <textarea
           value={story}
           onChange={(e) => setStory(e.target.value)}
-          maxLength={4000}
+          maxLength={STORY_MAX}
           rows={5}
           className="input resize-y text-sm"
         />

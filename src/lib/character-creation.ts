@@ -55,6 +55,7 @@ export function houseAgeMessage(house: string, age: number, taken: number[]) {
 export const ATTRIBUTES = RULES.stats;
 
 export const TEXT_MAX = 4000;
+export const STORY_MAX = 10000; // storia (BG) del personaggio
 export const APPEARANCE_MAX = 20000; // Aspetto della scheda (anche in HTML)
 
 export type CustomValue = string | number | boolean | string[];
@@ -161,7 +162,7 @@ export function sanitizeCreationData(raw: unknown): CreationData {
       );
   }
   out.appearance = text(input.appearance, TEXT_MAX);
-  out.story = text(input.story, TEXT_MAX);
+  out.story = text(input.story, STORY_MAX);
   out.height = text(input.height, 30);
   out.eye_color = text(input.eye_color, 40);
   out.hair_color = text(input.hair_color, 40);
