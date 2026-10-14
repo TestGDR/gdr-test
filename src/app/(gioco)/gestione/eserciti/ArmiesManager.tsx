@@ -19,6 +19,7 @@ const TABS = [
   { id: "potenza", label: "Potenza" },
   { id: "eserciti", label: "Eserciti delle casate" },
   { id: "truppe", label: "Tipi di truppa" },
+  { id: "gruppi", label: "Gruppi di truppe" },
   { id: "regni", label: "Regni" },
   { id: "confronto", label: "Confronto" },
 ] as const;
@@ -43,6 +44,9 @@ function useArmies() {
   // mantenimento (ogni 100 soldati, al mese): null = migrazione 0143 non ancora eseguita
   const [resources, setResources] = useState<{ id: string; name: string }[]>([]);
   const [upkeep, setUpkeep] = useState<{ troop_type_id: string; resource_id: string; amount: number }[] | null>(null);
+  // gruppi di truppe e chi si affronta: null = migrazione 0145 non ancora eseguita
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [faces, setFaces] = useState<{ category_a: string; category_b: string }[]>([]);
   const [ready, setReady] = useState(false);
   const [missing, setMissing] = useState(false);
   const [version, setVersion] = useState(0);
@@ -57,7 +61,11 @@ function useArmies() {
       supabase.from("alliances").select("id, name, members:alliance_kingdoms(kingdom_id)").order("name"),
       supabase.from("resources").select("id, name").order("sort_order").order("name"),
       supabase.from("troop_upkeep").select("*"),
-    ]).then(([t, m, h, k, hk, f, al, rs, up]) => {
+      supabase.from("troop_categories").select("*").order("sort_order").order("name"),
+      supabase.from("troop_category_faces").select("*"),
+    ]).then(([t, m, h, k, hk, f, al, rs, up, cg, fc]) => {
+      setCategories(cg.error ? null : ((cg.data ?? []) as Category[]));
+      setFaces((fc.data ?? []) as { category_a: string; category_b: string }[]);
       setResources((rs.data ?? []) as { id: string; name: string }[]);
       setUpkeep(up.error ? null : ((up.data ?? []) as { troop_type_id: string; resource_id: string; amount: number }[]));
       setAlliancesMissing(!!al.error);
@@ -90,7 +98,7 @@ function useArmies() {
       setReady(true);
     });
   }, [supabase, version]);
-  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, resources, upkeep, ready, missing, reload: () => setVersion((v) => v + 1) };
+  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, resources, upkeep, categories, faces, ready, missing, reload: () => setVersion((v) => v + 1) };
 }
 type Armies = ReturnType<typeof useArmies>;
 
@@ -161,6 +169,7 @@ export default function ArmiesManager({ houses }: { houses: HouseLite[] }) {
             {tab === "potenza" && <PowerTab {...data} houses={houses} />}
             {tab === "eserciti" && <HouseArmiesTab {...data} houses={houses} />}
             {tab === "truppe" && <TroopTypesTab {...data} />}
+            {tab === "gruppi" && <GroupsTab {...data} />}
             {tab === "regni" && <KingdomsTab {...data} houses={houses} />}
             {tab === "confronto" && <VersusTab {...data} houses={houses} />}
           </>
@@ -545,8 +554,15 @@ function TroopTypesTab(d: Armies) {
           + Nuovo tipo di truppa
         </button>
         <ul className="space-y-1">
-          {d.types.map((t) => (
+          {[...d.types]
+            .sort((a, b) => groupOrder(d, a) - groupOrder(d, b))
+            .map((t, i, list) => (
             <li key={t.id}>
+              {d.categories && (i === 0 || list[i - 1].category_id !== t.category_id) && (
+                <p className="mt-2 mb-1 text-[0.625rem] tracking-[0.15em] text-muted uppercase">
+                  {d.categories.find((c) => c.id === t.category_id)?.name ?? "Senza gruppo"}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => setOpenId(t.id)}
@@ -577,18 +593,31 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
   const [attack, setAttack] = useState(type?.attack ?? 1);
   const [defense, setDefense] = useState(type?.defense ?? 1);
   const [order, setOrder] = useState(type?.sort_order ?? 0);
+  const [category, setCategory] = useState(type?.category_id ?? "");
   const [mods, setMods] = useState<Record<string, number>>(
     Object.fromEntries(d.matchups.filter((m) => m.troop_type_id === type?.id).map((m) => [m.against_id, m.modifier])),
   );
   const [costs, setCosts] = useState<Record<string, number>>(
     Object.fromEntries((d.upkeep ?? []).filter((u) => u.troop_type_id === type?.id).map((u) => [u.resource_id, u.amount])),
   );
-  const others = d.types.filter((t) => t.id !== type?.id);
+  // contro chi si puo' essere forti o deboli: solo le truppe dei gruppi che si affrontano
+  const me = { ...(type ?? { id: "", name, description, attack, defense, sort_order: order }), category_id: category || null } as TroopType;
+  const allOthers = d.types.filter((t) => t.id !== type?.id);
+  const others = allOthers.filter((t) => canFace(d, me, t));
+  const hidden = allOthers.length - others.length;
 
   async function save() {
     let id = type?.id ?? null;
     const done = await run(async () => {
-      const row = { name: name.trim(), description: description.trim(), attack, defense, sort_order: order };
+      const row = {
+        name: name.trim(),
+        description: description.trim(),
+        attack,
+        defense,
+        sort_order: order,
+        // il gruppo si manda solo se la migrazione 0145 c'e'
+        ...(d.categories ? { category_id: category || null } : {}),
+      };
       if (!row.name) return { error: { message: "Scrivi il nome della truppa." } };
       if (id) {
         const r = await d.supabase.from("troop_types").update(row).eq("id", id);
@@ -603,6 +632,19 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
       const rows = others.filter((o) => (mods[o.id] ?? 0) !== 0).map((o) => ({ troop_type_id: id, against_id: o.id, modifier: mods[o.id] }));
       if (rows.length) {
         const r = await d.supabase.from("troop_matchups").insert(rows);
+        if (r.error) return r;
+      }
+      // il rovescio sull'altra truppa: solo per i valori cambiati adesso (+2 qui = -2 li')
+      const before = (o: string) => d.matchups.find((m) => m.troop_type_id === type?.id && m.against_id === o)?.modifier ?? 0;
+      for (const o of others) {
+        const v = mods[o.id] ?? 0;
+        if (v === before(o.id)) continue;
+        const r =
+          v === 0
+            ? await d.supabase.from("troop_matchups").delete().eq("troop_type_id", o.id).eq("against_id", id)
+            : await d.supabase
+                .from("troop_matchups")
+                .upsert({ troop_type_id: o.id, against_id: id, modifier: -v }, { onConflict: "troop_type_id,against_id" });
         if (r.error) return r;
       }
       // mantenimento: solo se la migrazione 0143 c'e'
@@ -639,6 +681,18 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         <Field label="Ordine">
           <input type="number" value={order} onChange={(e) => setOrder(int(e.target.value, -1000, 1000))} className="input w-24" />
         </Field>
+        {d.categories && (
+          <Field label="Gruppo">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="input w-56">
+              <option value="">Senza gruppo</option>
+              {d.categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
       {d.upkeep === null ? (
         <p className="text-xs text-amber-200">Per il mantenimento delle truppe va eseguita la migrazione 0143 in Supabase.</p>
@@ -664,6 +718,12 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
       )}
       <div>
         <p className="mb-1 text-xs tracking-wide text-muted uppercase">Forza o debolezza contro le altre truppe (punti per unità)</p>
+        {hidden > 0 && (
+          <p className="mb-1 text-xs text-muted">
+            {hidden} {hidden === 1 ? "truppa non compare" : "truppe non compaiono"}: {hidden === 1 ? "è" : "sono"} di gruppi che non si affrontano con
+            questo (contro di loro vale 0).
+          </p>
+        )}
         {others.length === 0 ? (
           <p className="text-sm text-muted">Crea altri tipi di truppa per impostare chi batte chi.</p>
         ) : (
@@ -686,8 +746,9 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
           </ul>
         )}
         <p className="mt-2 text-xs text-muted">
-          Numero positivo = questa truppa è più forte contro quell&apos;altra; negativo = più debole. Vale in una sola direzione: il
-          rovescio si imposta sull&apos;altra truppa.
+          Numero positivo = questa truppa è più forte contro quell&apos;altra; negativo = più debole. Il rovescio si scrive da solo
+          sull&apos;altra truppa (es. +2 qui diventa −2 là), e vale in tutti e due i sensi: cambiando il valore su una delle due si
+          aggiorna anche l&apos;altra.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -917,8 +978,14 @@ function VersusTab(d: Armies & { houses: HouseLite[] }) {
   };
   const A = side(a);
   const B = side(b);
-  const va = versus(A.power.lines, B.power.lines, d.matchups);
-  const vb = versus(B.power.lines, A.power.lines, d.matchups);
+  // contano solo forza e debolezza tra gruppi che si affrontano
+  const typeOf = (id: string) => d.types.find((t) => t.id === id);
+  const valid = d.matchups.filter((m) => {
+    const a = typeOf(m.troop_type_id), b = typeOf(m.against_id);
+    return !a || !b || canFace(d, a, b);
+  });
+  const va = versus(A.power.lines, B.power.lines, valid);
+  const vb = versus(B.power.lines, A.power.lines, valid);
   const picker = (value: string, set: (v: string) => void, label: string) => (
     <Field label={label}>
       <select value={value} onChange={(e) => set(e.target.value)} className="input">
@@ -973,5 +1040,168 @@ function VersusTab(d: Armies & { houses: HouseLite[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+// posizione del gruppo di una truppa nell'elenco (senza gruppo in fondo)
+function groupOrder(d: Armies, t: TroopType) {
+  if (!d.categories) return 0;
+  const i = d.categories.findIndex((c) => c.id === t.category_id);
+  return i < 0 ? d.categories.length : i;
+}
+
+// ---------------------------------------------------------------------
+// Gruppi di truppe: terrestri, navali, macchine da guerra... e chi affronta chi
+// ---------------------------------------------------------------------
+type Category = { id: string; name: string; sort_order: number };
+
+// Due truppe possono avere forza/debolezza tra loro? Si', se i loro gruppi si
+// affrontano (o se una delle due non ha ancora un gruppo)
+function canFace(d: Armies, a: TroopType, b: TroopType) {
+  if (!d.categories || !a.category_id || !b.category_id || a.category_id === b.category_id) return true;
+  const [x, y] = [a.category_id, b.category_id].sort();
+  return d.faces.some((f) => f.category_a === x && f.category_b === y);
+}
+
+function GroupsTab(d: Armies) {
+  const { busy, msg, run } = useSave(d.reload);
+  const [name, setName] = useState("");
+  if (d.categories === null) return <p className="text-sm text-amber-200">Per i gruppi di truppe va eseguita la migrazione 0145 in Supabase.</p>;
+  const cats = d.categories;
+  const faces = (a: string, b: string) => {
+    const [x, y] = [a, b].sort();
+    return d.faces.some((f) => f.category_a === x && f.category_b === y);
+  };
+  const toggle = (a: string, b: string) => {
+    const [x, y] = [a, b].sort();
+    return run(
+      () =>
+        faces(a, b)
+          ? d.supabase.from("troop_category_faces").delete().eq("category_a", x).eq("category_b", y)
+          : d.supabase.from("troop_category_faces").insert({ category_a: x, category_b: y }),
+      "Salvato.",
+    );
+  };
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-muted">
+        Ogni tipo di truppa appartiene a un gruppo (es. Terrestri, Navali, Macchine da guerra). Forza e debolezza si impostano solo contro
+        le truppe dei gruppi che <strong className="text-foreground">si affrontano</strong>: contro le altre valgono 0 da sole (la
+        fanteria non ha niente contro le galee). Un gruppo affronta sempre se stesso.
+      </p>
+      <section className="space-y-2">
+        <h3 className="font-serif text-lg text-accent">Gruppi</h3>
+        <ul className="space-y-1.5">
+          {cats.map((c) => (
+            <GroupRow key={c.id} d={d} cat={c} count={d.types.filter((t) => t.category_id === c.id).length} run={run} busy={busy} />
+          ))}
+          {cats.length === 0 && <li className="text-sm text-muted">Nessun gruppo: creane uno qui sotto.</li>}
+        </ul>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const n = name.trim();
+            if (!n) return;
+            if (await run(() => d.supabase.from("troop_categories").insert({ name: n, sort_order: cats.length }), "Gruppo creato.")) setName("");
+          }}
+          className="flex flex-wrap gap-2"
+        >
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Es. Terrestri, Navali, Macchine da guerra" className="input max-w-sm" />
+          <button className="btn px-4" disabled={busy || !name.trim()}>
+            + Aggiungi gruppo
+          </button>
+        </form>
+      </section>
+      {cats.length > 1 && (
+        <section className="space-y-2">
+          <h3 className="font-serif text-lg text-accent">Chi si affronta</h3>
+          <p className="text-xs text-muted">Spunta le coppie di gruppi che possono scontrarsi (es. Terrestri e Macchine da guerra sì, Terrestri e Navali no).</p>
+          <div className="overflow-x-auto">
+            <table className="text-sm">
+              <thead>
+                <tr>
+                  <th className={th} />
+                  {cats.map((c) => (
+                    <th key={c.id} className={th}>
+                      {c.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cats.map((a, i) => (
+                  <tr key={a.id} className="border-t border-border/50">
+                    <td className="py-1.5 pr-3 font-serif text-accent">{a.name}</td>
+                    {cats.map((b, j) => (
+                      <td key={b.id} className="py-1.5 pr-3 text-center">
+                        {i === j ? (
+                          <span className="text-xs text-muted" title="Un gruppo affronta sempre se stesso">✓</span>
+                        ) : j > i ? (
+                          <input
+                            type="checkbox"
+                            checked={faces(a.id, b.id)}
+                            disabled={busy}
+                            onChange={() => toggle(a.id, b.id)}
+                            aria-label={`${a.name} e ${b.name} si affrontano`}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted">{faces(a.id, b.id) ? "✓" : "—"}</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      <Msg msg={msg} />
+    </div>
+  );
+}
+
+function GroupRow({
+  d,
+  cat,
+  count,
+  run,
+  busy,
+}: {
+  d: Armies;
+  cat: Category;
+  count: number;
+  run: (op: () => PromiseLike<Result>, ok: string) => Promise<boolean>;
+  busy: boolean;
+}) {
+  const [name, setName] = useState(cat.name);
+  return (
+    <li className="flex flex-wrap items-center gap-2">
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Nome del gruppo" className="input max-w-xs py-1" />
+      <span className="text-xs text-muted">
+        {count} {count === 1 ? "truppa" : "truppe"}
+      </span>
+      {name.trim() !== cat.name && (
+        <button
+          type="button"
+          disabled={busy || !name.trim()}
+          onClick={() => run(() => d.supabase.from("troop_categories").update({ name: name.trim() }).eq("id", cat.id), "Gruppo rinominato.")}
+          className="btn px-3 py-1 text-xs"
+        >
+          Salva
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() =>
+          window.confirm(`Eliminare il gruppo "${cat.name}"? Le sue truppe restano, senza gruppo.`) &&
+          run(() => d.supabase.from("troop_categories").delete().eq("id", cat.id), "Gruppo eliminato.")
+        }
+        className="text-xs text-red-400 hover:text-red-300"
+      >
+        Elimina
+      </button>
+    </li>
   );
 }
