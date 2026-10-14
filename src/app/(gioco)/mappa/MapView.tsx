@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import { useState, useSyncExternalStore } from "react";
 import Modal from "@/components/ui/Modal";
 import type { GameMap, Location, Room, RoomGroup } from "@/lib/types";
@@ -188,14 +188,14 @@ function RoomList({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                      <Link href={`/chat/${room.id}`} className="font-serif text-lg text-accent hover:underline">
+                      <PrefetchLink href={`/chat/${room.id}`} className="font-serif text-lg text-accent hover:underline">
                         {room.access !== "pubblica" && (
                           <span aria-label="Privata" title="Chat privata">
                             🔒{" "}
                           </span>
                         )}
                         {room.name}
-                      </Link>
+                      </PrefetchLink>
                       {st && <span className={`text-xs ${st.tone}`}>{st.text}</span>}
                     </div>
                     {room.description && (

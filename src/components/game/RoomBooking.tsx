@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { untilLabel } from "@/lib/world";
@@ -160,9 +160,9 @@ export default function RoomBooking() {
                       {mine ? "Prolunga" : "Affitta"} · {cost} monete
                     </button>
                     {mine && (
-                      <Link href={`/chat/${room.id}`} className="text-accent hover:underline">
+                      <PrefetchLink href={`/chat/${room.id}`} className="text-accent hover:underline">
                         Entra →
-                      </Link>
+                      </PrefetchLink>
                     )}
                   </div>
                 )}

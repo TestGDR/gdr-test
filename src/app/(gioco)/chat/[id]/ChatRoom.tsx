@@ -32,6 +32,7 @@ type Props = {
   canNarrate: boolean;
   characters: Character[];
   initialMessages: Message[];
+  snapshotAt: string; // quando il server ha letto i messaggi (la pagina puo' essere stata preparata in anticipo)
   maxLen: number; // limite di caratteri di un'azione (Gestione -> Chat, o modalita' master)
   canMaster: boolean; // master, moderatori e admin: possono usare la modalita' master
   canModerate: boolean; // moderatori e admin: possono cancellare le singole azioni
@@ -59,6 +60,7 @@ export default function ChatRoom({
   canNarrate,
   characters,
   initialMessages,
+  snapshotAt,
   maxLen: MAX_LEN,
   canMaster,
   canModerate,
@@ -213,11 +215,29 @@ export default function ChatRoom({
             setMessages((prev) => prev.filter((m) => m.id !== id));
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        // Collegato: recupero le azioni arrivate dopo la lettura del server (la pagina
+        // puo' essere stata preparata in anticipo, passando col mouse sul link)
+        supabase
+          .from("messages")
+          .select("*")
+          .eq("room_id", roomId)
+          .gt("created_at", snapshotAt)
+          .order("created_at")
+          .limit(100)
+          .then(({ data }) => {
+            if (!data?.length) return;
+            setMessages((prev) => {
+              const byId = new Map([...prev, ...(data as Message[])].map((m) => [m.id, m]));
+              return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+            });
+          });
+      });
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, mine, router]);
+  }, [supabase, roomId, mine, router, snapshotAt]);
 
   // Dopo un'ora dall'invio l'azione sparisce dalla chat (resta nel database)
   const [clock, setClock] = useState(() => Date.now()); // per i 5 minuti in cui un'azione si puo' correggere

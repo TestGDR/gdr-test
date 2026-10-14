@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -774,9 +775,9 @@ function LeftColumn({
         {/* in una chat: il nome del luogo (sulla mappa non serve) */}
         {me?.place === "chat" && (
           <h3 className="mb-2 shrink-0 truncate border-b border-border pb-1 text-xs font-semibold tracking-[0.15em] text-accent uppercase">
-            <Link href={`/chat/${me.placeKey.replace(/^chat:/, "")}`} className="hover:underline" title={`Vai in ${me.placeLabel}`}>
+            <PrefetchLink href={`/chat/${me.placeKey.replace(/^chat:/, "")}`} className="hover:underline" title={`Vai in ${me.placeLabel}`}>
               {me.placeLabel}
-            </Link>
+            </PrefetchLink>
           </h3>
         )}
         <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-1 text-sm [text-shadow:0_2px_2px_#000,0_0_6px_#000,0_0_10px_rgb(0_0_0/0.8)]">

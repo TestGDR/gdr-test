@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
@@ -178,9 +178,9 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
             <ul className="space-y-0.5 text-sm">
               {rooms.map((r) => (
                 <li key={r.room_id}>
-                  <Link href={`/chat/${r.room_id}`} className="text-accent hover:underline">
+                  <PrefetchLink href={`/chat/${r.room_id}`} className="text-accent hover:underline">
                     {r.room_name}
-                  </Link>{" "}
+                  </PrefetchLink>{" "}
                   <span className="text-xs text-muted">· {r.location_name}</span>
                 </li>
               ))}

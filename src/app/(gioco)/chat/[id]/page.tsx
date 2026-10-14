@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import { notFound } from "next/navigation";
 import InactiveBanner from "@/components/InactiveBanner";
 import { GameArea } from "@/components/game/GameShell";
@@ -15,6 +16,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const { supabase, user, permissions, isAdmin } = await getStaffContext();
 
   const since = freshSince();
+  const snapshotAt = new Date().toISOString(); // momento della lettura dei messaggi
   const canNpc = permissions.has("png.gestire");
   // Primo giro: tutto cio' che dipende solo dalla chat e dall'utente, insieme.
   // Le chat delle mappe spente non si vedono (regole del database)
@@ -142,12 +144,12 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
   const header = (
     <div className="mb-3 max-lg:mb-0 max-lg:flex max-lg:items-center max-lg:gap-3 max-lg:border-b max-lg:border-border max-lg:px-3 max-lg:py-2.5">
       {/* computer: torna al luogo (con l'elenco delle sue chat) */}
-      <Link
+      <PrefetchLink
         href={back}
         className="hidden text-sm text-muted hover:text-accent lg:inline"
       >
         ← {room.location.name}
-      </Link>
+      </PrefetchLink>
       {/* cellulare: torna alla mappa, senza aprire la finestra del luogo */}
       <Link
         href={`/mappa?id=${room.location.map_id}`}
@@ -321,6 +323,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           initialMessages={
             canRead ? ((messages ?? []) as Message[]).reverse() : []
           }
+          snapshotAt={snapshotAt}
         />
       ) : (
         <InactiveBanner />

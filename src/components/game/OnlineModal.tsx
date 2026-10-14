@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import PrefetchLink from "@/components/ui/PrefetchLink";
 import { useState, type FormEvent } from "react";
 import Modal from "@/components/ui/Modal";
 import type { Availability } from "@/lib/availability";
@@ -116,14 +116,14 @@ export default function OnlineModal(props: Props) {
                 }`}
               >
                 {group.chatId ? (
-                  <Link
+                  <PrefetchLink
                     href={`/chat/${group.chatId}`}
                     onClick={onClose}
                     title={`Entra in ${group.label}`}
                     className="text-accent underline-offset-4 hover:underline"
                   >
                     {group.label}
-                  </Link>
+                  </PrefetchLink>
                 ) : (
                   <>
                     {group.label}
