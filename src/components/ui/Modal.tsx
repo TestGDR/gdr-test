@@ -26,8 +26,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
   lg: "w-[min(46rem,calc(100vw-2rem))] max-h-[90vh]",
   xl: "w-[min(80rem,calc(100vw-2rem))] h-[min(52rem,calc(100vh-2rem))]",
-  // stretta e alta (es. elenco online): max 600px, su cellulare tutta la larghezza disponibile
-  tall: "w-[min(37.5rem,calc(100vw-1rem))] h-[min(52rem,calc(100dvh-1rem))]",
+  // stretta (es. elenco online): alta quanto serve, al massimo 600px; oltre, l elenco scorre dentro
+  tall: "w-[min(37.5rem,calc(100vw-1rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)
   area: "w-[min(46rem,calc(100vw-2rem))] h-[min(43.75rem,calc(100dvh-1rem))]",
   // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
@@ -252,12 +252,11 @@ export default function Modal({
             </div>
             <div
               className={
-                size === "xl" ||
-                size === "tall" ||
-                size === "sheet" ||
-                size === "pg"
-                  ? "min-h-0 flex-1"
-                  : "min-h-0 flex-1 overflow-y-auto p-5"
+                size === "tall"
+                  ? "flex min-h-0 flex-1 flex-col"
+                  : size === "xl" || size === "sheet" || size === "pg"
+                    ? "min-h-0 flex-1"
+                    : "min-h-0 flex-1 overflow-y-auto p-5"
               }
             >
               {children}

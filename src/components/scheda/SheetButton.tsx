@@ -16,7 +16,6 @@ import Modal from "@/components/ui/Modal";
 import ModalButton from "@/components/ui/ModalButton";
 import {
   SEXES,
-  TEXT_MAX,
   APPEARANCE_MAX,
   labelOf,
   type CreationData,

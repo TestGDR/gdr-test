@@ -19,6 +19,7 @@ type StructureType = {
   id: string;
   name: string;
   description: string;
+  image_url?: string | null;
   sort_order: number;
   attack: number;
   defense: number;
@@ -51,6 +52,7 @@ const TABS = [
   { id: "feudi", label: "Feudi" },
   { id: "tasse", label: "Tasse" },
   { id: "tesoro", label: "Tesoro delle casate" },
+  { id: "umore", label: "Umore del popolo" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -106,6 +108,7 @@ export default function EconomyManager({ houses, places }: { houses: HouseLite[]
         {tab === "feudi" && <FiefsTab {...cat} houses={houses} places={places} />}
         {tab === "tasse" && <TaxesTab {...cat} houses={houses} />}
         {tab === "tesoro" && <TreasuryTab {...cat} houses={houses} />}
+        {tab === "umore" && <MoodTab {...cat} />}
       </div>
     </section>
   );
@@ -320,11 +323,11 @@ function TypeEditor({
   onCancel,
 }: {
   title: string;
-  initial: { name: string; description: string; sort_order: number; incomes: Amount[]; costs?: Amount[]; upkeep?: Amount[]; attack?: number; defense?: number } | null;
+  initial: { name: string; description: string; sort_order: number; incomes: Amount[]; costs?: Amount[]; upkeep?: Amount[]; attack?: number; defense?: number; image_url?: string | null } | null;
   resources: Resource[];
   withCosts: boolean; // strutture: costo, mantenimento, attacco e difesa
   onSave: (
-    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number },
+    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number; image_url?: string | null },
     lists: { incomes: Amount[]; costs: Amount[]; upkeep: Amount[] },
   ) => Promise<string | null>;
   onCancel: () => void;
@@ -337,6 +340,7 @@ function TypeEditor({
   const [upkeep, setUpkeep] = useState<Amount[]>(initial?.upkeep ?? []);
   const [attack, setAttack] = useState(String(initial?.attack ?? 0));
   const [defense, setDefense] = useState(String(initial?.defense ?? 0));
+  const [image, setImage] = useState(initial?.image_url ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -360,6 +364,15 @@ function TypeEditor({
           </Field>
           <Field label="Difesa">
             <input type="number" min={0} value={defense} onChange={(e) => setDefense(e.target.value)} className="input w-28! py-1.5" />
+          </Field>
+          <Field label="Immagine (facoltativa: indirizzo https, meglio quadrata)">
+            <span className="flex items-center gap-2">
+              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://..." className="input min-w-64 py-1.5" />
+              {/^https:\/\//.test(image.trim()) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={image.trim()} alt="" className="h-10 w-10 shrink-0 rounded border border-border object-cover" />
+              )}
+            </span>
           </Field>
         </div>
       )}
@@ -388,8 +401,18 @@ function TypeEditor({
           disabled={busy || !name.trim()}
           onClick={async () => {
             setBusy(true);
+            const img = image.trim();
+            if (withCosts && img && !img.startsWith("https://")) {
+              setBusy(false);
+              return setError("L'indirizzo dell'immagine deve iniziare con https://");
+            }
             const stats = withCosts
-              ? { attack: Math.max(0, Math.round(Number(attack) || 0)), defense: Math.max(0, Math.round(Number(defense) || 0)) }
+              ? {
+                  attack: Math.max(0, Math.round(Number(attack) || 0)),
+                  defense: Math.max(0, Math.round(Number(defense) || 0)),
+                  // l'immagine si manda solo se c'e' (o c'era): cosi' si salva anche prima della migrazione 0142
+                  ...(img || initial?.image_url ? { image_url: img || null } : {}),
+                }
               : {};
             const err = await onSave({ name: name.trim(), description, sort_order: Number(order) || 0, ...stats }, { incomes, costs, upkeep });
             setBusy(false);
@@ -446,6 +469,10 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
       <ul className="divide-y divide-border/60 border border-border/60">
         {structures.map((t) => (
           <li key={t.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+            {t.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={t.image_url} alt="" className="h-12 w-12 shrink-0 rounded border border-border object-cover" />
+            )}
             <span className="min-w-40 flex-1">
               <span className="font-serif text-accent">{t.name}</span>
               {t.description && <span className="block text-xs text-muted">{t.description}</span>}
@@ -1021,6 +1048,192 @@ function TreasuryTab({ supabase, resources, houses }: Cat & { houses: HouseLite[
           {log.length === 0 && <li className="px-3 py-2 text-muted">Nessun movimento.</li>}
         </ul>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Umore del popolo: minimi di scorte per grandezza del feudo
+// ---------------------------------------------------------------------
+const SIZES_MIN = ["piccolo", "medio", "grande"] as const;
+
+function MoodTab({ supabase, resources }: Cat) {
+  const [rows, setRows] = useState<Record<string, number> | null>(null); // "grandezza|risorsa" -> minimo
+  const [levels, setLevels] = useState<{ id?: string; from_score: number; label: string; color: string; alert: boolean }[]>([]);
+  const [fullRatio, setFullRatio] = useState("2");
+  const [missing, setMissing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const key = (size: string, resource: string) => `${size}|${resource}`;
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("fief_minimums").select("*"),
+      supabase.from("mood_levels").select("*").order("from_score"),
+      supabase.from("mood_settings").select("full_ratio").maybeSingle(),
+    ]).then(([m, l, st]) => {
+      if (m.error || l.error) return setMissing(true);
+      setRows(
+        Object.fromEntries(((m.data ?? []) as { size: string; resource_id: string; amount: number }[]).map((r) => [key(r.size, r.resource_id), r.amount])),
+      );
+      setLevels((l.data ?? []) as { id: string; from_score: number; label: string; color: string; alert: boolean }[]);
+      if (st.data) setFullRatio(String(st.data.full_ratio));
+    });
+  }, [supabase]);
+
+  if (missing) return <p className="text-sm text-amber-200">Per l&apos;umore del popolo va eseguita la migrazione 0143 in Supabase.</p>;
+  if (!rows) return <p className="text-sm text-muted">Caricamento...</p>;
+
+  const sorted = [...levels].sort((a, b) => a.from_score - b.from_score);
+  const ratio = Number(fullRatio);
+  const setLevel = (i: number, patch: Partial<(typeof levels)[number]>) => setLevels((l) => l.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+
+  async function save() {
+    if (!rows) return;
+    const scores = levels.map((l) => l.from_score);
+    if (!levels.some((l) => l.from_score === 0)) return setMsg({ ok: false, text: "Serve un livello che parta da 0." });
+    if (new Set(scores).size !== scores.length) return setMsg({ ok: false, text: "Due livelli partono dallo stesso punteggio." });
+    if (levels.some((l) => !l.label.trim())) return setMsg({ ok: false, text: "Ogni livello ha bisogno di un nome." });
+    if (!(ratio > 1 && ratio <= 100)) return setMsg({ ok: false, text: "Il valore per arrivare a 100 deve essere più di 1 volta il minimo." });
+    setBusy(true);
+    setMsg(null);
+    const fail = (text: string) => (setBusy(false), setMsg({ ok: false, text }));
+    // minimi
+    const delMin = await supabase.from("fief_minimums").delete().neq("size", "");
+    if (delMin.error) return fail("Minimi non salvati.");
+    const list = SIZES_MIN.flatMap((size) =>
+      resources.filter((r) => (rows[key(size, r.id)] ?? 0) > 0).map((r) => ({ size, resource_id: r.id, amount: rows[key(size, r.id)] })),
+    );
+    if (list.length && (await supabase.from("fief_minimums").insert(list)).error) return fail("Minimi non salvati.");
+    // livelli e scala
+    const delLv = await supabase.from("mood_levels").delete().gte("from_score", 0);
+    if (delLv.error) return fail("Livelli non salvati.");
+    const ins = await supabase
+      .from("mood_levels")
+      .insert(levels.map((l) => ({ from_score: l.from_score, label: l.label.trim(), color: l.color, alert: l.alert })));
+    if (ins.error) return fail("Livelli non salvati.");
+    const st = await supabase.from("mood_settings").update({ full_ratio: ratio }).eq("id", true);
+    setBusy(false);
+    setMsg(st.error ? { ok: false, text: "Scala non salvata." } : { ok: true, text: "Umore del popolo salvato." });
+  }
+
+  async function runNow() {
+    if (!window.confirm("Pagare adesso il mantenimento del mese (esercito e draghi) per tutte le casate PG? Conta come un mese in più.")) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("run_house_upkeep", { p_force: true });
+    setBusy(false);
+    setMsg(error ? { ok: false, text: "Mantenimento non eseguito." } : { ok: true, text: "Mantenimento del mese pagato; eventuali avvisi sono stati mandati." });
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="font-serif text-lg text-accent">Come si calcola</h3>
+        <p className="text-sm text-muted">
+          Ogni risorsa con un minimo ha un punteggio da 0 a 100. <strong className="text-foreground">50 = scorte esattamente al minimo</strong>{" "}
+          (la somma dei minimi dei feudi della casata). Sotto il minimo il punteggio scende fino a 0 (scorte finite); sopra sale fino a 100.
+          L&apos;umore della casata è quello della risorsa che sta peggio.
+        </p>
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          Si arriva a 100 con
+          <input type="number" min={1.1} max={100} step={0.1} value={fullRatio} onChange={(e) => setFullRatio(e.target.value)} className="input w-20 py-1" />
+          volte il minimo
+          <span className="text-xs text-muted">(es. 2 = il doppio del minimo vale 100)</span>
+        </label>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-serif text-lg text-accent">Livelli</h3>
+        <p className="text-xs text-muted">Ogni livello vale dal suo punteggio fino al livello successivo. &quot;Avvisa lo staff&quot;: ogni mese, a quel livello, gli admin ricevono un messaggio.</p>
+        {/* scala colorata con i livelli */}
+        <div className="flex h-3 overflow-hidden rounded-sm">
+          {sorted.map((l, i) => (
+            <span key={i} title={`${l.label}: da ${l.from_score}`} style={{ width: `${(sorted[i + 1]?.from_score ?? 101) - l.from_score}%`, background: l.color }} />
+          ))}
+        </div>
+        <ul className="space-y-1.5">
+          {levels.map((l, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-1 text-xs text-muted">
+                da
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={l.from_score}
+                  onChange={(e) => setLevel(i, { from_score: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) })}
+                  aria-label="Da che punteggio"
+                  className="input w-20 py-1"
+                />
+              </label>
+              <input value={l.label} onChange={(e) => setLevel(i, { label: e.target.value })} maxLength={40} aria-label="Nome del livello" className="input w-44 py-1" />
+              <input type="color" value={l.color} onChange={(e) => setLevel(i, { color: e.target.value })} aria-label="Colore" className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent" />
+              <label className="flex items-center gap-1.5 text-xs">
+                <input type="checkbox" checked={l.alert} onChange={(e) => setLevel(i, { alert: e.target.checked })} />
+                avvisa lo staff
+              </label>
+              <button type="button" onClick={() => setLevels((x) => x.filter((_, j) => j !== i))} className="text-xs text-red-400 hover:text-red-300">
+                Togli
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => setLevels((x) => [...x, { from_score: Math.min(100, (sorted.at(-1)?.from_score ?? -10) + 10), label: "", color: "#65a30d", alert: false }])}
+          className="btn-ghost px-3 py-1 text-xs"
+        >
+          + Aggiungi un livello
+        </button>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="font-serif text-lg text-accent">Minimi &quot;da granaio&quot; per feudo</h3>
+        <p className="text-xs text-muted">Quanto di ogni risorsa una casata deve tenere nel tesoro per ogni suo feudo. Le risorse lasciate a 0 non contano.</p>
+        <div className="overflow-x-auto">
+          <table className="text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="py-2 pr-4 text-left text-xs tracking-wide text-muted uppercase">Risorsa</th>
+                {SIZES_MIN.map((s) => (
+                  <th key={s} className="py-2 pr-4 text-left text-xs tracking-wide text-muted uppercase">
+                    Feudo {s}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resources.map((r) => (
+                <tr key={r.id} className="border-b border-border/50">
+                  <td className="py-1.5 pr-4 font-serif text-accent">{r.name}</td>
+                  {SIZES_MIN.map((s) => (
+                    <td key={s} className="py-1.5 pr-4">
+                      <input
+                        type="number"
+                        min={0}
+                        value={rows[key(s, r.id)] ?? 0}
+                        onChange={(e) => setRows((x) => ({ ...x, [key(s, r.id)]: Math.max(0, Math.min(100000000, Math.round(Number(e.target.value) || 0))) }))}
+                        aria-label={`Minimo di ${r.name} per un feudo ${s}`}
+                        className="input w-28 py-1"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={save} disabled={busy} className="btn px-4 py-1.5 text-sm">
+          Salva
+        </button>
+        <button type="button" onClick={runNow} disabled={busy} className="btn-ghost px-3 py-1.5 text-xs" title="Normalmente avviene da solo il primo giorno del mese">
+          Paga ora il mantenimento del mese
+        </button>
+      </div>
+      <Msg msg={msg} />
     </div>
   );
 }

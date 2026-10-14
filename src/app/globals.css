@@ -215,6 +215,14 @@ body {
    "Presenti online", nomi dei campi...) e i nomi dei PG negli elenchi usano Lora;
    i titoli con font-serif restano in Cinzel */
 @layer base {
+  /* tutto cio che si clicca mostra la manina (Tailwind 4 la toglie ai pulsanti) */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label:has(> input[type="checkbox"], > input[type="radio"]),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
   .uppercase:not(.font-serif) {
     font-family: var(--font-lora), Georgia, serif;
   }

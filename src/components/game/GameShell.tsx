@@ -1274,15 +1274,6 @@ function RailCaption({ children }: { children: ReactNode }) {
   return <span className="hidden lg:contents"><Caption>{children}</Caption></span>;
 }
 
-function Tip({ children }: { children: ReactNode }) {
-  // Etichetta al passaggio del mouse (solo desktop)
-  return (
-    <span className="pointer-events-none absolute right-full z-50 mr-2 hidden rounded border border-border bg-panel px-2 py-1 text-xs whitespace-nowrap text-foreground opacity-0 transition group-hover:opacity-100 lg:block">
-      {children}
-    </span>
-  );
-}
-
 // Notizie, ricerca gioco e assenze: per tutti i giocatori
 const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   // ON game
@@ -1361,14 +1352,13 @@ function RailRule({ className = "" }: { className?: string }) {
 
 // Gestione: per moderatori e admin porta ai pannelli; agli altri dice che
 // non hanno i permessi
-function ManageButton({ canManage, className, tip = false, caption }: { canManage: boolean; className: string; tip?: boolean; caption?: string }) {
+function ManageButton({ canManage, className, caption }: { canManage: boolean; className: string; caption?: string }) {
   const [denied, setDenied] = useState(false);
   if (canManage)
     return (
       <Link href="/gestione" className={className} aria-label="Gestione">
         <GearIcon />
         {caption && <Caption>{caption}</Caption>}
-        {tip && <Tip>Gestione</Tip>}
       </Link>
     );
   return (
@@ -1376,7 +1366,6 @@ function ManageButton({ canManage, className, tip = false, caption }: { canManag
       <button type="button" onClick={() => setDenied(true)} className={className} aria-label="Gestione">
         <GearIcon />
         {caption && <Caption>{caption}</Caption>}
-        {tip && <Tip>Gestione</Tip>}
       </button>
       <Modal open={denied} onClose={() => setDenied(false)} title="Gestione" size="md">
         <p className="py-4 text-center font-serif text-lg text-[#d8c39a]">Non hai i permessi per accedere qui.</p>
@@ -1403,7 +1392,6 @@ function PanelButton({
   newRequests,
   onOpen,
   className,
-  tip,
   caption,
 }: {
   panel: Panel;
@@ -1411,7 +1399,6 @@ function PanelButton({
   newRequests: number;
   onOpen: (p: Panel) => void;
   className: string;
-  tip?: boolean;
   caption?: string; // nome sotto l'icona (menu del cellulare)
 }) {
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
@@ -1450,7 +1437,6 @@ function PanelButton({
           {forumNew}
         </span>
       )}
-      {tip && <Tip>{panelLabel(panel, newRequests, newNews)}</Tip>}
     </button>
   );
 }
@@ -1498,17 +1484,15 @@ function RightRail({
         <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />
           <RailCaption>Mappa</RailCaption>
-          <Tip>Mappa</Tip>
         </Link>
         {zonePanels(ZONE_ON, inHouse).map((p) => (
-          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} tip caption={PANEL_SHORT[p.id]} />
+          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} caption={PANEL_SHORT[p.id]} />
         ))}
         {/* Il mio drago: solo per chi cavalca un drago */}
         {onOpenDragon && (
           <button type="button" onClick={onOpenDragon} className={`${railBtn} max-lg:hidden`} aria-label="Il mio drago">
             <DragonIcon />
             <RailCaption>Drago</RailCaption>
-            <Tip>Il mio drago</Tip>
           </button>
         )}
 
@@ -1517,7 +1501,7 @@ function RightRail({
         <RailRule className="max-lg:hidden" />
         <RailZone>Off game</RailZone>
         {zonePanels(ZONE_OFF, inHouse).map((p) => (
-          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} tip caption={PANEL_SHORT[p.id]} />
+          <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} caption={PANEL_SHORT[p.id]} />
         ))}
       </div>
       <form action={logout} className="lg:hidden">

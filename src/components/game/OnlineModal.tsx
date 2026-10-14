@@ -62,7 +62,7 @@ export default function OnlineModal(props: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="Elenco online" size="tall">
-      <div className="flex h-full flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
           <p className="font-serif text-lg tracking-[0.15em] uppercase sm:text-xl">
             <span className="text-accent">{online.length}</span> online
@@ -167,7 +167,7 @@ function PlayerRow({
 }) {
   return (
     <li
-      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2 ${
+      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-1 sm:gap-3 sm:px-3 ${
         player.live ? "" : "opacity-50"
       }`}
       title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
@@ -178,13 +178,13 @@ function PlayerRow({
           invisibile
         </span>
       )}
-      <Avatar name={player.name} url={player.avatar} size="h-8 w-8 sm:h-11 sm:w-11" />
+      <Avatar name={player.name} url={player.avatar} size="h-[35px] w-[35px]" />
       {/* Stemma della casata: alto quanto nome e frase insieme */}
       {player.sigil ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10" />
+        <img src={player.sigil} alt="" title={`Casata ${player.house}`} className="h-[35px] w-[35px] shrink-0 object-contain" />
       ) : (
-        <span className="w-8 shrink-0 sm:w-10" aria-hidden /> // senza casata: i nomi restano allineati
+        <span className="w-[35px] shrink-0" aria-hidden /> // senza casata: i nomi restano allineati
       )}
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 sm:gap-2">
@@ -195,12 +195,12 @@ function PlayerRow({
             disabled={!player.characterId}
             title={player.characterId ? `Apri la scheda di ${fullName(player)}` : undefined}
             // su cellulare nome e cognome vanno a capo invece di essere tagliati
-            className="font-name min-w-0 text-left text-[0.8125rem] leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.9375rem]"
+            className="font-name min-w-0 text-left text-xs leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.8125rem]"
           >
             {fullName(player)}
           </button>
         </p>
-        <p className="truncate text-[0.6875rem] text-[#7d7470] sm:text-xs">{player.phrase || "\u00a0"}</p>
+        <p className="truncate text-[0.625rem] leading-tight text-[#7d7470] sm:text-[0.6875rem]">{player.phrase || "\u00a0"}</p>
       </div>
       {/* Simboli */}
       <div className="flex shrink-0 items-center gap-1 text-base sm:gap-2 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5">

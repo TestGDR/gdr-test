@@ -340,7 +340,7 @@ export async function rollFreeDice(
   characterId: string,
   formula: string,
 ): Promise<{ error?: string }> {
-  const { supabase, user, permissions } = await getStaffContext();
+  const { supabase, user } = await getStaffContext();
   const { data: character } = await supabase
     .from("characters")
     .select("id, owner_id, status")

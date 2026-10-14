@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  TEXT_MAX,
   APPEARANCE_MAX,
   sanitizeCreationData,
   type CreationData,

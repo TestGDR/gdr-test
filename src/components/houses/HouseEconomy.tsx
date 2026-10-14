@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { worstMood, type MoodRow } from "@/lib/mood";
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
@@ -17,6 +18,7 @@ export type EcoStructureType = {
   id: string;
   name: string;
   description: string;
+  image_url?: string | null; // facoltativa: si vede nelle caselle del feudo
   attack: number;
   defense: number;
   costs: Amount[];
@@ -24,6 +26,8 @@ export type EcoStructureType = {
   upkeep: Amount[];
 };
 export type EcoFiefType = { id: string; name: string; incomes: Amount[] };
+// mantenimento del mese per risorsa: esercito (pieno se richiamato, un quarto se congedato) e draghi
+export type UpkeepRow = { resource_id: string; army: number; dragons: number };
 export type EcoFief = {
   id: string;
   name: string;
@@ -49,6 +53,9 @@ export default function HouseEconomy({
   onChanged,
   bare = false,
   taxes,
+  part = "tutto",
+  mood = null,
+  upkeep = [],
 }: {
   houseName: string;
   playable: boolean;
@@ -61,6 +68,11 @@ export default function HouseEconomy({
   builderId: string | null; // il mio PG, se puo' costruire
   onChanged?: () => void; // nel pannello della barra: ricarica i dati
   bare?: boolean; // senza riquadro (dentro una finestra)
+  // nel pannello Feudi le parti stanno in schede separate: entrate (tesoro e da dove
+  // arriva) oppure strutture (costruire e demolire); nella pagina della casata tutto insieme
+  part?: "tutto" | "entrate" | "strutture";
+  mood?: MoodRow[] | null; // umore del popolo (null: non disponibile)
+  upkeep?: UpkeepRow[];
   // tasse: impostazioni, nome della casata regnante, se questa casata e' la regnante e quanto riceve
   taxes?: { settings: TaxSettings; rulerName: string | null; isRuler: boolean; received: Record<string, number> } | null;
 }) {
@@ -77,6 +89,7 @@ export default function HouseEconomy({
   const monthly: Record<string, number> = {};
   for (const [r, n] of Object.entries(paid)) monthly[r] = (monthly[r] ?? 0) - n;
   if (taxes?.isRuler) for (const [r, n] of Object.entries(taxes.received)) monthly[r] = (monthly[r] ?? 0) + n;
+  for (const u of upkeep) monthly[u.resource_id] = (monthly[u.resource_id] ?? 0) - u.army - u.dragons;
   for (const f of fiefs) {
     for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
     for (const s of f.structures) {
@@ -95,7 +108,7 @@ export default function HouseEconomy({
     setBusy(false);
     setMsg(
       error
-        ? { ok: false, text: error.message.includes("insufficienti") ? `Il tesoro non basta (${error.message.split(":")[1]?.trim() ?? ""}).` : error.message.replace("piu''", "più") }
+        ? { ok: false, text: error.message.includes("insufficienti") ? `Il tesoro non basta (${error.message.split(":")[1]?.trim() ?? ""}).` : error.message.includes("duplicate key") || error.message.includes("già nel feudo") ? `${type.name} c'è già in ${fief.name}.` : error.message.replace("piu''", "più") }
         : { ok: true, text: `${type.name} costruita a ${fief.name}.` },
     );
     if (!error) {
@@ -121,14 +134,31 @@ export default function HouseEconomy({
   }
 
   if (fiefs.length === 0 && !isMember) return null;
+  const showIncome = part !== "strutture";
+  const showFiefs = part !== "entrate";
+  // da dove arriva ogni mese: per feudo, tipo di feudo + strutture - mantenimento
+  const fiefMonthly = (f: EcoFief) => {
+    const m: Record<string, number> = {};
+    for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) m[a.resource_id] = (m[a.resource_id] ?? 0) + a.amount;
+    for (const s of f.structures) {
+      const t = structureTypes.find((x) => x.id === s.structure_type_id);
+      for (const a of t?.incomes ?? []) m[a.resource_id] = (m[a.resource_id] ?? 0) + a.amount;
+      for (const a of t?.upkeep ?? []) m[a.resource_id] = (m[a.resource_id] ?? 0) - a.amount;
+    }
+    return Object.entries(m).filter(([, n]) => n !== 0);
+  };
 
   return (
     <section className={bare ? "space-y-4" : "mt-6 space-y-4 border border-border bg-black/40 p-5"}>
       {!bare && <h2 className="font-serif text-2xl text-accent">Feudi e risorse</h2>}
+      {showIncome && (
+        <>
       <p className="text-sm text-muted">
         I feudi di casa {houseName} ({playable ? "casata PG" : "casata PNG"}). Ogni 1° del mese la casata riceve le risorse dei feudi e delle
         strutture.
       </p>
+
+      {isMember && part === "entrate" && mood !== null && <MoodBar rows={mood} res={res} />}
 
       {taxes?.isRuler && (
         <p className="border border-[#d4a72c]/50 bg-[#d4a72c]/10 px-3 py-2 text-sm text-[#f0c75e]">
@@ -161,8 +191,45 @@ export default function HouseEconomy({
           </ul>
         </div>
       )}
+      {part === "entrate" && fiefs.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs tracking-[0.12em] text-muted uppercase">Da dove arrivano, ogni mese</h3>
+          <ul className="space-y-1 text-sm">
+            {fiefs.map((f) => {
+              const list = fiefMonthly(f);
+              return (
+                <li key={f.id} className="flex flex-wrap gap-x-2 border-b border-border/40 py-1">
+                  <span className="font-serif text-accent">{f.name}</span>
+                  <span className="text-muted">
+                    {list.length
+                      ? list.map(([id, n]) => `${n > 0 ? "+" : ""}${n} ${res(id)}`).join(" · ")
+                      : "per ora non produce nulla"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {upkeep.some((u) => u.army > 0) && (
+            <p className="flex flex-wrap gap-x-2 border-b border-border/40 py-1 text-sm">
+              <span className="font-serif text-accent">Esercito</span>
+              <span className="text-muted">{upkeep.filter((u) => u.army > 0).map((u) => `-${u.army} ${res(u.resource_id)}`).join(" · ")}</span>
+            </p>
+          )}
+          {upkeep.some((u) => u.dragons > 0) && (
+            <p className="flex flex-wrap gap-x-2 border-b border-border/40 py-1 text-sm">
+              <span className="font-serif text-accent">Draghi</span>
+              <span className="text-muted">{upkeep.filter((u) => u.dragons > 0).map((u) => `-${u.dragons} ${res(u.resource_id)}`).join(" · ")}</span>
+            </p>
+          )}
+          <p className="text-xs text-muted">Già al netto del mantenimento delle strutture; le tasse sono scritte sopra.</p>
+        </div>
+      )}
+      {part === "entrate" && fiefs.length === 0 && <p className="text-sm text-muted">La casata non ha ancora feudi.</p>}
+        </>
+      )}
 
-      {fiefs.length === 0 && <p className="text-sm text-muted">La casata non ha ancora feudi.</p>}
+      {showFiefs && fiefs.length === 0 && <p className="text-sm text-muted">La casata non ha ancora feudi.</p>}
+      {showFiefs && (
       <ul className="space-y-3">
         {fiefs.map((f) => {
           const type = fiefTypes.find((t) => t.id === f.fief_type_id);
@@ -188,53 +255,228 @@ export default function HouseEconomy({
               {f.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{f.description}</p>}
               {type && <p className="mt-1 text-xs text-muted">Rende ogni mese: {text(type.incomes)}</p>}
               {vassal && taxes && <p className="text-xs text-muted">Tasse: {fiefTaxPct(f, taxes.settings)}% di ciò che produce</p>}
-              {f.structures.length === 0 ? (
-                <p className="mt-2 text-sm text-muted">Nessuna struttura.</p>
-              ) : builderId ? (
-                // chi costruisce vede le strutture una per una e puo' demolirle
-                <ul className="mt-2 space-y-1 text-sm">
-                  {f.structures.map((s) => (
-                    <li key={s.id} className="flex items-center gap-2">
-                      <span>{structureTypes.find((t) => t.id === s.structure_type_id)?.name ?? "?"}</span>
-                      {s.is_background && <span className="border border-border px-1 text-[0.625rem] text-muted uppercase">BG</span>}
-                      <button type="button" disabled={busy} onClick={() => demolish(f, s)} className="ml-auto text-xs text-red-400 hover:text-red-300">
-                        Demolisci
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm">
-                  {[...counts].map(([id, n]) => `${structureTypes.find((t) => t.id === id)?.name ?? "?"}${n > 1 ? ` ×${n}` : ""}`).join(", ")}
-                </p>
-              )}
-              {builderId && f.structures.length < cap && structureTypes.length > 0 && (
-                <select
-                  value=""
-                  disabled={busy}
-                  onChange={(e) => e.target.value && build(f, e.target.value)}
-                  className="input mt-2 max-w-md py-1 text-sm"
-                  aria-label={`Costruisci a ${f.name}`}
-                >
-                  <option value="">Costruisci una struttura…</option>
-                  {structureTypes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} — costa {text(t.costs)}
-                      {t.incomes.length ? ` · rende ${text(t.incomes)}/mese` : ""}
-                      {t.upkeep.length ? ` · mantenimento ${text(t.upkeep)}/mese` : ""}
-                      {t.attack || t.defense ? ` · ATT ${t.attack} DIF ${t.defense}` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <StructureSlots
+                fief={f}
+                cap={cap}
+                structureTypes={structureTypes}
+                treasury={treasury}
+                builderId={builderId}
+                busy={busy}
+                text={text}
+                onBuild={(typeId) => build(f, typeId)}
+                onDemolish={(s) => demolish(f, s)}
+              />
             </li>
           );
         })}
       </ul>
+      )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
-      {isMember && !builderId && fiefs.length > 0 && (
+      {showFiefs && isMember && !builderId && fiefs.length > 0 && (
         <p className="text-xs text-muted">Le strutture le costruisce chi nella casata ha un ruolo abilitato (es. il signore).</p>
       )}
     </section>
+  );
+}
+
+// Una struttura vista come tessera: immagine (o l'iniziale su un fondo scuro), nome e forza
+function StructureTile({ type, bg, onDemolish, busy }: { type: EcoStructureType | undefined; bg?: boolean; onDemolish?: () => void; busy?: boolean }) {
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded border border-accent/40 bg-black/50 shadow shadow-black/60">
+      <StructureImage type={type} />
+      <div className="px-1.5 py-1 text-center">
+        <p className="truncate font-serif text-xs text-accent" title={type?.description || type?.name}>
+          {type?.name ?? "?"}
+        </p>
+        {(type?.attack || type?.defense) ? (
+          <p className="text-[0.625rem] text-muted">
+            ATT {type?.attack ?? 0} · DIF {type?.defense ?? 0}
+          </p>
+        ) : null}
+      </div>
+      {bg && <span className="absolute top-1 left-1 rounded border border-border bg-black/80 px-1 text-[0.5625rem] text-muted uppercase">BG</span>}
+      {onDemolish && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDemolish}
+          title={`Demolisci ${type?.name ?? "la struttura"}`}
+          aria-label={`Demolisci ${type?.name ?? "la struttura"}`}
+          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-red-900 bg-black/80 text-[0.625rem] text-red-400 opacity-80 hover:text-red-300 hover:opacity-100"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
+function StructureImage({ type, small = false }: { type: EcoStructureType | undefined; small?: boolean }) {
+  return type?.image_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={type.image_url} alt="" className={`w-full object-cover ${small ? "aspect-[4/3]" : "aspect-square"}`} />
+  ) : (
+    <span
+      aria-hidden
+      className={`flex w-full items-center justify-center bg-gradient-to-br from-[#3a2a1c] via-[#1f1712] to-black font-serif text-accent/80 ${small ? "aspect-[4/3] text-2xl" : "aspect-square text-3xl"}`}
+    >
+      {type?.name?.[0] ?? "?"}
+    </span>
+  );
+}
+
+// Le caselle del feudo: quelle occupate e quelle libere; chi costruisce sceglie da un catalogo
+function StructureSlots({
+  fief,
+  cap,
+  structureTypes,
+  treasury,
+  builderId,
+  busy,
+  text,
+  onBuild,
+  onDemolish,
+}: {
+  fief: EcoFief;
+  cap: number;
+  structureTypes: EcoStructureType[];
+  treasury: Record<string, number> | null;
+  builderId: string | null;
+  busy: boolean;
+  text: (list: Amount[]) => string;
+  onBuild: (typeId: string) => void;
+  onDemolish: (s: EcoFief["structures"][number]) => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const free = Math.max(0, cap - fief.structures.length);
+  const built = new Set(fief.structures.map((s) => s.structure_type_id));
+  const lacks = (t: EcoStructureType) => !!treasury && t.costs.some((c) => (treasury[c.resource_id] ?? 0) < c.amount);
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {fief.structures.map((s) => (
+          <StructureTile
+            key={s.id}
+            type={structureTypes.find((t) => t.id === s.structure_type_id)}
+            bg={s.is_background}
+            busy={busy}
+            onDemolish={builderId ? () => onDemolish(s) : undefined}
+          />
+        ))}
+        {Array.from({ length: free }, (_, i) =>
+          builderId && i === 0 ? (
+            <button
+              key={i}
+              type="button"
+              disabled={busy}
+              onClick={() => setPicking((v) => !v)}
+              aria-expanded={picking}
+              className={`flex aspect-square flex-col items-center justify-center gap-1 rounded border border-dashed text-xs transition ${picking ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:border-accent hover:text-accent"}`}
+            >
+              <span className="text-2xl leading-none">+</span>
+              Costruisci
+            </button>
+          ) : (
+            <span key={i} className="flex aspect-square items-center justify-center rounded border border-dashed border-border/50 text-[0.625rem] tracking-wider text-muted/60 uppercase">
+              Libera
+            </span>
+          ),
+        )}
+      </div>
+      {builderId && picking && (
+        <div className="space-y-2 border border-accent/40 bg-black/40 p-2">
+          <p className="text-xs tracking-wide text-muted uppercase">Scegli che cosa costruire a {fief.name}</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {structureTypes.map((t) => {
+              const already = built.has(t.id);
+              const poor = !already && lacks(t);
+              return (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    disabled={busy || already || poor}
+                    onClick={() => {
+                      setPicking(false);
+                      onBuild(t.id);
+                    }}
+                    title={already ? "C'è già in questo feudo: non se ne può costruire una seconda" : poor ? "Il tesoro della casata non basta" : `Costruisci ${t.name}`}
+                    className="flex w-full gap-2 rounded border border-border bg-black/50 p-1.5 text-left transition enabled:hover:border-accent disabled:opacity-45"
+                  >
+                    <span className="w-16 shrink-0">
+                      <StructureImage type={t} small />
+                    </span>
+                    <span className="min-w-0 flex-1 text-xs">
+                      <span className="block font-serif text-sm text-accent">{t.name}</span>
+                      <span className="block text-muted">Costa: {text(t.costs)}</span>
+                      {t.incomes.length > 0 && <span className="block text-green-400/90">Rende: {text(t.incomes)}/mese</span>}
+                      {t.upkeep.length > 0 && <span className="block text-red-400/90">Mantenimento: {text(t.upkeep)}/mese</span>}
+                      {(t.attack || t.defense) ? <span className="block text-muted">ATT {t.attack} · DIF {t.defense}</span> : null}
+                      {already && <span className="block text-amber-200">Già nel feudo</span>}
+                      {poor && <span className="block text-red-400">Tesoro insufficiente</span>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Umore del popolo: barra da 0 a 100 (50 = stabile) e dettaglio risorsa per risorsa
+// rispetto al minimo "da granaio" dei feudi
+function MoodBar({ rows, res }: { rows: MoodRow[]; res: (id: string) => string }) {
+  const worst = worstMood(rows);
+  // minimi non ancora fissati: la barra c'e' lo stesso, vuota
+  if (!worst)
+    return (
+      <div className="space-y-2 border border-border/60 bg-black/30 p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-xs tracking-[0.12em] text-muted uppercase">Umore del popolo</h3>
+          <span className="font-serif text-lg text-muted">—</span>
+        </div>
+        <div className="relative h-3 overflow-hidden rounded-sm bg-white/10">
+          <span className="absolute inset-y-0 left-1/2 w-px bg-white/40" />
+        </div>
+        <p className="text-xs text-muted">Lo staff non ha ancora fissato i minimi di scorte per i feudi (Gestione → Economia → Umore del popolo).</p>
+      </div>
+    );
+  const color = worst.color ?? "#968d89";
+  return (
+    <div className="space-y-2 border border-border/60 bg-black/30 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs tracking-[0.12em] text-muted uppercase">Umore del popolo</h3>
+        <span className="font-serif text-lg" style={{ color }}>
+          {worst.label ?? "—"} <span className="text-sm text-muted">{worst.score}/100</span>
+        </span>
+      </div>
+      <div
+        className="relative h-3 overflow-hidden rounded-sm bg-white/10"
+        role="meter"
+        aria-label="Umore del popolo"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={worst.score}
+        aria-valuetext={worst.label ?? undefined}
+      >
+        <span className="absolute inset-y-0 left-0 rounded-sm transition-all" style={{ width: `${worst.score}%`, background: color }} />
+        {/* 50: scorte esattamente al minimo */}
+        <span className="absolute inset-y-0 left-1/2 w-px bg-white/60" title="50: scorte al minimo (stabile)" />
+      </div>
+      <p className="text-xs text-muted">Conta la risorsa che sta peggio. A 50 le scorte sono esattamente al minimo.</p>
+      <ul className="grid gap-x-4 gap-y-0.5 text-xs sm:grid-cols-2">
+        {rows.map((r) => (
+          <li key={r.resource_id} className="flex justify-between gap-2">
+            <span>{res(r.resource_id)}</span>
+            <span style={{ color: r.color ?? undefined }}>
+              {r.have.toLocaleString("it-IT")} su {r.need.toLocaleString("it-IT")} · {r.score}/100
+              {r.label ? ` · ${r.label.toLowerCase()}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

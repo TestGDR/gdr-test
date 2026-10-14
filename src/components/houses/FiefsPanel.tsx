@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+// il pannello e' diviso in schede
+type Tab = "entrate" | "strutture" | "commerci" | "esercito";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "entrate", label: "Entrate" },
+  { id: "strutture", label: "Strutture" },
+  { id: "commerci", label: "Commerci" },
+  { id: "esercito", label: "Esercito" },
+];
 import { createClient } from "@/lib/supabase/client";
 import HouseArmy from "./HouseArmy";
 import HouseTrade from "./HouseTrade";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
 import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
+import type { MoodRow } from "@/lib/mood";
+import type { UpkeepRow } from "./HouseEconomy";
 
 // Pannello "Feudi" della barra di destra: feudi e tesoro della casata del PG.
 // Costruisce solo chi ha un ruolo di casata con "Costruisce nei feudi".
@@ -18,11 +29,14 @@ type Data = {
   treasury: Record<string, number>;
   builderId: string | null;
   taxes: HouseTaxes | null;
+  mood: MoodRow[] | null; // null: migrazione 0143 non ancora eseguita
+  upkeep: UpkeepRow[];
 };
 
 export default function FiefsPanel({ characterId }: { characterId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState<Data | null | undefined>(undefined);
+  const [tab, setTab] = useState<Tab>("entrate");
 
   const load = useCallback(async (): Promise<Data | null> => {
     const { data: me } = await supabase
@@ -41,14 +55,18 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),
       supabase
         .from("structure_types")
-        .select("id, name, description, attack, defense, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
+        .select("*, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
         .order("sort_order")
         .order("name"),
       supabase.from("resources").select("id, name").order("sort_order").order("name"),
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", house.id),
     ]);
     const role = me.house_role as unknown as { can_build: boolean } | null;
-    const taxes = await loadHouseTaxes(supabase, house.id);
+    const [taxes, mood, upkeep] = await Promise.all([
+      loadHouseTaxes(supabase, house.id),
+      supabase.rpc("house_mood", { p_house: house.id }),
+      supabase.rpc("house_upkeep", { p_house: house.id }),
+    ]);
     return {
       house,
       fiefs: (fiefs.data ?? []) as unknown as EcoFief[],
@@ -58,6 +76,8 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       treasury: Object.fromEntries((treasury.data ?? []).map((t) => [t.resource_id as string, Number(t.amount)])),
       builderId: role?.can_build ? me.id : null,
       taxes,
+      mood: mood.error ? null : ((mood.data ?? []) as MoodRow[]),
+      upkeep: (upkeep.data ?? []) as UpkeepRow[],
     };
   }, [supabase, characterId]);
 
@@ -77,9 +97,9 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       fiefPoints.defense += type?.defense ?? 0;
     }
 
-  return (
-    <>
+  const economy = (part: "entrate" | "strutture") => (
     <HouseEconomy
+      part={part}
       houseName={data.house.name}
       playable={data.house.playable}
       fiefs={data.fiefs}
@@ -91,10 +111,36 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       builderId={data.builderId}
       onChanged={() => load().then(setData)}
       taxes={data.taxes}
+      mood={data.mood}
+      upkeep={data.upkeep}
       bare
     />
-    <HouseTrade houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
-    <HouseArmy houseId={data.house.id} fief={fiefPoints} />
-    </>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-1 border-b border-border" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 font-serif text-sm tracking-wide uppercase ${tab === t.id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === "entrate" && economy("entrate")}
+      {tab === "strutture" && economy("strutture")}
+      {tab === "commerci" && (
+        <HouseTrade houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
+      )}
+      {tab === "esercito" && (
+        <HouseArmy houseId={data.house.id} fief={fiefPoints} canCommand={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
+      )}
+    </div>
   );
 }

@@ -40,6 +40,9 @@ function useArmies() {
   const [alliances, setAlliances] = useState<Alliance[]>([]);
   const [alliancesMissing, setAlliancesMissing] = useState(false);
   const [fiefs, setFiefs] = useState<Record<string, FiefPoints>>({});
+  // mantenimento (ogni 100 soldati, al mese): null = migrazione 0143 non ancora eseguita
+  const [resources, setResources] = useState<{ id: string; name: string }[]>([]);
+  const [upkeep, setUpkeep] = useState<{ troop_type_id: string; resource_id: string; amount: number }[] | null>(null);
   const [ready, setReady] = useState(false);
   const [missing, setMissing] = useState(false);
   const [version, setVersion] = useState(0);
@@ -52,7 +55,11 @@ function useArmies() {
       supabase.from("house_kingdoms").select("*"),
       supabase.from("fiefs").select("house_id, structures:fief_structures(type:structure_types(attack, defense))"),
       supabase.from("alliances").select("id, name, members:alliance_kingdoms(kingdom_id)").order("name"),
-    ]).then(([t, m, h, k, hk, f, al]) => {
+      supabase.from("resources").select("id, name").order("sort_order").order("name"),
+      supabase.from("troop_upkeep").select("*"),
+    ]).then(([t, m, h, k, hk, f, al, rs, up]) => {
+      setResources((rs.data ?? []) as { id: string; name: string }[]);
+      setUpkeep(up.error ? null : ((up.data ?? []) as { troop_type_id: string; resource_id: string; amount: number }[]));
       setAlliancesMissing(!!al.error);
       setAlliances(
         ((al.data ?? []) as unknown as { id: string; name: string; members: { kingdom_id: string }[] }[]).map((x) => ({
@@ -83,7 +90,7 @@ function useArmies() {
       setReady(true);
     });
   }, [supabase, version]);
-  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, ready, missing, reload: () => setVersion((v) => v + 1) };
+  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, resources, upkeep, ready, missing, reload: () => setVersion((v) => v + 1) };
 }
 type Armies = ReturnType<typeof useArmies>;
 
@@ -427,6 +434,7 @@ function HouseArmyEditor({ d, houseId }: { d: Armies; houseId: string }) {
 
   return (
     <div className="space-y-3">
+      <CallToggle d={d} houseId={houseId} />
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -471,6 +479,46 @@ function HouseArmyEditor({ d, houseId }: { d: Armies; houseId: string }) {
         </button>
         <Msg msg={msg} />
       </div>
+    </div>
+  );
+}
+
+// Richiamato o congedato: richiamato paga tutto il mantenimento, congedato un quarto
+function CallToggle({ d, houseId }: { d: Armies; houseId: string }) {
+  const [called, setCalled] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    d.supabase
+      .from("houses")
+      .select("army_called")
+      .eq("id", houseId)
+      .maybeSingle()
+      .then(({ data, error }) => setCalled(error ? null : !!data?.army_called));
+  }, [d.supabase, houseId]);
+  if (called === null) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3 border border-border/60 bg-black/30 px-3 py-2 text-sm">
+      <span>
+        Esercito: <strong className={called ? "text-red-300" : "text-muted"}>{called ? "richiamato alle armi" : "congedato"}</strong>
+        <span className="ml-2 text-xs text-muted">{called ? "paga tutto il mantenimento" : "paga un quarto del mantenimento"}</span>
+      </span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const { error } = await d.supabase.rpc("set_army_called", { p_house: houseId, p_called: !called });
+          setBusy(false);
+          if (error) return setError(errorText(error));
+          setCalled(!called);
+        }}
+        className={`ml-auto px-3 py-1 text-xs ${called ? "btn-ghost" : "btn"}`}
+      >
+        {called ? "Congeda" : "Richiama"}
+      </button>
+      {error && <span className="w-full text-xs text-red-400">{error}</span>}
     </div>
   );
 }
@@ -532,6 +580,9 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
   const [mods, setMods] = useState<Record<string, number>>(
     Object.fromEntries(d.matchups.filter((m) => m.troop_type_id === type?.id).map((m) => [m.against_id, m.modifier])),
   );
+  const [costs, setCosts] = useState<Record<string, number>>(
+    Object.fromEntries((d.upkeep ?? []).filter((u) => u.troop_type_id === type?.id).map((u) => [u.resource_id, u.amount])),
+  );
   const others = d.types.filter((t) => t.id !== type?.id);
 
   async function save() {
@@ -550,7 +601,16 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
       const del = await d.supabase.from("troop_matchups").delete().eq("troop_type_id", id);
       if (del.error) return del;
       const rows = others.filter((o) => (mods[o.id] ?? 0) !== 0).map((o) => ({ troop_type_id: id, against_id: o.id, modifier: mods[o.id] }));
-      return rows.length ? d.supabase.from("troop_matchups").insert(rows) : { error: null };
+      if (rows.length) {
+        const r = await d.supabase.from("troop_matchups").insert(rows);
+        if (r.error) return r;
+      }
+      // mantenimento: solo se la migrazione 0143 c'e'
+      if (d.upkeep === null) return { error: null };
+      const delUp = await d.supabase.from("troop_upkeep").delete().eq("troop_type_id", id);
+      if (delUp.error) return delUp;
+      const up = d.resources.filter((r) => (costs[r.id] ?? 0) > 0).map((r) => ({ troop_type_id: id, resource_id: r.id, amount: costs[r.id] }));
+      return up.length ? d.supabase.from("troop_upkeep").insert(up) : { error: null };
     }, "Truppa salvata.");
     if (done) onDone(id);
   }
@@ -580,6 +640,28 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
           <input type="number" value={order} onChange={(e) => setOrder(int(e.target.value, -1000, 1000))} className="input w-24" />
         </Field>
       </div>
+      {d.upkeep === null ? (
+        <p className="text-xs text-amber-200">Per il mantenimento delle truppe va eseguita la migrazione 0143 in Supabase.</p>
+      ) : (
+        <div>
+          <p className="mb-1 text-xs tracking-wide text-muted uppercase">Mantenimento al mese, ogni 100 soldati (da richiamati)</p>
+          <div className="flex flex-wrap gap-3">
+            {d.resources.map((r) => (
+              <label key={r.id} className="block text-xs text-muted">
+                {r.name}
+                <input
+                  type="number"
+                  min={0}
+                  value={costs[r.id] ?? 0}
+                  onChange={(e) => setCosts((c) => ({ ...c, [r.id]: int(e.target.value, 0, 1000000) }))}
+                  className="input mt-1 block w-24 py-1"
+                />
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted">Esempio: 2 Alimenti ogni 100 soldati → 1.000 fanti costano 20 Alimenti al mese. Congedati pagano un quarto.</p>
+        </div>
+      )}
       <div>
         <p className="mb-1 text-xs tracking-wide text-muted uppercase">Forza o debolezza contro le altre truppe (punti per unità)</p>
         {others.length === 0 ? (

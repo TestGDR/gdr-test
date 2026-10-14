@@ -123,8 +123,7 @@ export default function HouseTrade({
   };
 
   return (
-    <section className="mt-6 space-y-4 border-t border-border pt-5">
-      <h3 className="font-serif text-xl text-accent">Commerci</h3>
+    <section className="space-y-4">
       <p className="text-sm text-muted">
         Una tratta scambia ogni mese una risorsa con un&apos;altra casata. Il primo scambio avviene quando la proposta viene accettata, i successivi il primo
         giorno di ogni mese. Se in un mese mancano le risorse, lo scambio di quel mese salta.
