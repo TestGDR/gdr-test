@@ -9,7 +9,7 @@ export default async function DraghiPage() {
   const { supabase } = await requirePermission("draghi.gestire");
 
   const [houses, dragons, stages, traits, pgs, skills, temperaments, effects, npcs, settings] = await Promise.all([
-    supabase.from("houses").select("id, name, sigil_url").order("sort_order").order("name"),
+    supabase.from("houses").select("id, name, sigil_url, playable").order("sort_order").order("name"),
     supabase.from("dragons").select("*").order("created_at"),
     supabase.from("dragon_stages").select("*").order("sort_order"),
     supabase.from("dragon_trait_pairs").select("*").order("pregio"),

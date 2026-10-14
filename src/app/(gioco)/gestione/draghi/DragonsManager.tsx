@@ -19,7 +19,7 @@ import {
 import { invalidateDragonEffects, invalidateDragonSkills, type DragonSkill } from "@/lib/dragon-skills";
 import { createClient } from "@/lib/supabase/client";
 
-export type HouseLite = { id: string; name: string; sigil_url: string | null };
+export type HouseLite = { id: string; name: string; sigil_url: string | null; playable: boolean };
 export type PgLite = { id: string; name: string; house_id: string | null; px: number; status: string };
 export type NpcLite = { id: string; name: string; house_id: string | null; deceased: boolean };
 
@@ -103,12 +103,18 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temper
   const { supabase, run, busy, feedback } = useOp();
   const [selectedId, setSelectedId] = useState<string | null>(dragons[0]?.id ?? null);
   const [newStage, setNewStage] = useState<Record<string, string>>({});
+  // l'elenco a sinistra mostra le casate PG oppure quelle PNG
+  const [kind, setKind] = useState<"pg" | "png">("pg");
+  // casate aperte a tendina (di base solo quella del drago scelto)
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   const selected = dragons.find((d) => d.id === selectedId) ?? null;
   // nome del cavaliere, PG o PNG
   const riderName = (d: Dragon) =>
     d.rider_id ? (pgs.find((p) => p.id === d.rider_id)?.name ?? null) : d.npc_rider_id ? `${npcs.find((n) => n.id === d.npc_rider_id)?.name ?? "?"} (PNG)` : null;
+  const shown = houses.filter((h) => (kind === "pg" ? h.playable : !h.playable));
+  const count = (pg: boolean) => dragons.filter((d) => houses.some((h) => h.id === d.house_id && h.playable === pg)).length;
   const groups = [
-    ...houses.map((h) => ({ id: h.id, name: `Casata ${h.name}`, house: h as HouseLite | null })),
+    ...shown.map((h) => ({ id: h.id, name: `Casata ${h.name}`, house: h as HouseLite | null })),
     { id: "nessuna", name: "Senza casata", house: null },
   ];
 
@@ -116,27 +122,56 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temper
     <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
       <aside className="space-y-4">
         {feedback}
+        <div className="flex gap-1 border-b border-border" role="tablist">
+          {([
+            ["pg", "Casate PG", count(true)],
+            ["png", "Casate PNG", count(false)],
+          ] as const).map(([id, label, n]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={kind === id}
+              onClick={() => setKind(id)}
+              className={`-mb-px border-b-2 px-3 py-2 text-xs tracking-[0.12em] uppercase ${kind === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"}`}
+            >
+              {label} <span className="text-muted">({n})</span>
+            </button>
+          ))}
+        </div>
+        {shown.length === 0 && <p className="text-sm text-muted">Nessuna casata {kind === "pg" ? "PG" : "PNG"}.</p>}
         {groups.map((g) => {
           const list = dragons.filter((d) => (d.house_id ?? null) === (g.house?.id ?? null));
           if (!g.house && list.length === 0) return null;
           const hid = g.house?.id;
+          const isOpen = opened[g.id] ?? (!!selected && (selected.house_id ?? "nessuna") === g.id);
           return (
             <div key={g.id} className="border border-border/70">
-              <div className="flex items-center gap-2 border-b border-border/70 bg-black/40 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setOpened((o) => ({ ...o, [g.id]: !isOpen }))}
+                aria-expanded={isOpen}
+                className={`flex w-full items-center gap-2 bg-black/40 px-3 py-2 text-left hover:bg-black/60 ${isOpen ? "border-b border-border/70" : ""}`}
+              >
                 {g.house?.sigil_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={g.house.sigil_url} alt="" className="h-6 w-6 object-contain" />
                 )}
                 <span className="flex-1 font-serif">{g.name}</span>
                 <span className="text-xs text-muted">{list.length}</span>
-              </div>
+                <span className="w-3 text-xs text-muted" aria-hidden>
+                  {isOpen ? "▾" : "▸"}
+                </span>
+              </button>
+              {isOpen && (
+                <>
               <ul>
                 {list.map((d) => (
-                  <li key={d.id}>
+                  <li key={d.id} className="flex items-center">
                     <button
                       type="button"
                       onClick={() => setSelectedId(d.id)}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${d.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}
+                      className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-sm ${d.id === selectedId ? "bg-blood/30" : "hover:bg-blood/15"}`}
                     >
                       <DragonPortrait dragon={d} size="h-8 w-8" />
                       <span className="min-w-0 flex-1">
@@ -146,6 +181,21 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temper
                           {riderName(d) && ` · ${riderName(d)}`}
                         </span>
                       </span>
+                    </button>
+                    {/* elimina direttamente dall'elenco */}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (!window.confirm(`Eliminare definitivamente ${d.status === "uovo" ? "questo uovo" : dragonName(d)}?`)) return;
+                        if (await run(() => supabase.from("dragons").delete().eq("id", d.id), d.status === "uovo" ? "Uovo eliminato." : "Drago eliminato."))
+                          if (selectedId === d.id) setSelectedId(null);
+                      }}
+                      title={`Elimina ${d.status === "uovo" ? "l'uovo" : dragonName(d)}`}
+                      aria-label={`Elimina ${d.status === "uovo" ? "l'uovo" : dragonName(d)}`}
+                      className="shrink-0 self-stretch px-3 text-sm text-muted hover:bg-red-950/40 hover:text-red-400"
+                    >
+                      ✕
                     </button>
                   </li>
                 ))}
@@ -199,6 +249,8 @@ function DragonsTab({ houses, dragons, stages, traits, pgs, npcs, skills, temper
                     + Drago
                   </button>
                 </div>
+              )}
+                </>
               )}
             </div>
           );
@@ -292,10 +344,19 @@ function DragonEditor({
         <Field label="Casata">
           <select value={d.house_id ?? ""} onChange={(e) => set("house_id", e.target.value || null)} className="input">
             <option value="">Nessuna</option>
-            {houses.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name}
-              </option>
+            {([
+              ["Casate PG", true],
+              ["Casate PNG", false],
+            ] as const).map(([label, pg]) => (
+              <optgroup key={label} label={label}>
+                {houses
+                  .filter((h) => h.playable === pg)
+                  .map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </select>
         </Field>

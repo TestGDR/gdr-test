@@ -242,7 +242,10 @@ export function FamilyCanvas({
       const b = center(other.id);
       lines.push({ d: `M${a.x},${a.y} L${b.x},${b.y}`, dashed: true });
       const kind = RELATION_KINDS[relation.kind];
-      medallions.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, symbol: kind.symbol, title: kind.label + (relation.note ? ` — ${relation.note}` : "") });
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // anche qui i figli della coppia scendono dal medaglione, non da uno dei due
+      unionPoint.set(key, mid);
+      medallions.push({ ...mid, symbol: kind.symbol, title: kind.label + (relation.note ? ` — ${relation.note}` : "") });
     }
   }
 
