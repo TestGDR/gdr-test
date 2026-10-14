@@ -370,7 +370,7 @@ export async function rollFreeDice(
 
 // ---------------------------------------------------------------------
 // Raggira: prova contrapposta nascosta (regolamento, "Ingannare"):
-// PRE + Persuadere + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
+// EMP + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
 // A parita' vince chi difende. In chat non compare nulla: se il bersaglio
 // scopre l'inganno riceve, lui solo, il testo scritto da chi ha tentato il
 // raggiro. Chi raggira non viene a sapere com'e' andata
@@ -426,7 +426,7 @@ export async function rollRaggira(
     supabase
       .from("skills")
       .select("id, name")
-      .in("name", ["Persuadere", "Percepire Intenzioni"]),
+      .in("name", ["Dissimulare", "Percepire Intenzioni"]),
   ]);
   if (!me || !(await controls(supabase, me.id)) || me.status !== "attivo")
     return { error: "Personaggio non valido." };
@@ -464,20 +464,20 @@ export async function rollRaggira(
     ["EMP"],
   );
   if ("error" in def) return { error: def.error };
-  // chi raggira usa Persuadere, che dipende dalla Presenza
+  // chi raggira usa Dissimulare (Empatia)
   const att = rollFormula(
-    "PRE + ABILITA + 1d10",
+    "EMP + ABILITA + 1d10",
     PROVA_RULES,
     {
       vars: {
-        PRE: stat(me, "pre"),
-        ABILITA: await levelOf(characterId, "Persuadere"),
+        EMP: stat(me, "emp"),
+        ABILITA: await levelOf(characterId, "Dissimulare"),
       },
-      varLabels: { ABILITA: "Persuadere" },
+      varLabels: { ABILITA: "Dissimulare" },
       target: def.total,
     },
     secureRng,
-    ["PRE"],
+    ["EMP"],
   );
   if ("error" in att) return { error: att.error };
   const won = att.total > def.total; // a parita' vince chi difende
