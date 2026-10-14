@@ -20,6 +20,9 @@ import type { UpkeepRow } from "./HouseEconomy";
 
 // Pannello "Feudi" della barra di destra: feudi e tesoro della casata del PG.
 // Costruisce solo chi ha un ruolo di casata con "Costruisce nei feudi".
+// Lo staff dell'economia (admin, e chi ha il permesso) puo' scegliere una
+// qualsiasi casata e vederla e gestirla come il suo signore: il database
+// gli permette gia' di costruire, demolire, commerciare e richiamare l'esercito.
 type Data = {
   house: { id: string; name: string; playable: boolean };
   fiefs: EcoFief[];
@@ -37,6 +40,19 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState<Data | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("entrate");
+  // staff: elenco delle casate e casata scelta ("" = la propria)
+  const [staffHouses, setStaffHouses] = useState<Data["house"][] | null>(null);
+  const [viewAs, setViewAs] = useState("");
+  useEffect(() => {
+    supabase.rpc("has_permission", { perm: "economia.gestire" }).then(({ data: ok }) => {
+      if (ok !== true) return;
+      supabase
+        .from("houses")
+        .select("id, name, playable")
+        .order("name")
+        .then(({ data: list }) => setStaffHouses((list ?? []) as Data["house"][]));
+    });
+  }, [supabase]);
 
   const load = useCallback(async (): Promise<Data | null> => {
     const { data: me } = await supabase
@@ -44,7 +60,9 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       .select("id, house_id, house_role:house_roles(can_build), house:houses(id, name, playable)")
       .eq("id", characterId)
       .maybeSingle();
-    const house = (me?.house ?? null) as unknown as Data["house"] | null;
+    // lo staff che guarda un'altra casata la gestisce come il suo signore
+    const other = viewAs ? (await supabase.from("houses").select("id, name, playable").eq("id", viewAs).maybeSingle()).data : null;
+    const house = (other ?? me?.house ?? null) as unknown as Data["house"] | null;
     if (!me || !house) return null;
     const [fiefs, fiefTypes, structureTypes, resources, treasury] = await Promise.all([
       supabase
@@ -74,19 +92,48 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       structureTypes: (structureTypes.data ?? []) as unknown as EcoStructureType[],
       resources: (resources.data ?? []) as EcoResource[],
       treasury: Object.fromEntries((treasury.data ?? []).map((t) => [t.resource_id as string, Number(t.amount)])),
-      builderId: role?.can_build ? me.id : null,
+      builderId: other || role?.can_build ? me.id : null,
       taxes,
       mood: mood.error ? null : ((mood.data ?? []) as MoodRow[]),
       upkeep: (upkeep.data ?? []) as UpkeepRow[],
     };
-  }, [supabase, characterId]);
+  }, [supabase, characterId, viewAs]);
 
   useEffect(() => {
     load().then(setData);
   }, [load]);
 
-  if (data === undefined) return <p className="text-center text-muted">Caricamento...</p>;
-  if (data === null) return <p className="py-6 text-center text-muted">Il tuo personaggio non appartiene a una casata.</p>;
+  // scelta della casata (solo staff)
+  const picker = staffHouses && (
+    <label className="flex flex-wrap items-center gap-2 border border-[#d4a72c]/40 bg-[#d4a72c]/10 px-3 py-2 text-xs text-[#f0c75e]">
+      Staff · vedi e gestisci come la casata
+      <select
+        value={viewAs}
+        onChange={(e) => {
+          setViewAs(e.target.value);
+          setData(undefined);
+        }}
+        className="input w-auto! py-1 text-sm text-foreground"
+      >
+        <option value="">la tua</option>
+        {staffHouses.map((h) => (
+          <option key={h.id} value={h.id}>
+            {h.name}
+            {h.playable ? "" : " (PNG)"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  if (data === undefined) return <>{picker}<p className="text-center text-muted">Caricamento...</p></>;
+  if (data === null)
+    return (
+      <>
+        {picker}
+        <p className="py-6 text-center text-muted">Il tuo personaggio non appartiene a una casata.</p>
+      </>
+    );
 
   // attacco e difesa delle strutture dei feudi: entrano nella potenza della casata
   const fiefPoints = { attack: 0, defense: 0 };
@@ -119,6 +166,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
 
   return (
     <div className="space-y-4">
+      {picker}
       <div className="flex flex-wrap gap-1 border-b border-border" role="tablist">
         {TABS.map((t) => (
           <button
