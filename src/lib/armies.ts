@@ -10,6 +10,7 @@ export type TroopType = {
   defense: number;
   sort_order: number;
   category_id?: string | null; // gruppo (terrestri, navali...): migrazione 0145
+  image_url?: string | null; // immagine facoltativa: migrazione 0147
 };
 
 // Punti in piu' (o in meno) per ogni unita' di "troop_type_id" contro "against_id"

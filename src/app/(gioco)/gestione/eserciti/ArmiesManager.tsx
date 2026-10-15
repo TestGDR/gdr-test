@@ -47,6 +47,8 @@ function useArmies() {
   // gruppi di truppe e chi si affronta: null = migrazione 0145 non ancora eseguita
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [faces, setFaces] = useState<{ category_a: string; category_b: string }[]>([]);
+  // costo di addestramento ogni 10 soldati: null = migrazione 0148 non ancora eseguita
+  const [training, setTraining] = useState<{ troop_type_id: string; resource_id: string; amount: number }[] | null>(null);
   const [ready, setReady] = useState(false);
   const [missing, setMissing] = useState(false);
   const [version, setVersion] = useState(0);
@@ -63,7 +65,9 @@ function useArmies() {
       supabase.from("troop_upkeep").select("*"),
       supabase.from("troop_categories").select("*").order("sort_order").order("name"),
       supabase.from("troop_category_faces").select("*"),
-    ]).then(([t, m, h, k, hk, f, al, rs, up, cg, fc]) => {
+      supabase.from("troop_training_costs").select("*"),
+    ]).then(([t, m, h, k, hk, f, al, rs, up, cg, fc, tr]) => {
+      setTraining(tr.error ? null : ((tr.data ?? []) as { troop_type_id: string; resource_id: string; amount: number }[]));
       setCategories(cg.error ? null : ((cg.data ?? []) as Category[]));
       setFaces((fc.data ?? []) as { category_a: string; category_b: string }[]);
       setResources((rs.data ?? []) as { id: string; name: string }[]);
@@ -98,7 +102,7 @@ function useArmies() {
       setReady(true);
     });
   }, [supabase, version]);
-  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, resources, upkeep, categories, faces, ready, missing, reload: () => setVersion((v) => v + 1) };
+  return { supabase, types, matchups, troops, kingdoms, houseKingdom, alliances, alliancesMissing, fiefs, resources, upkeep, categories, faces, training, ready, missing, reload: () => setVersion((v) => v + 1) };
 }
 type Armies = ReturnType<typeof useArmies>;
 
@@ -594,6 +598,10 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
   const [defense, setDefense] = useState(type?.defense ?? 1);
   const [order, setOrder] = useState(type?.sort_order ?? 0);
   const [category, setCategory] = useState(type?.category_id ?? "");
+  const [image, setImage] = useState(type?.image_url ?? "");
+  const [train, setTrain] = useState<Record<string, number>>(
+    Object.fromEntries((d.training ?? []).filter((u) => u.troop_type_id === type?.id).map((u) => [u.resource_id, u.amount])),
+  );
   const [mods, setMods] = useState<Record<string, number>>(
     Object.fromEntries(d.matchups.filter((m) => m.troop_type_id === type?.id).map((m) => [m.against_id, m.modifier])),
   );
@@ -617,8 +625,11 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         sort_order: order,
         // il gruppo si manda solo se la migrazione 0145 c'e'
         ...(d.categories ? { category_id: category || null } : {}),
+        // l'immagine solo se c'e' (o c'era): cosi' si salva anche prima della migrazione 0147
+        ...(image.trim() || type?.image_url ? { image_url: image.trim() || null } : {}),
       };
       if (!row.name) return { error: { message: "Scrivi il nome della truppa." } };
+      if (image.trim() && !image.trim().startsWith("https://")) return { error: { message: "L'indirizzo dell'immagine deve iniziare con https://" } };
       if (id) {
         const r = await d.supabase.from("troop_types").update(row).eq("id", id);
         if (r.error) return r;
@@ -646,6 +657,16 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
                 .from("troop_matchups")
                 .upsert({ troop_type_id: o.id, against_id: id, modifier: -v }, { onConflict: "troop_type_id,against_id" });
         if (r.error) return r;
+      }
+      // costo di addestramento: solo se la migrazione 0148 c'e'
+      if (d.training !== null) {
+        const delTr = await d.supabase.from("troop_training_costs").delete().eq("troop_type_id", id);
+        if (delTr.error) return delTr;
+        const tr = d.resources.filter((r) => (train[r.id] ?? 0) > 0).map((r) => ({ troop_type_id: id, resource_id: r.id, amount: train[r.id] }));
+        if (tr.length) {
+          const r = await d.supabase.from("troop_training_costs").insert(tr);
+          if (r.error) return r;
+        }
       }
       // mantenimento: solo se la migrazione 0143 c'e'
       if (d.upkeep === null) return { error: null };
@@ -693,7 +714,40 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
             </select>
           </Field>
         )}
+        <Field label="Immagine (facoltativa: indirizzo https)">
+          <span className="flex items-center gap-2">
+            <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://..." className="input w-64" />
+            {image.trim().startsWith("https://") && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={image.trim()} alt="" className="h-10 w-10 shrink-0 rounded border border-border object-cover" />
+            )}
+          </span>
+        </Field>
       </div>
+      {d.training !== null && (
+        <div>
+          <p className="mb-1 text-xs tracking-wide text-muted uppercase">Costo di addestramento, ogni 10 soldati</p>
+          <div className="flex flex-wrap gap-3">
+            {d.resources
+              .filter((r) => r.name.toLowerCase() !== "manodopera")
+              .map((r) => (
+                <label key={r.id} className="block text-xs text-muted">
+                  {r.name}
+                  <input
+                    type="number"
+                    min={0}
+                    value={train[r.id] ?? 0}
+                    onChange={(e) => setTrain((c) => ({ ...c, [r.id]: int(e.target.value, 0, 1000000) }))}
+                    className="input mt-1 block w-24 py-1"
+                  />
+                </label>
+              ))}
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            Oltre a questo, ogni soldato costa 1 Manodopera. Esempio: 5 Oro ogni 10 → addestrare 50 soldati costa 25 Oro e 50 Manodopera.
+          </p>
+        </div>
+      )}
       {d.upkeep === null ? (
         <p className="text-xs text-amber-200">Per il mantenimento delle truppe va eseguita la migrazione 0143 in Supabase.</p>
       ) : (
