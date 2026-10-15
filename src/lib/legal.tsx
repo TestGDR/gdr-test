@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
-// ATTENZIONE: questi testi sono BOZZE da completare (parti tra [PARENTESI QUADRE])
-// e da far verificare da un professionista prima dell'apertura al pubblico.
+// Testi legali mostrati all'iscrizione e nelle pagine /legale (da far verificare a un
+// professionista prima dell'apertura al pubblico).
 // Quando cambi un documento in modo sostanziale, aggiorna LEGAL_VERSION:
 // ogni profilo salva la versione accettata all'iscrizione.
-export const LEGAL_VERSION = "2026-09-30";
+export const LEGAL_VERSION = "2026-10-15";
 
-const TITOLARE = "[NOME E COGNOME DEL TITOLARE / NOME ASSOCIAZIONE]";
-const CONTATTO = "[EMAIL DI CONTATTO]";
+const TITOLARE = "Sara Cirone";
+const CONTATTO = "sara.cirone93@gmail.com";
 
 export type LegalDocId = "disclaimer" | "termini" | "privacy" | "cookie";
 
@@ -34,10 +34,18 @@ export const LEGAL_DOCS: Record<LegalDocId, LegalDoc> = {
           responsabili. Lo staff modera il gioco ma non può verificare in anticipo ogni messaggio.
           Se trovi contenuti inappropriati scrivi a {CONTATTO}.
         </p>
-        <H>Temi trattati</H>
+        <H>Diritto d&apos;Autore</H>
         <p>
-          Il gioco può trattare temi maturi (violenza, conflitti, argomenti drammatici) sempre in
-          chiave narrativa. Per questo la registrazione è riservata ai maggiorenni.
+          L&apos;ambientazione è liberamente ispirata all&apos;universo di Westeros / Le Cronache del
+          Ghiaccio e del Fuoco: tutti i diritti appartengono a George R.R. Martin e ai legittimi
+          detentori. La Land è un&apos;attività amatoriale, gratuita e senza scopo di lucro (fair use /
+          fanfiction).
+        </p>
+        <H>Limitazioni d&apos;Età e Contenuti</H>
+        <p>
+          L&apos;iscrizione è rigorosamente vietata ai minori di 18 anni. Il sito contiene tematiche
+          mature: violenza di guerra, descrizioni crude, tematiche sessuali e linguaggio forte coerenti
+          con l&apos;opera d&apos;origine.
         </p>
         <H>Nessuna garanzia</H>
         <p>
@@ -133,10 +141,10 @@ export const LEGAL_DOCS: Record<LegalDocId, LegalDoc> = {
         </ul>
         <H>Conservazione</H>
         <p>
-          I dati dell&apos;account restano finché l&apos;account è attivo. I dati di accesso (IP e
-          verifiche) sono conservati per [6 MESI] e poi cancellati. I messaggi di gioco possono
-          restare visibili nelle liste anche dopo la chiusura dell&apos;account, salvo richiesta di
-          cancellazione.
+          Nessun dato viene ceduto a terzi, nessuna profilazione commerciale. Puoi chiedere in ogni
+          momento la cancellazione definitiva del tuo account scrivendo a {CONTATTO}. I dati
+          dell&apos;account restano finché l&apos;account è attivo. I dati di accesso (IP e verifiche)
+          sono conservati per 6 mesi e poi cancellati.
         </p>
         <H>I tuoi diritti</H>
         <p>
@@ -160,17 +168,6 @@ export const LEGAL_DOCS: Record<LegalDocId, LegalDoc> = {
           cookie di profilazione, pubblicità o statistiche di terze parti, quindi non è richiesto il
           tuo consenso preventivo (Linee guida del Garante Privacy, 10 giugno 2021).
         </p>
-        <H>Cookie utilizzati</H>
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            <code>sb-…-auth-token</code> — mantiene l&apos;accesso al tuo account (Supabase). Durata:
-            fino al logout o alla scadenza della sessione.
-          </li>
-          <li>
-            <code>gdr_access</code> — sicurezza: evita di registrare più volte lo stesso accesso
-            dallo stesso indirizzo IP. Durata: fino alla chiusura del browser.
-          </li>
-        </ul>
         <H>Come gestirli</H>
         <p>
           Puoi cancellare i cookie dalle impostazioni del browser; senza cookie tecnici non è
