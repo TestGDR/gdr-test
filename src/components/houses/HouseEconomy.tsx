@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { worstMood, type MoodRow } from "@/lib/mood";
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { DEFAULT_ECONOMY, fiefTypeRows, sumAmounts, type EconomySettings } from "@/lib/fief-income";
 import { createClient } from "@/lib/supabase/client";
 import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 
@@ -13,19 +14,20 @@ import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 // ---------------------------------------------------------------------
 
 type Amount = { resource_id: string; amount: number };
-export type EcoResource = { id: string; name: string };
+export type EcoResource = { id: string; name: string; tradable?: boolean };
 export type EcoStructureType = {
   id: string;
   name: string;
   description: string;
   image_url?: string | null; // facoltativa: si vede nelle caselle del feudo
+  category?: string; // Produzione, Militari... (solo per raggrupparle)
   attack: number;
   defense: number;
   costs: Amount[];
   incomes: Amount[];
   upkeep: Amount[];
 };
-export type EcoFiefType = { id: string; name: string; incomes: Amount[] };
+export type EcoFiefType = { id: string; name: string; incomes: Amount[]; upkeep?: Amount[] };
 // mantenimento del mese per risorsa: esercito (pieno se richiamato, un quarto se congedato) e draghi
 export type UpkeepRow = { resource_id: string; army: number; dragons: number };
 export type EcoFief = {
@@ -33,6 +35,7 @@ export type EcoFief = {
   name: string;
   size: "piccolo" | "medio" | "grande";
   fief_type_id: string | null;
+  fief_type2_id?: string | null; // secondo tipo (conta in parte)
   description: string;
   location: { name: string } | null;
   structures: { id: string; structure_type_id: string; is_background: boolean }[];
@@ -80,18 +83,37 @@ export default function HouseEconomy({
   const router = useRouter();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // grandezza e secondo tipo (Gestione -> Economia), mantenimento dei tipi di feudo,
+  // tipi di feudo in cui si costruisce ogni struttura (migrazione 0155)
+  const [eco, setEco] = useState<EconomySettings>(DEFAULT_ECONOMY);
+  const [typeUpkeep, setTypeUpkeep] = useState<(Amount & { fief_type_id: string })[]>([]);
+  const [allowed, setAllowed] = useState<{ structure_type_id: string; fief_type_id: string }[]>([]);
+  useEffect(() => {
+    Promise.all([
+      supabase.from("economy_settings").select("medium_factor, large_factor, secondary_factor").maybeSingle(),
+      supabase.from("fief_type_upkeep").select("fief_type_id, resource_id, amount"),
+      supabase.from("structure_fief_types").select("structure_type_id, fief_type_id"),
+    ]).then(([e, u, a]) => {
+      if (e.data) setEco(e.data as EconomySettings);
+      setTypeUpkeep((u.data ?? []) as (Amount & { fief_type_id: string })[]);
+      setAllowed((a.data ?? []) as { structure_type_id: string; fief_type_id: string }[]);
+    });
+  }, [supabase]);
+  const types = fiefTypes.map((t) => ({ ...t, upkeep: typeUpkeep.filter((u) => u.fief_type_id === t.id) }));
   const res = (id: string) => resources.find((r) => r.id === id)?.name ?? "?";
   const text = (list: Amount[]) => (list.length ? list.map((a) => `${a.amount} ${res(a.resource_id)}`).join(", ") : "nulla");
 
   // al mese: introiti dei tipi di feudo + entrate delle strutture - mantenimento - tasse (+ tasse ricevute)
   const vassal = !!taxes?.settings.ruling_house_id && !taxes.isRuler;
-  const paid = vassal && taxes ? fiefsTaxes(fiefs, taxes.settings, fiefTypes, structureTypes) : {};
+  const paid = vassal && taxes ? fiefsTaxes(fiefs, taxes.settings, types, structureTypes, eco) : {};
   const monthly: Record<string, number> = {};
   for (const [r, n] of Object.entries(paid)) monthly[r] = (monthly[r] ?? 0) - n;
   if (taxes?.isRuler) for (const [r, n] of Object.entries(taxes.received)) monthly[r] = (monthly[r] ?? 0) + n;
   for (const u of upkeep) monthly[u.resource_id] = (monthly[u.resource_id] ?? 0) - u.army - u.dragons;
   for (const f of fiefs) {
-    for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
+    const rows = fiefTypeRows(f, types, eco);
+    for (const a of rows.incomes) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
+    for (const a of rows.upkeep) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) - a.amount;
     for (const s of f.structures) {
       const t = structureTypes.find((x) => x.id === s.structure_type_id);
       for (const a of t?.incomes ?? []) monthly[a.resource_id] = (monthly[a.resource_id] ?? 0) + a.amount;
@@ -139,7 +161,9 @@ export default function HouseEconomy({
   // da dove arriva ogni mese: per feudo, tipo di feudo + strutture - mantenimento
   const fiefMonthly = (f: EcoFief) => {
     const m: Record<string, number> = {};
-    for (const a of fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []) m[a.resource_id] = (m[a.resource_id] ?? 0) + a.amount;
+    const rows = fiefTypeRows(f, types, eco);
+    for (const a of rows.incomes) m[a.resource_id] = (m[a.resource_id] ?? 0) + a.amount;
+    for (const a of rows.upkeep) m[a.resource_id] = (m[a.resource_id] ?? 0) - a.amount;
     for (const s of f.structures) {
       const t = structureTypes.find((x) => x.id === s.structure_type_id);
       for (const a of t?.incomes ?? []) m[a.resource_id] = (m[a.resource_id] ?? 0) + a.amount;
@@ -233,6 +257,8 @@ export default function HouseEconomy({
       <ul className="space-y-3">
         {fiefs.map((f) => {
           const type = fiefTypes.find((t) => t.id === f.fief_type_id);
+          const type2 = f.fief_type2_id ? fiefTypes.find((t) => t.id === f.fief_type2_id) : undefined;
+          const rows = fiefTypeRows(f, types, eco);
           const cap = CAPACITY[f.size];
           const counts = new Map<string, number>();
           for (const s of f.structures) counts.set(s.structure_type_id, (counts.get(s.structure_type_id) ?? 0) + 1);
@@ -241,7 +267,8 @@ export default function HouseEconomy({
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <h3 className="font-serif text-lg text-accent">{f.name}</h3>
                 <span className="text-xs text-muted">
-                  {type?.name ?? "senza tipo"} · feudo {f.size}
+                  {type?.name ?? "senza tipo"}
+                  {type2 && ` + ${type2.name} (secondario)`} · feudo {f.size}
                   {f.location && ` · ${f.location.name}`}
                 </span>
                 <span className="ml-auto text-right text-sm">
@@ -253,12 +280,15 @@ export default function HouseEconomy({
                 </span>
               </div>
               {f.description && <p className="mt-1 text-sm whitespace-pre-line text-muted">{f.description}</p>}
-              {type && <p className="mt-1 text-xs text-muted">Rende ogni mese: {text(type.incomes)}</p>}
+              {(type || type2) && <p className="mt-1 text-xs text-muted">Rende ogni mese: {text(sumAmounts(rows.incomes))}</p>}
+              {rows.upkeep.length > 0 && <p className="text-xs text-muted">Mantenimento del feudo: {text(sumAmounts(rows.upkeep))} al mese</p>}
               {vassal && taxes && <p className="text-xs text-muted">Tasse: {fiefTaxPct(f, taxes.settings)}% di ciò che produce</p>}
               <StructureSlots
                 fief={f}
                 cap={cap}
                 structureTypes={structureTypes}
+                allowed={allowed}
+                fiefTypes={fiefTypes}
                 treasury={treasury}
                 builderId={builderId}
                 busy={busy}
@@ -330,6 +360,8 @@ function StructureSlots({
   fief,
   cap,
   structureTypes,
+  allowed,
+  fiefTypes,
   treasury,
   builderId,
   busy,
@@ -340,6 +372,8 @@ function StructureSlots({
   fief: EcoFief;
   cap: number;
   structureTypes: EcoStructureType[];
+  allowed: { structure_type_id: string; fief_type_id: string }[];
+  fiefTypes: EcoFiefType[];
   treasury: Record<string, number> | null;
   builderId: string | null;
   busy: boolean;
@@ -351,6 +385,21 @@ function StructureSlots({
   const free = Math.max(0, cap - fief.structures.length);
   const built = new Set(fief.structures.map((s) => s.structure_type_id));
   const lacks = (t: EcoStructureType) => !!treasury && t.costs.some((c) => (treasury[c.resource_id] ?? 0) < c.amount);
+  // strutture che si costruiscono solo in certi tipi di feudo (es. Porto: Costiero)
+  const onlyIn = (t: EcoStructureType) => allowed.filter((a) => a.structure_type_id === t.id).map((a) => a.fief_type_id);
+  const forbidden = (t: EcoStructureType) => {
+    const list = onlyIn(t);
+    return list.length > 0 && !list.includes(fief.fief_type_id ?? "") && !list.includes(fief.fief_type2_id ?? "");
+  };
+  const typeNames = (ids: string[]) => ids.map((id) => fiefTypes.find((x) => x.id === id)?.name ?? "?").join(", ");
+  // raggruppate per categoria, nell'ordine in cui compaiono
+  const groups: { name: string; list: EcoStructureType[] }[] = [];
+  for (const t of structureTypes) {
+    const name = t.category?.trim() || "";
+    const g = groups.find((x) => x.name === name);
+    if (g) g.list.push(t);
+    else groups.push({ name, list: [t] });
+  }
   return (
     <div className="mt-2 space-y-2">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -387,19 +436,25 @@ function StructureSlots({
         <div className="space-y-2 border border-accent/40 bg-black/40 p-2">
           <p className="text-xs tracking-wide text-muted uppercase">Scegli che cosa costruire a {fief.name}</p>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {structureTypes.map((t) => {
+            {groups.map((g) => (
+              <Fragment key={g.name || "-"}>
+            {g.name && groups.length > 1 && (
+              <li className="pt-1 text-xs tracking-[0.12em] text-accent/80 uppercase sm:col-span-2">{g.name}</li>
+            )}
+            {g.list.map((t) => {
               const already = built.has(t.id);
-              const poor = !already && lacks(t);
+              const notHere = !already && forbidden(t);
+              const poor = !already && !notHere && lacks(t);
               return (
                 <li key={t.id}>
                   <button
                     type="button"
-                    disabled={busy || already || poor}
+                    disabled={busy || already || poor || notHere}
                     onClick={() => {
                       setPicking(false);
                       onBuild(t.id);
                     }}
-                    title={already ? "C'è già in questo feudo: non se ne può costruire una seconda" : poor ? "Il tesoro della casata non basta" : `Costruisci ${t.name}`}
+                    title={already ? "C'è già in questo feudo: non se ne può costruire una seconda" : notHere ? `Si costruisce solo nei feudi di tipo ${typeNames(onlyIn(t))}` : poor ? "Il tesoro della casata non basta" : `Costruisci ${t.name}`}
                     className="flex w-full gap-2 rounded border border-border bg-black/50 p-1.5 text-left transition enabled:hover:border-accent disabled:opacity-45"
                   >
                     <span className="w-16 shrink-0">
@@ -413,11 +468,14 @@ function StructureSlots({
                       {(t.attack || t.defense) ? <span className="block text-muted">ATT {t.attack} · DIF {t.defense}</span> : null}
                       {already && <span className="block text-amber-200">Già nel feudo</span>}
                       {poor && <span className="block text-red-400">Tesoro insufficiente</span>}
+                      {notHere && <span className="block text-amber-200">Solo nei feudi di tipo {typeNames(onlyIn(t))}</span>}
                     </span>
                   </button>
                 </li>
               );
             })}
+              </Fragment>
+            ))}
           </ul>
         </div>
       )}

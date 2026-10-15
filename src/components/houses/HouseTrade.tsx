@@ -23,7 +23,7 @@ type Route = {
   created_at: string;
 };
 type House = { id: string; name: string; playable: boolean };
-type Resource = { id: string; name: string };
+type Resource = { id: string; name: string; tradable?: boolean };
 
 const STATUS_LABEL: Record<Route["status"], string> = {
   proposta: "In attesa",
@@ -336,9 +336,11 @@ function OfferForm({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [to, setTo] = useState("");
-  const [give, setGive] = useState(resources[0]?.id ?? "");
+  // solo le risorse commerciabili (la Manodopera no: Gestione -> Economia -> Risorse)
+  const tradable = resources.filter((r) => r.tradable !== false);
+  const [give, setGive] = useState(tradable[0]?.id ?? "");
   const [giveAmount, setGiveAmount] = useState("10");
-  const [want, setWant] = useState(resources[1]?.id ?? "");
+  const [want, setWant] = useState(tradable[1]?.id ?? "");
   const [wantAmount, setWantAmount] = useState("10");
   const [duration, setDuration] = useState("3");
   const [note, setNote] = useState("");
@@ -366,7 +368,7 @@ function OfferForm({
   }
 
   const label = "block space-y-1 text-xs tracking-wide text-muted uppercase";
-  const options = resources.map((r) => (
+  const options = tradable.map((r) => (
     <option key={r.id} value={r.id}>
       {r.name}
     </option>

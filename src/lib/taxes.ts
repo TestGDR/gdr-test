@@ -1,5 +1,7 @@
 // Tasse delle casate feudatarie alla casata regnante: stesso calcolo del
-// database (migrazione 0064), per mostrarlo prima del 1 del mese.
+// database (migrazioni 0064 e 0155), per mostrarlo prima del 1 del mese.
+
+import { DEFAULT_ECONOMY, fiefTypeRows, type EconomySettings } from "./fief-income";
 
 export type TaxSettings = {
   ruling_house_id: string | null;
@@ -11,7 +13,12 @@ export type TaxSettings = {
 };
 
 type Amount = { resource_id: string; amount: number };
-type FiefLike = { size: "piccolo" | "medio" | "grande"; fief_type_id: string | null; structures: { structure_type_id: string }[] };
+type FiefLike = {
+  size: "piccolo" | "medio" | "grande";
+  fief_type_id: string | null;
+  fief_type2_id?: string | null;
+  structures: { structure_type_id: string }[];
+};
 
 // percentuale di un feudo: grandezza + una quota per struttura, fino al massimo
 export function fiefTaxPct(f: FiefLike, s: TaxSettings) {
@@ -24,14 +31,15 @@ export function fiefTaxPct(f: FiefLike, s: TaxSettings) {
 export function fiefsTaxes(
   fiefs: FiefLike[],
   s: TaxSettings,
-  fiefTypes: { id: string; incomes: Amount[] }[],
+  fiefTypes: { id: string; incomes: Amount[]; upkeep?: Amount[] }[],
   structureTypes: { id: string; incomes: Amount[] }[],
+  eco: EconomySettings = DEFAULT_ECONOMY,
 ) {
   const out: Record<string, number> = {};
   for (const f of fiefs) {
     const pct = fiefTaxPct(f, s);
     const rows = [
-      ...(fiefTypes.find((t) => t.id === f.fief_type_id)?.incomes ?? []),
+      ...fiefTypeRows(f, fiefTypes, eco).incomes,
       ...f.structures.flatMap((st) => structureTypes.find((t) => t.id === st.structure_type_id)?.incomes ?? []),
     ];
     for (const r of rows) {

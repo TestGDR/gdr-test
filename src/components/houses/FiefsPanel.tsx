@@ -67,7 +67,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
     const [fiefs, fiefTypes, structureTypes, resources, treasury] = await Promise.all([
       supabase
         .from("fiefs")
-        .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
+        .select("*, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
         .eq("house_id", house.id)
         .order("name"),
       supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),
@@ -76,7 +76,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
         .select("*, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
         .order("sort_order")
         .order("name"),
-      supabase.from("resources").select("id, name").order("sort_order").order("name"),
+      supabase.from("resources").select("*").order("sort_order").order("name"),
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", house.id),
     ]);
     const role = me.house_role as unknown as { can_build: boolean } | null;

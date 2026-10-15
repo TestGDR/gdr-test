@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_ECONOMY, fiefTypeRows, sumAmounts, type EconomySettings } from "@/lib/fief-income";
 import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 
 // ---------------------------------------------------------------------
@@ -12,14 +13,17 @@ import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
 
 export type HouseLite = { id: string; name: string; playable: boolean };
 export type PlaceLite = { id: string; name: string };
-type Resource = { id: string; name: string; description: string; sort_order: number };
+type Resource = { id: string; name: string; description: string; sort_order: number; tradable?: boolean };
 type Amount = { resource_id: string; amount: number };
-type FiefType = { id: string; name: string; description: string; sort_order: number; incomes: Amount[] };
+// introiti e mantenimento sono quelli del feudo piccolo (medio e grande li moltiplicano)
+type FiefType = { id: string; name: string; description: string; sort_order: number; incomes: Amount[]; upkeep: Amount[] };
 type StructureType = {
   id: string;
   name: string;
   description: string;
   image_url?: string | null;
+  category?: string; // solo per raggrupparle
+  allowed: string[]; // tipi di feudo in cui si costruisce (vuoto = ovunque)
   sort_order: number;
   attack: number;
   defense: number;
@@ -32,6 +36,7 @@ type Fief = {
   name: string;
   house_id: string;
   fief_type_id: string | null;
+  fief_type2_id?: string | null; // secondo tipo (conta in parte)
   size: "piccolo" | "medio" | "grande";
   location_id: string | null;
   description: string;
@@ -61,6 +66,7 @@ function useCatalog() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [fiefTypes, setFiefTypes] = useState<FiefType[]>([]);
   const [structures, setStructures] = useState<StructureType[]>([]);
+  const [eco, setEco] = useState<EconomySettings | null>(null); // null: migrazione 0155 non ancora eseguita
   const [version, setVersion] = useState(0);
   useEffect(() => {
     Promise.all([
@@ -71,13 +77,25 @@ function useCatalog() {
         .select("*, costs:structure_costs(resource_id, amount), incomes:structure_incomes(resource_id, amount), upkeep:structure_upkeep(resource_id, amount)")
         .order("sort_order")
         .order("name"),
-    ]).then(([r, f, s]) => {
+      // tabelle della migrazione 0155: se mancano restano vuote
+      supabase.from("fief_type_upkeep").select("fief_type_id, resource_id, amount"),
+      supabase.from("structure_fief_types").select("structure_type_id, fief_type_id"),
+      supabase.from("economy_settings").select("medium_factor, large_factor, secondary_factor").maybeSingle(),
+    ]).then(([r, f, s, u, a, e]) => {
+      const upkeep = (u.data ?? []) as (Amount & { fief_type_id: string })[];
+      const allowed = (a.data ?? []) as { structure_type_id: string; fief_type_id: string }[];
       setResources((r.data ?? []) as Resource[]);
-      setFiefTypes((f.data ?? []) as FiefType[]);
-      setStructures((s.data ?? []) as StructureType[]);
+      setFiefTypes(((f.data ?? []) as FiefType[]).map((t) => ({ ...t, upkeep: upkeep.filter((x) => x.fief_type_id === t.id) })));
+      setStructures(
+        ((s.data ?? []) as StructureType[]).map((t) => ({
+          ...t,
+          allowed: allowed.filter((x) => x.structure_type_id === t.id).map((x) => x.fief_type_id),
+        })),
+      );
+      setEco(e.error ? null : ((e.data as EconomySettings | null) ?? DEFAULT_ECONOMY));
     });
   }, [supabase, version]);
-  return { supabase, resources, fiefTypes, structures, reload: () => setVersion((v) => v + 1) };
+  return { supabase, resources, fiefTypes, structures, eco, reload: () => setVersion((v) => v + 1) };
 }
 
 export default function EconomyManager({ houses, places }: { houses: HouseLite[]; places: PlaceLite[] }) {
@@ -196,7 +214,8 @@ function ResourcesTab({ supabase, resources, reload }: Cat) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Le risorse delle casate (es. oro, legname, ferro, grano, cavalli). Servono per costruire strutture e, in seguito, eserciti e navi.
+        Le risorse delle casate (es. oro, legname, ferro, grano, cavalli). Servono per costruire strutture, addestrare e mantenere
+        eserciti. Le risorse non commerciabili (es. Manodopera) non si possono scambiare nelle tratte commerciali.
       </p>
       <div className="flex flex-wrap gap-2">
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nuova risorsa" className="input max-w-xs py-1.5" />
@@ -219,9 +238,14 @@ function ResourceRow({ r, supabase, reload }: { r: Resource; supabase: Cat["supa
   const [name, setName] = useState(r.name);
   const [description, setDescription] = useState(r.description);
   const [order, setOrder] = useState(String(r.sort_order));
+  const [tradable, setTradable] = useState(r.tradable !== false);
   const [err, setErr] = useState<string | null>(null);
   async function save() {
-    const { error } = await supabase.from("resources").update({ name: name.trim(), description, sort_order: Number(order) || 0 }).eq("id", r.id);
+    const { error } = await supabase
+      .from("resources")
+      // "commerciabile" esiste dalla migrazione 0155
+      .update({ name: name.trim(), description, sort_order: Number(order) || 0, ...(r.tradable !== undefined ? { tradable } : {}) })
+      .eq("id", r.id);
     setErr(error ? "Non salvata." : null);
     if (!error) reload();
   }
@@ -235,6 +259,12 @@ function ResourceRow({ r, supabase, reload }: { r: Resource; supabase: Cat["supa
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} className="input w-44! py-1" aria-label="Nome" />
       <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrizione" className="input min-w-40 flex-1 py-1" aria-label="Descrizione" />
       <input type="number" value={order} onChange={(e) => setOrder(e.target.value)} className="input w-20! py-1" aria-label="Ordine" title="Ordine" />
+      {r.tradable !== undefined && (
+        <label className="flex items-center gap-1.5 text-xs text-muted" title="Si può scambiare nelle tratte commerciali">
+          <input type="checkbox" checked={tradable} onChange={(e) => setTradable(e.target.checked)} />
+          commerciabile
+        </label>
+      )}
       <button type="button" onClick={save} className="btn px-3 py-1 text-xs">
         Salva
       </button>
@@ -248,19 +278,23 @@ function ResourceRow({ r, supabase, reload }: { r: Resource; supabase: Cat["supa
 
 // ---------------------------------------------------------------------
 // Tipi di feudo (introiti mensili)
-function FiefTypesTab({ supabase, resources, fiefTypes, reload }: Cat) {
+function FiefTypesTab({ supabase, resources, fiefTypes, eco, reload }: Cat) {
   const [editing, setEditing] = useState<FiefType | "new" | null>(null);
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Ogni tipo di feudo (es. Castello, Borgo agricolo, Miniera, Porto) dà alla sua casata degli introiti di risorse ogni 1° del mese.
+        Ogni tipo di feudo (es. Agricolo, Militare, Costiero) dà alla sua casata degli introiti di risorse ogni 1° del mese e può avere un
+        mantenimento. I valori che scrivi sono quelli del <strong>feudo piccolo</strong>: medio e grande li moltiplicano. Un feudo può
+        avere anche un secondo tipo, che conta in parte.
       </p>
+      {eco ? <EconomyFactors supabase={supabase} eco={eco} reload={reload} /> : <p className="text-xs text-amber-200">Per grandezze, secondo tipo e mantenimento serve la migrazione 0155.</p>}
       {editing ? (
         <TypeEditor
           title={editing === "new" ? "Nuovo tipo di feudo" : editing.name}
           initial={editing === "new" ? null : editing}
           resources={resources}
           withCosts={false}
+          withUpkeep={!!eco}
           onCancel={() => setEditing(null)}
           onSave={async (row, lists) => {
             const { data, error } =
@@ -270,6 +304,7 @@ function FiefTypesTab({ supabase, resources, fiefTypes, reload }: Cat) {
             if (error || !data) return "Tipo non salvato (forse il nome esiste già).";
             const e2 = await replaceAmounts(supabase, "fief_type_incomes", "fief_type_id", data.id, lists.incomes);
             if (e2) return "Introiti non salvati.";
+            if (eco && (await replaceAmounts(supabase, "fief_type_upkeep", "fief_type_id", data.id, lists.upkeep))) return "Mantenimento non salvato.";
             setEditing(null);
             reload();
             return null;
@@ -288,8 +323,16 @@ function FiefTypesTab({ supabase, resources, fiefTypes, reload }: Cat) {
               {t.description && <span className="block text-xs text-muted">{t.description}</span>}
             </span>
             <span className="text-sm">
-              <span className="text-xs text-muted">Introiti al mese: </span>
-              {amountsText(resources, t.incomes)}
+              <span className="block">
+                <span className="text-xs text-muted">Introiti al mese (piccolo): </span>
+                {amountsText(resources, t.incomes)}
+              </span>
+              {t.upkeep.length > 0 && (
+                <span className="block">
+                  <span className="text-xs text-muted">Mantenimento (piccolo): </span>
+                  {amountsText(resources, t.upkeep)}
+                </span>
+              )}
             </span>
             <button type="button" onClick={() => setEditing(t)} className="text-xs text-muted hover:text-accent">
               Modifica
@@ -313,22 +356,96 @@ function FiefTypesTab({ supabase, resources, fiefTypes, reload }: Cat) {
   );
 }
 
+// Grandezza del feudo e secondo tipo: quanto contano introiti e mantenimento
+function EconomyFactors({ supabase, eco, reload }: { supabase: Cat["supabase"]; eco: EconomySettings; reload: () => void }) {
+  const [v, setV] = useState({
+    medium_factor: String(eco.medium_factor),
+    large_factor: String(eco.large_factor),
+    secondary_factor: String(eco.secondary_factor),
+  });
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const num = (x: string) => Number(x.replace(",", "."));
+  const bad =
+    !(num(v.medium_factor) >= 0 && num(v.medium_factor) <= 10) ||
+    !(num(v.large_factor) >= 0 && num(v.large_factor) <= 10) ||
+    !(num(v.secondary_factor) >= 0 && num(v.secondary_factor) <= 1);
+  // esempio: 10 di una risorsa nel feudo piccolo
+  const example = (size: "medio" | "grande") =>
+    sumAmounts(
+      fiefTypeRows({ size, fief_type_id: "x" }, [{ id: "x", incomes: [{ resource_id: "r", amount: 10 }] }], {
+        medium_factor: num(v.medium_factor),
+        large_factor: num(v.large_factor),
+        secondary_factor: num(v.secondary_factor),
+      }).incomes,
+    )[0]?.amount ?? 0;
+  async function save() {
+    const { error } = await supabase
+      .from("economy_settings")
+      .update({ medium_factor: num(v.medium_factor), large_factor: num(v.large_factor), secondary_factor: num(v.secondary_factor) })
+      .eq("id", true);
+    setMsg(error ? { ok: false, text: "Non salvato." } : { ok: true, text: "Salvato: vale dal prossimo 1° del mese." });
+    if (!error) reload();
+  }
+  return (
+    <div className="flex flex-wrap items-end gap-3 border border-dashed border-border p-3">
+      {(
+        [
+          ["medium_factor", "Feudo medio ×"],
+          ["large_factor", "Feudo grande ×"],
+          ["secondary_factor", "Secondo tipo ×"],
+        ] as const
+      ).map(([k, label]) => (
+        <Field key={k} label={label}>
+          <input inputMode="decimal" value={v[k]} onChange={(e) => setV((x) => ({ ...x, [k]: e.target.value }))} className="input w-24! py-1.5" />
+        </Field>
+      ))}
+      <button type="button" disabled={bad} onClick={save} className="btn px-4 py-1.5 text-sm">
+        Salva
+      </button>
+      <span className="text-xs text-muted">
+        Esempio: 10 nel piccolo → {example("medio")} nel medio, {example("grande")} nel grande. Il secondo tipo conta per{" "}
+        {Math.round(num(v.secondary_factor) * 100) || 0}%.
+      </span>
+      {bad && <span className="text-xs text-red-400">Grandezze da 0 a 10, secondo tipo da 0 a 1 (es. 0,5).</span>}
+      <Msg msg={msg} />
+    </div>
+  );
+}
+
 // Modulo comune per tipi di feudo e strutture
 function TypeEditor({
   title,
   initial,
   resources,
   withCosts,
+  withUpkeep = withCosts,
+  categories,
+  fiefTypes,
   onSave,
   onCancel,
 }: {
   title: string;
-  initial: { name: string; description: string; sort_order: number; incomes: Amount[]; costs?: Amount[]; upkeep?: Amount[]; attack?: number; defense?: number; image_url?: string | null } | null;
+  initial: {
+    name: string;
+    description: string;
+    sort_order: number;
+    incomes: Amount[];
+    costs?: Amount[];
+    upkeep?: Amount[];
+    attack?: number;
+    defense?: number;
+    image_url?: string | null;
+    category?: string;
+    allowed?: string[];
+  } | null;
   resources: Resource[];
   withCosts: boolean; // strutture: costo, mantenimento, attacco e difesa
+  withUpkeep?: boolean; // tipi di feudo: anche il mantenimento
+  categories?: string[]; // strutture: categorie gia' usate (migrazione 0155)
+  fiefTypes?: { id: string; name: string }[]; // strutture: dove si possono costruire
   onSave: (
-    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number; image_url?: string | null },
-    lists: { incomes: Amount[]; costs: Amount[]; upkeep: Amount[] },
+    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number; image_url?: string | null; category?: string },
+    lists: { incomes: Amount[]; costs: Amount[]; upkeep: Amount[]; allowed: string[] },
   ) => Promise<string | null>;
   onCancel: () => void;
 }) {
@@ -341,6 +458,8 @@ function TypeEditor({
   const [attack, setAttack] = useState(String(initial?.attack ?? 0));
   const [defense, setDefense] = useState(String(initial?.defense ?? 0));
   const [image, setImage] = useState(initial?.image_url ?? "");
+  const [category, setCategory] = useState(initial?.category ?? "");
+  const [allowed, setAllowed] = useState<string[]>(initial?.allowed ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -376,7 +495,43 @@ function TypeEditor({
           </Field>
         </div>
       )}
-      <div className={`grid gap-4 ${withCosts ? "sm:grid-cols-3" : ""}`}>
+      {withCosts && categories && (
+        <div className="flex flex-wrap gap-3">
+          <Field label="Categoria (per raggrupparle)">
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              list="categorie-strutture"
+              maxLength={40}
+              placeholder="es. Produzione, Militari"
+              className="input w-64! py-1.5"
+            />
+            <datalist id="categorie-strutture">
+              {categories.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </Field>
+          {fiefTypes && fiefTypes.length > 0 && (
+            <div className="space-y-1">
+              <span className="block text-xs tracking-wide text-muted uppercase">Si costruisce solo nei feudi (nessuno = ovunque)</span>
+              <span className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {fiefTypes.map((t) => (
+                  <label key={t.id} className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={allowed.includes(t.id)}
+                      onChange={(e) => setAllowed((a) => (e.target.checked ? [...a, t.id] : a.filter((x) => x !== t.id)))}
+                    />
+                    {t.name}
+                  </label>
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      <div className={`grid gap-4 ${withCosts ? "sm:grid-cols-3" : withUpkeep ? "sm:grid-cols-2" : ""}`}>
         {withCosts && (
           <div className="space-y-1">
             <p className="text-xs tracking-wide text-muted uppercase">Costo di costruzione</p>
@@ -384,12 +539,12 @@ function TypeEditor({
           </div>
         )}
         <div className="space-y-1">
-          <p className="text-xs tracking-wide text-muted uppercase">{withCosts ? "Entrate al mese (facoltative)" : "Introiti al mese"}</p>
+          <p className="text-xs tracking-wide text-muted uppercase">{withCosts ? "Entrate al mese (facoltative)" : "Introiti al mese (feudo piccolo)"}</p>
           <AmountsEditor resources={resources} value={incomes} onChange={setIncomes} />
         </div>
-        {withCosts && (
+        {withUpkeep && (
           <div className="space-y-1">
-            <p className="text-xs tracking-wide text-muted uppercase">Mantenimento al mese (facoltativo)</p>
+            <p className="text-xs tracking-wide text-muted uppercase">{withCosts ? "Mantenimento al mese (facoltativo)" : "Mantenimento al mese (feudo piccolo, facoltativo)"}</p>
             <AmountsEditor resources={resources} value={upkeep} onChange={setUpkeep} />
           </div>
         )}
@@ -414,7 +569,10 @@ function TypeEditor({
                   ...(img || initial?.image_url ? { image_url: img || null } : {}),
                 }
               : {};
-            const err = await onSave({ name: name.trim(), description, sort_order: Number(order) || 0, ...stats }, { incomes, costs, upkeep });
+            const err = await onSave(
+              { name: name.trim(), description, sort_order: Number(order) || 0, ...stats, ...(withCosts && categories ? { category: category.trim() } : {}) },
+              { incomes, costs, upkeep, allowed },
+            );
             setBusy(false);
             setError(err);
           }}
@@ -432,8 +590,17 @@ function TypeEditor({
 
 // ---------------------------------------------------------------------
 // Strutture (costo e introiti extra)
-function StructuresTab({ supabase, resources, structures, reload }: Cat) {
+function StructuresTab({ supabase, resources, structures, fiefTypes, eco, reload }: Cat) {
   const [editing, setEditing] = useState<StructureType | "new" | null>(null);
+  const categories = [...new Set(structures.map((t) => t.category?.trim() ?? "").filter(Boolean))];
+  // raggruppate per categoria, nell'ordine in cui compaiono
+  const groups: { name: string; list: StructureType[] }[] = [];
+  for (const t of structures) {
+    const name = t.category?.trim() || "";
+    const g = groups.find((x) => x.name === name);
+    if (g) g.list.push(t);
+    else groups.push({ name, list: [t] });
+  }
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
@@ -446,6 +613,8 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
           initial={editing === "new" ? null : editing}
           resources={resources}
           withCosts
+          categories={eco ? categories : undefined}
+          fiefTypes={eco ? fiefTypes : undefined}
           onCancel={() => setEditing(null)}
           onSave={async (row, lists) => {
             const { data, error } =
@@ -456,6 +625,13 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
             if (await replaceAmounts(supabase, "structure_costs", "structure_type_id", data.id, lists.costs)) return "Costi non salvati.";
             if (await replaceAmounts(supabase, "structure_incomes", "structure_type_id", data.id, lists.incomes)) return "Entrate non salvate.";
             if (await replaceAmounts(supabase, "structure_upkeep", "structure_type_id", data.id, lists.upkeep)) return "Mantenimento non salvato.";
+            if (eco) {
+              const del = await supabase.from("structure_fief_types").delete().eq("structure_type_id", data.id);
+              const ins = lists.allowed.length
+                ? await supabase.from("structure_fief_types").insert(lists.allowed.map((id) => ({ structure_type_id: data.id, fief_type_id: id })))
+                : { error: null };
+              if (del.error || ins.error) return "Tipi di feudo non salvati.";
+            }
             setEditing(null);
             reload();
             return null;
@@ -466,8 +642,11 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
           + Nuova struttura
         </button>
       )}
+      {groups.map((g) => (
+      <div key={g.name || "-"} className="space-y-1">
+      {g.name && <h3 className="font-serif text-lg text-accent">{g.name}</h3>}
       <ul className="divide-y divide-border/60 border border-border/60">
-        {structures.map((t) => (
+        {g.list.map((t) => (
           <li key={t.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
             {t.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -495,6 +674,11 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
                 {t.attack} <span className="text-xs text-muted">· Difesa </span>
                 {t.defense}
               </span>
+              {t.allowed.length > 0 && (
+                <span className="block text-xs text-amber-200">
+                  Solo nei feudi: {t.allowed.map((id) => fiefTypes.find((x) => x.id === id)?.name ?? "?").join(", ")}
+                </span>
+              )}
             </span>
             <button type="button" onClick={() => setEditing(t)} className="text-xs text-muted hover:text-accent">
               Modifica
@@ -512,15 +696,17 @@ function StructuresTab({ supabase, resources, structures, reload }: Cat) {
             </button>
           </li>
         ))}
-        {structures.length === 0 && <li className="p-3 text-sm text-muted">Nessuna struttura.</li>}
       </ul>
+      </div>
+      ))}
+      {structures.length === 0 && <p className="text-sm text-muted">Nessuna struttura.</p>}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------
 // Feudi
-function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }: Cat & { houses: HouseLite[]; places: PlaceLite[] }) {
+function FiefsTab({ supabase, resources, fiefTypes, structures, eco, houses, places }: Cat & { houses: HouseLite[]; places: PlaceLite[] }) {
   const [fiefs, setFiefs] = useState<Fief[] | null>(null);
   const [house, setHouse] = useState("");
   const [editing, setEditing] = useState<Fief | "new" | null>(null);
@@ -570,8 +756,10 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
           houses={houses}
           places={places}
           fiefTypes={fiefTypes}
+          withSecond={!!eco}
           onCancel={() => setEditing(null)}
           onSave={async (row) => {
+            if (row.fief_type2_id && row.fief_type2_id === row.fief_type_id) row = { ...row, fief_type2_id: null };
             const used = editing !== "new" ? editing.structures.length : 0;
             if (used > CAPACITY[row.size]) return `Il feudo ha già ${used} strutture: non può diventare ${row.size}.`;
             const { error } = editing === "new" ? await supabase.from("fiefs").insert(row) : await supabase.from("fiefs").update(row).eq("id", editing.id);
@@ -596,7 +784,8 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
                 <button type="button" onClick={() => setOpenId(openId === f.id ? null : f.id)} className="min-w-48 flex-1 text-left">
                   <span className="font-serif text-accent">{f.name}</span>
                   <span className="block text-xs text-muted">
-                    {h?.name ?? "?"} · feudo {h?.playable ? "PG" : "PNG"} · {type?.name ?? "senza tipo"} · {f.size}
+                    {h?.name ?? "?"} · feudo {h?.playable ? "PG" : "PNG"} · {type?.name ?? "senza tipo"}
+                    {f.fief_type2_id && ` + ${fiefTypes.find((t) => t.id === f.fief_type2_id)?.name ?? "?"} (secondario)`} · {f.size}
                     {f.location_id && ` · ${places.find((p) => p.id === f.location_id)?.name ?? ""}`}
                   </span>
                 </button>
@@ -631,7 +820,15 @@ function FiefsTab({ supabase, resources, fiefTypes, structures, houses, places }
   );
 }
 
-type FiefRow = { name: string; house_id: string; fief_type_id: string | null; size: Fief["size"]; location_id: string | null; description: string };
+type FiefRow = {
+  name: string;
+  house_id: string;
+  fief_type_id: string | null;
+  fief_type2_id?: string | null;
+  size: Fief["size"];
+  location_id: string | null;
+  description: string;
+};
 
 function FiefEditor({
   fief,
@@ -639,6 +836,7 @@ function FiefEditor({
   houses,
   places,
   fiefTypes,
+  withSecond,
   onSave,
   onCancel,
 }: {
@@ -647,6 +845,7 @@ function FiefEditor({
   houses: HouseLite[];
   places: PlaceLite[];
   fiefTypes: FiefType[];
+  withSecond: boolean;
   onSave: (row: FiefRow) => Promise<string | null>;
   onCancel: () => void;
 }) {
@@ -654,6 +853,8 @@ function FiefEditor({
     name: fief?.name ?? "",
     house_id: fief?.house_id ?? defaultHouse,
     fief_type_id: fief?.fief_type_id ?? null,
+    // il secondo tipo esiste dalla migrazione 0155
+    ...(withSecond ? { fief_type2_id: fief?.fief_type2_id ?? null } : {}),
     size: fief?.size ?? "medio",
     location_id: fief?.location_id ?? null,
     description: fief?.description ?? "",
@@ -687,6 +888,20 @@ function FiefEditor({
             ))}
           </select>
         </Field>
+        {withSecond && (
+          <Field label="Secondo tipo (facoltativo, conta in parte)">
+            <select value={row.fief_type2_id ?? ""} onChange={(e) => set({ fief_type2_id: e.target.value || null })} className="input py-1.5">
+              <option value="">— nessuno —</option>
+              {fiefTypes
+                .filter((t) => t.id !== row.fief_type_id)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+        )}
         <Field label="Grandezza">
           <select value={row.size} onChange={(e) => set({ size: e.target.value as Fief["size"] })} className="input py-1.5">
             {SIZES.map((s) => (
@@ -820,7 +1035,7 @@ function FiefStructures({
 
 // ---------------------------------------------------------------------
 // Tasse: casata regnante, percentuali e quanto paghera' ogni feudataria
-function TaxesTab({ supabase, resources, fiefTypes, structures, houses }: Cat & { houses: HouseLite[] }) {
+function TaxesTab({ supabase, resources, fiefTypes, structures, eco, houses }: Cat & { houses: HouseLite[] }) {
   const [settings, setSettings] = useState<TaxSettings | null>(null);
   const [fiefs, setFiefs] = useState<Fief[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -850,7 +1065,9 @@ function TaxesTab({ supabase, resources, fiefTypes, structures, houses }: Cat & 
   const ruler = houses.find((h) => h.id === settings.ruling_house_id);
   const vassals = houses.filter((h) => h.id !== settings.ruling_house_id && fiefs.some((f) => f.house_id === h.id));
   // tasse di ogni feudataria e totale per la regnante (calcolati prima di disegnare)
-  const byHouse = new Map(vassals.map((h) => [h.id, fiefsTaxes(fiefs.filter((f) => f.house_id === h.id), settings, fiefTypes, structures)]));
+  const byHouse = new Map(
+    vassals.map((h) => [h.id, fiefsTaxes(fiefs.filter((f) => f.house_id === h.id), settings, fiefTypes, structures, eco ?? DEFAULT_ECONOMY)]),
+  );
   const totalIn: Record<string, number> = {};
   for (const t of byHouse.values()) for (const [r, n] of Object.entries(t)) totalIn[r] = (totalIn[r] ?? 0) + n;
 

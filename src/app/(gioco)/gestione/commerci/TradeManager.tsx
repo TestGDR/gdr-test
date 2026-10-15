@@ -8,7 +8,7 @@ type House = { id: string; name: string; playable: boolean };
 
 // Lo staff gestisce le tratte per conto di una casata (di solito PNG):
 // stesse funzioni che i giocatori hanno nel pannello Feudo
-export default function TradeManager({ houses, resources }: { houses: House[]; resources: { id: string; name: string }[] }) {
+export default function TradeManager({ houses, resources }: { houses: House[]; resources: { id: string; name: string; tradable?: boolean }[] }) {
   const supabase = useMemo(() => createClient(), []);
   const npc = houses.filter((h) => !h.playable);
   const pc = houses.filter((h) => h.playable);

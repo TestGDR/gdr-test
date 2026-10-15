@@ -35,7 +35,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     // Economia: feudi (li vedono tutti), tesoro (solo i membri: le regole del database), chi puo' costruire
     supabase
       .from("fiefs")
-      .select("id, name, size, fief_type_id, description, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
+      .select("*, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
       .eq("house_id", id)
       .order("name"),
     supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),

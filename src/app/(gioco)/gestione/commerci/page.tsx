@@ -7,7 +7,7 @@ export default async function CommerciPage() {
   const { supabase } = await requirePermission("economia.gestire");
   const [{ data: houses }, { data: resources }] = await Promise.all([
     supabase.from("houses").select("id, name, playable").order("name"),
-    supabase.from("resources").select("id, name").order("sort_order").order("name"),
+    supabase.from("resources").select("*").order("sort_order").order("name"),
   ]);
 
   return (
