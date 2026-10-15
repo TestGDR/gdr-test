@@ -197,7 +197,9 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
             ? "Sei in viaggio: finché non arrivi puoi giocare solo nelle chat di viaggio. Le trovi nel pannello Viaggio (la bussola)."
             : travelBlock === "non_in_viaggio"
               ? "Questa è una chat di viaggio: ci entra solo chi è in viaggio. Per partire usa il pannello Viaggio (la bussola)."
-              : travelBlock === "viaggio_diverso"
+              : travelBlock === "altro_luogo"
+                ? "Il tuo personaggio si trova in un altro luogo: per giocare qui devi prima raggiungerlo con il pannello Viaggio (la bussola). La posizione del PG è scritta nella sua scheda, tra i Dati."
+                : travelBlock === "viaggio_diverso"
                 ? "Questa chat di viaggio non è sul tuo percorso (o è per chi viaggia con un altro mezzo): le tue sono nel pannello Viaggio."
                 : room.access === "casata"
                   ? `Questa è una chat privata della casata ${house?.name ?? ""}: entrano solo i suoi membri e chi viene invitato.`

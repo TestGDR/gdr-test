@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AVAILABILITY, type Availability } from "@/lib/availability";
+import { QuestContext } from "./quest";
 
 const OPTIONS: Availability[] = ["disponibile", "cerca", "occupato"];
 
@@ -16,6 +17,8 @@ export default function AvailabilityDot({
   onChange?: (value: Availability) => void;
   align?: "left" | "right"; // lato verso cui si apre il menu
 }) {
+  // Quest Mode (solo master, moderatori e admin, nel menu del proprio pallino)
+  const quest = useContext(QuestContext);
   // punto dello schermo in cui si apre il menu (null = chiuso)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const open = pos !== null;
@@ -75,7 +78,7 @@ export default function AvailabilityDot({
         title={`${AVAILABILITY[value].label} — clicca per cambiare`}
         aria-label={`Disponibilità: ${AVAILABILITY[value].label}. Cambia`}
         aria-expanded={open}
-        className="-m-1.5 rounded-full p-1.5 hover:bg-white/10"
+        className={`-m-1.5 rounded-full p-1.5 hover:bg-white/10 ${quest?.on ? "ring-1 ring-[#f0c75e]" : ""}`}
       >
         {dot}
       </button>
@@ -107,6 +110,26 @@ export default function AvailabilityDot({
                 {AVAILABILITY[option].label}
               </button>
             ))}
+            {quest?.allowed && (
+              <>
+                <span className="my-1 block border-t border-border" />
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={quest.on}
+                  disabled={quest.busy}
+                  onClick={() => {
+                    quest.toggle();
+                    setPos(null);
+                  }}
+                  title="Entri in qualsiasi chat senza spostare il tuo PG"
+                  className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-blood/25 ${quest.on ? "text-[#f0c75e]" : ""}`}
+                >
+                  <span aria-hidden>{quest.on ? "◆" : "◇"}</span>
+                  Quest Mode {quest.on ? "attiva" : "spenta"}
+                </button>
+              </>
+            )}
           </span>,
           document.body,
         )}

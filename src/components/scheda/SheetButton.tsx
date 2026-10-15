@@ -31,6 +31,7 @@ import Affections from "./Affections";
 import Equipment from "./Equipment";
 import { maritalLabel, VISIBLE_MARKS_MAX } from "@/lib/marital";
 import { PaperRow, PaperSheet } from "./PaperSheet";
+import PositionRow from "./PositionRow";
 import BirthPicker from "./BirthPicker";
 import { CustomFieldRows } from "./CustomFields";
 import PregnancyRow from "./Pregnancy";
@@ -903,6 +904,7 @@ function DataPage({
             label="Ruolo in casata"
             value={character.house_role?.name ?? "—"}
           />
+          <PositionRow characterId={character.id} />
           <PaperRow
             label="Stato civile"
             value={<MaritalValue character={character} />}

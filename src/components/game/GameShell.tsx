@@ -77,6 +77,7 @@ import MessagesModal, { Avatar, type Contact, type MessageKind } from "./Message
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
 import AvailabilityDot from "./AvailabilityDot";
+import { QuestContext, useQuestMode } from "./quest";
 import { usePresence, type OnlinePlayer } from "./presence";
 import { setInvisible } from "@/app/(gioco)/chat/presence-actions";
 import SalaryCollector from "./SalaryCollector";
@@ -277,6 +278,9 @@ export default function GameShell({
   }
 
   // La disponibilita' resta salvata in un cookie (letto dal server al prossimo caricamento)
+  // Quest Mode dello staff (menu della disponibilita')
+  const quest = useQuestMode(userId);
+
   function changeAvailability(value: Availability) {
     document.cookie = `${AVAILABILITY_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`;
     setAvailability(value);
@@ -288,6 +292,7 @@ export default function GameShell({
   }
 
   return (
+    <QuestContext.Provider value={quest}>
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
       <EventsUnseenContext.Provider value={events.unseen}>
@@ -619,6 +624,7 @@ export default function GameShell({
       </EventsUnseenContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
+    </QuestContext.Provider>
   );
 }
 
