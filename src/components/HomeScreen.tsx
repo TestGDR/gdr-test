@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 import AgeRating from "@/components/AgeRating";
 import { LoginButton } from "@/components/auth/LoginPanel";
 import RegisterButton from "@/components/auth/RegisterModal";
+import { getSignupState } from "@/lib/signups";
 import homeBg from "../../public/images/home-bg.jpg";
 import logo from "../../public/images/logo-westeros.png";
 
 // Schermata d'ingresso: la usano la home e la pagina di login (con un avviso
 // facoltativo, es. link scaduto o sessione chiusa per inattivita')
-export default function HomeScreen({ notice }: { notice?: ReactNode }) {
+export default async function HomeScreen({ notice }: { notice?: ReactNode }) {
+  const signups = await getSignupState();
   return (
     <>
       {/* Sfondo a tutto schermo, dietro header e contenuti */}
@@ -39,9 +41,14 @@ export default function HomeScreen({ notice }: { notice?: ReactNode }) {
         {notice && <div className="mt-6 max-w-md">{notice}</div>}
 
         <div className="mt-6 flex justify-center gap-4">
-          <RegisterButton className="btn min-w-32 tracking-widest uppercase" />
+          <RegisterButton className="btn min-w-32 tracking-widest uppercase" disabled={!signups.open} />
           <LoginButton className="btn-ghost min-w-32 tracking-widest uppercase" />
         </div>
+        {!signups.open && (
+          <p className="mt-3 rounded bg-black/60 px-3 py-1 font-serif text-sm tracking-wide text-[#f0c75e]">
+            {signups.message || "Iscrizioni chiuse"}
+          </p>
+        )}
 
         <div className="mt-8">
           <AgeRating />

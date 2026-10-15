@@ -24,6 +24,7 @@ import {
   weaponValues,
 } from "@/lib/rules/combat";
 import {
+  ARMOR_MATERIALS,
   COMBAT,
   type ArmorPart,
   type AttackKind,
@@ -44,6 +45,15 @@ import {
   type Stats,
 } from "@/lib/rules/engine";
 import { currentStamina, hpState, recoveredHp } from "@/lib/rules/hp";
+import {
+  DAMAGE_STYLE,
+  damageTypesOf,
+  materialFactor,
+  qualityBonus,
+  type DamageType,
+  type MaterialModRow,
+  type QualityBonusRow,
+} from "@/lib/rules/quality";
 import { getStaffContext } from "@/lib/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -58,6 +68,9 @@ type ItemRow = {
   id: string;
   name: string;
   kind: string;
+  damage_type: string | null;
+  damage_type_alt: string | null;
+  material: string | null;
   weight_kg: number | null;
   damage: string | null;
   weapon_category: string | null;
@@ -78,12 +91,15 @@ type ItemRow = {
   encumbrance: number;
   ammo_capacity: number | null;
 };
+// Bonus della qualita' gia' scelti per il tipo dell'oggetto (migrazione 0154)
 type Quality = {
   hit_bonus: number;
   damage_bonus: number;
   pierce_bonus: number;
   aff_bonus: number;
   sp_bonus: number;
+  parry_bonus: number;
+  enc_bonus: number;
 };
 type Gear = {
   id: string;
@@ -94,6 +110,7 @@ type Gear = {
   loaded: boolean;
   poisoned?: boolean; // arma avvelenata: avvelena al primo colpo che penetra
   reload_progress: number;
+  quality_id: string | null;
   item: ItemRow;
   quality: Quality | null;
 };
@@ -138,6 +155,7 @@ async function loadFighter(admin: Admin, id: string, now: number) {
     { data: gear },
     { data: wounds },
     { data: skills },
+    { data: bonusRows },
   ] = await Promise.all([
     admin.from("characters").select(CHAR_COLS).eq("id", id).maybeSingle(),
     admin
@@ -151,7 +169,7 @@ async function loadFighter(admin: Admin, id: string, now: number) {
     admin
       .from("character_items")
       .select(
-        "id, equipped, aff_current, sp_current, charges, loaded, poisoned, reload_progress, item:items(*), quality:item_qualities(hit_bonus, damage_bonus, pierce_bonus, aff_bonus, sp_bonus)",
+        "id, equipped, aff_current, sp_current, charges, loaded, poisoned, reload_progress, quality_id, item:items(*)",
       )
       .eq("character_id", id),
     admin
@@ -159,8 +177,12 @@ async function loadFighter(admin: Admin, id: string, now: number) {
       .select("id, location, severity, bleed, penalty, mutilated, created_at")
       .eq("character_id", id),
     admin.from("skills").select("id, name, stat"),
+    admin.from("quality_bonuses").select("*"),
   ]);
   if (!c) return null;
+  const qualityRows = (bonusRows ?? []) as QualityBonusRow[];
+  const bonusOf = (g: Gear, damageType?: string | null) =>
+    qualityBonus(g.item, g.quality_id, qualityRows, damageType);
   const ch = c as CharRow;
   const stat = (s: string) => Number(ch.attributes?.[s]) || RULES.statMin;
   const stats = Object.fromEntries(
@@ -180,7 +202,23 @@ async function loadFighter(admin: Admin, id: string, now: number) {
   );
   const d = deriveStats(stats, hpBonus);
   const rec = recoveredHp(ch, d.hp, d.rec, now);
-  const items = ((gear ?? []) as unknown as Gear[]).filter((g) => g.item);
+  const items = ((gear ?? []) as unknown as Gear[])
+    .filter((g) => g.item)
+    .map((g) => {
+      const b = bonusOf(g);
+      return {
+        ...g,
+        quality: {
+          hit_bonus: b.hit,
+          damage_bonus: b.damage,
+          pierce_bonus: b.pierce,
+          aff_bonus: b.aff,
+          sp_bonus: b.sp,
+          parry_bonus: b.parry,
+          enc_bonus: b.encumbrance,
+        },
+      };
+    });
   const equipped = items.filter((g) => g.equipped);
   const armor: Partial<Record<ArmorPart, Gear>> = {};
   for (const g of equipped)
@@ -234,10 +272,16 @@ async function loadFighter(admin: Admin, id: string, now: number) {
     items,
     equipped,
     armor,
+    // ingombro delle armature, ridotto dalla qualita' (mai sopra 0)
     encumbrance: equipped.reduce(
-      (a, g) => a + (g.item.kind === "armatura" ? g.item.encumbrance : 0),
+      (a, g) =>
+        a +
+        (g.item.kind === "armatura"
+          ? Math.min(0, g.item.encumbrance + (g.quality?.enc_bonus ?? 0))
+          : 0),
       0,
     ),
+    bonusOf,
     wounds: w,
     armPenalty: worst(["arm_r", "arm_l"]),
     legPenalty: worst(["leg_r", "leg_l"]),
@@ -477,10 +521,12 @@ async function me(characterId: string) {
   return { user, admin, now, f } as const;
 }
 
-// Arma impugnata: valori con qualita' e chi la tiene; null = mani nude
-function weaponOf(f: Fighter, g: Gear | null) {
+// Arma impugnata: valori con qualita' e chi la tiene; null = mani nude.
+// damageType: come colpisce (es. spada di taglio o in affondo)
+function weaponOf(f: Fighter, g: Gear | null, damageType?: string | null) {
   if (!g) {
     return {
+      damageType: "contundente" as string | null,
       name: "a mani nude",
       skill: f.skillByName(COMBAT.skills.unarmed),
       damage: f.unarmed,
@@ -492,14 +538,11 @@ function weaponOf(f: Fighter, g: Gear | null) {
       dice: diceCount(f.unarmed),
     };
   }
-  const q = g.quality ?? {
-    hit_bonus: 0,
-    damage_bonus: 0,
-    pierce_bonus: 0,
-    aff_bonus: 0,
-    sp_bonus: 0,
-  };
   const isShield = g.item.kind === "scudo";
+  const type = isShield
+    ? "contundente"
+    : (damageType ?? g.item.damage_type ?? null);
+  const b = f.bonusOf(g, isShield ? null : type);
   const damage = (isShield ? g.item.bash_dice : g.item.damage) ?? "1d6";
   const v = weaponValues(
     {
@@ -509,15 +552,16 @@ function weaponOf(f: Fighter, g: Gear | null) {
       pierce: g.item.pierce,
     },
     {
-      hit: q.hit_bonus,
-      damage: q.damage_bonus,
-      pierce: q.pierce_bonus,
-      aff: q.aff_bonus,
-      sp: q.sp_bonus,
+      hit: b.hit,
+      damage: b.damage,
+      pierce: b.pierce,
+      aff: b.aff,
+      sp: b.sp,
     },
     f.stats.body,
   );
   return {
+    damageType: type,
     name: `con ${g.item.name}`,
     skill: isShield
       ? f.skillByName(COMBAT.skills.shieldFree)
@@ -558,6 +602,7 @@ export type AttackOptions = {
   contact?: boolean; // arma a distanza contro un bersaglio a contatto
   mounted?: "cavallo" | "drago" | null;
   charge?: boolean; // carica in sella (effetto da_carica)
+  damageType?: string | null; // armi con due tipi di danno: come colpisce
 };
 
 type AttackData = {
@@ -578,6 +623,7 @@ type AttackData = {
   charge: boolean;
   dice: number;
   attackerName: string;
+  damageType?: string | null; // taglio, perforante, contundente
 };
 
 export async function attack(
@@ -609,7 +655,14 @@ export async function attack(
       error:
         "Puoi attaccare solo con un'arma o uno scudo indossati (Equipaggiamento).",
     };
-  const w = weaponOf(f, g);
+  if (
+    g &&
+    g.item.kind === "arma" &&
+    o.damageType &&
+    !damageTypesOf(g.item).includes(o.damageType as DamageType)
+  )
+    return { error: `${g.item.name} non colpisce in quel modo.` };
+  const w = weaponOf(f, g, o.damageType);
   const shield = f.equipped.find((x) => x.item.kind === "scudo");
   if (g && g.item.kind === "arma" && g.item.hands === "2" && shield)
     return { error: "Un'arma a due mani non si usa con lo scudo." };
@@ -728,6 +781,7 @@ export async function attack(
       charge,
       dice: w.dice,
       attackerName: f.c.name,
+      damageType: w.damageType,
     };
     if (!canDefend) {
       // a terra, incosciente: non puo' difendersi, incassa
@@ -748,8 +802,12 @@ export async function attack(
     pendings.push(row.id as string);
   }
 
+  const style =
+    g && damageTypesOf(g.item).length > 1 && w.damageType
+      ? ` ${DAMAGE_STYLE[w.damageType as DamageType]}`
+      : "";
   const what =
-    `attacca ${t.c.name} ${w.name}` +
+    `attacca ${t.c.name} ${w.name}${style}` +
     (o.kind !== "normal"
       ? ` (attacco ${kindCfg.label.toLowerCase()}${o.aimed ? ` ${locationOf(o.aimed).to}` : ""})`
       : "") +
@@ -863,7 +921,10 @@ async function resolveHit(
     if (shield) {
       // con lo scudo: abilita' dell'arma nell'altra mano (Armi da impatto se libera) + bonus dello scudo
       if (!usable) skill = t.skillByName(COMBAT.skills.shieldFree);
-      mods.push({ label: "scudo", value: shield.item.parry_bonus });
+      mods.push({
+        label: "scudo",
+        value: shield.item.parry_bonus + (shield.quality?.parry_bonus ?? 0),
+      });
       parryGear = shield;
       parryDice = diceCount(shield.item.bash_dice);
     } else {
@@ -953,7 +1014,24 @@ async function resolveHit(
     const sp = piece
       ? (durability(piece.item, piece.quality, piece)?.current ?? 0)
       : 0;
+    // tipo di danno contro il materiale del pezzo colpito
+    let material: { label: string; factor: number } | null = null;
+    if (piece?.item.material && a.damageType) {
+      const { data: mods } = await admin
+        .from("damage_material_mods")
+        .select("damage_type, material, factor");
+      const factor = materialFactor(
+        a.damageType,
+        piece.item.material,
+        (mods ?? []) as MaterialModRow[],
+      );
+      const label =
+        ARMOR_MATERIALS.find((m) => m.id === piece.item.material)?.label ??
+        piece.item.material;
+      material = { label: label.toLowerCase(), factor };
+    }
     const r = resolveDamage({
+      material,
       diceTotal,
       damageBonus: a.damageBonus,
       attackKind: a.kind,
@@ -1550,6 +1628,7 @@ export async function combatStatus(
             poisoned: !!g.poisoned,
             aff: d ? `${d.current}/${d.max}` : null,
             effects: g.item.effects ?? [],
+            damageTypes: g.item.kind === "arma" ? damageTypesOf(g.item) : [],
           };
         }),
     },

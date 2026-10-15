@@ -1,10 +1,16 @@
 "use client";
 
-import { isWoundHealed, woundDaysLeft, woundPenaltyNow } from "@/lib/rules/condition";
+import {
+  isWoundHealed,
+  woundDaysLeft,
+  woundPenaltyNow,
+} from "@/lib/rules/condition";
 import { useGameSettings } from "@/lib/rules/useGameSettings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { durability } from "@/lib/rules/combat";
 import { COMBAT, type ArmorPart } from "@/lib/rules/combat-config";
+import { durabilityBonus, qualityBonus } from "@/lib/rules/quality";
+import { useQualityBonuses } from "@/lib/rules/useQualityBonuses";
 import { createClient } from "@/lib/supabase/client";
 
 type Owned = {
@@ -13,16 +19,13 @@ type Owned = {
   aff_current: number | null;
   sp_current: number | null;
   charges: number | null;
-  quality: {
-    name: string;
-    aff_bonus: number;
-    sp_bonus: number;
-    hit_bonus: number;
-    damage_bonus: number;
-  } | null;
+  quality_id: string | null;
+  quality: { name: string } | null;
   item: {
     name: string;
     kind: string;
+    damage_type: string | null;
+    material: string | null;
     damage: string | null;
     bash_dice: string | null;
     weapon_category: string | null;
@@ -67,6 +70,10 @@ export default function CombatSummary({
   const [wounds, setWounds] = useState<Wound[]>([]);
   const [now, setNow] = useState(0);
   const [canHeal, setCanHeal] = useState(false);
+  const bonusRows = useQualityBonuses();
+  // bonus della qualita' per il tipo dell'oggetto (Gestione -> Oggetti)
+  const bonus = (i: Owned) => qualityBonus(i.item!, i.quality_id, bonusRows);
+  const wear = (i: Owned) => durability(i.item!, durabilityBonus(bonus(i)), i);
 
   const load = useCallback(
     () =>
@@ -74,19 +81,23 @@ export default function CombatSummary({
         supabase
           .from("character_items")
           .select(
-            "id, equipped, aff_current, sp_current, charges, quality:item_qualities(name, aff_bonus, sp_bonus, hit_bonus, damage_bonus), item:items(name, kind, damage, bash_dice, weapon_category, armor_part, aff_max, sp_max, encumbrance, parry_bonus, ammo_type, ammo_capacity)",
+            "id, equipped, aff_current, sp_current, charges, quality_id, quality:item_qualities(name), item:items(name, kind, damage_type, material, damage, bash_dice, weapon_category, armor_part, aff_max, sp_max, encumbrance, parry_bonus, ammo_type, ammo_capacity)",
           )
           .eq("character_id", characterId),
         supabase
           .from("character_wounds")
-          .select("id, location, severity, bleed, penalty, mutilated, created_at")
+          .select(
+            "id, location, severity, bleed, penalty, mutilated, created_at",
+          )
           .eq("character_id", characterId)
           .order("created_at"),
       ]).then(([a, b]) => {
         setItems((a.data ?? []) as unknown as Owned[]);
         // le ferite ormai guarite non si mostrano piu'
         const t = Date.now();
-        setWounds(((b.data ?? []) as Wound[]).filter((w) => !isWoundHealed(w, t)));
+        setWounds(
+          ((b.data ?? []) as Wound[]).filter((w) => !isWoundHealed(w, t)),
+        );
         setNow(t);
       }),
     [supabase, characterId],
@@ -106,7 +117,11 @@ export default function CombatSummary({
     if (i.item!.kind === "armatura" && i.item!.armor_part)
       armor.set(i.item!.armor_part, i);
   const encumbrance = worn.reduce(
-    (a, i) => a + (i.item!.kind === "armatura" ? i.item!.encumbrance : 0),
+    (a, i) =>
+      a +
+      (i.item!.kind === "armatura"
+        ? Math.min(0, i.item!.encumbrance + bonus(i).encumbrance)
+        : 0),
     0,
   );
   const ammo = items.filter((i) => i.item?.kind === "munizione");
@@ -129,13 +144,13 @@ export default function CombatSummary({
           ) : (
             <ul className="space-y-0.5">
               {weapons.map((w) => {
-                const d = durability(w.item!, w.quality, w);
+                const d = wear(w);
                 return (
                   <li key={w.id}>
                     <span className="text-accent">{w.item!.name}</span>{" "}
                     <span className="text-muted">
                       {w.item!.kind === "scudo"
-                        ? `Parare +${w.item!.parry_bonus}`
+                        ? `Parare +${w.item!.parry_bonus + bonus(w).parry}`
                         : w.item!.damage}
                       {w.quality && ` · ${w.quality.name}`}
                       {d && (
@@ -175,7 +190,7 @@ export default function CombatSummary({
           <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {COMBAT.armorParts.map((p) => {
               const a = armor.get(p.id as ArmorPart);
-              const d = a ? durability(a.item!, a.quality, a) : null;
+              const d = a ? wear(a) : null;
               return (
                 <li key={p.id} className="flex justify-between gap-2">
                   <span className="text-muted">{p.label.split(" ")[0]}</span>
@@ -210,7 +225,9 @@ export default function CombatSummary({
                 </span>
                 <span className="text-muted">
                   {loc(w.location)}
-                  {woundPenaltyNow(w, now) ? ` · ${woundPenaltyNow(w, now)} alle prove` : ""}
+                  {woundPenaltyNow(w, now)
+                    ? ` · ${woundPenaltyNow(w, now)} alle prove`
+                    : ""}
                   {woundDaysLeft(w, now) !== null
                     ? ` · guarisce in ${woundDaysLeft(w, now)} ${woundDaysLeft(w, now) === 1 ? "giorno" : "giorni"}`
                     : ""}

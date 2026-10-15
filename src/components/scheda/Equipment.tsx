@@ -30,6 +30,7 @@ export type Item = {
   weapon_category?: "mischia" | "distanza" | null;
   weapon_skill_id?: string | null; // abilita' per attaccare
   damage_type?: string | null;
+  damage_type_alt?: string | null; // secondo modo di colpire (spade: affondo)
   hands?: string | null;
   body_min?: number;
   reach_m?: number | null;

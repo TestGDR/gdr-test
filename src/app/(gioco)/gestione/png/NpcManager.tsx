@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import { loadCatalog, type Skill, type Trait } from "@/lib/rules/catalog";
 import { durability } from "@/lib/rules/combat";
+import { durabilityBonus, qualityBonus } from "@/lib/rules/quality";
+import { useQualityBonuses } from "@/lib/rules/useQualityBonuses";
 import { RULES } from "@/lib/rules/config";
 import { deriveStats, skillLevelCap, type Stats } from "@/lib/rules/engine";
 import { currentHp, hpState, HP_STATE_LABEL } from "@/lib/rules/hp";
@@ -783,10 +785,13 @@ type Owned = {
   equipped: boolean;
   aff_current: number | null;
   sp_current: number | null;
-  quality: { name: string; aff_bonus: number; sp_bonus: number } | null;
+  quality_id: string | null;
+  quality: { name: string } | null;
   item: {
     name: string;
     kind: string;
+    damage_type: string | null;
+    material: string | null;
     damage: string | null;
     aff_max: number | null;
     sp_max: number | null;
@@ -799,6 +804,7 @@ type Owned = {
 function NpcItems({ characterId }: { characterId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<Owned[] | null>(null);
+  const bonusRows = useQualityBonuses();
   const [catalog, setCatalog] = useState<
     { id: string; name: string; kind: string; damage: string | null }[]
   >([]);
@@ -810,7 +816,7 @@ function NpcItems({ characterId }: { characterId: string }) {
       supabase
         .from("character_items")
         .select(
-          "id, equipped, aff_current, sp_current, quality:item_qualities(name, aff_bonus, sp_bonus), item:items(name, kind, damage, aff_max, sp_max, slot_id, slot_group)",
+          "id, equipped, aff_current, sp_current, quality_id, quality:item_qualities(name), item:items(name, kind, damage_type, material, damage, aff_max, sp_max, slot_id, slot_group)",
         )
         .eq("character_id", characterId)
         .order("acquired_at")
@@ -882,7 +888,13 @@ function NpcItems({ characterId }: { characterId: string }) {
       ) : (
         <ul className="space-y-1">
           {items.map((o) => {
-            const wear = o.item ? durability(o.item, o.quality, o) : null;
+            const wear = o.item
+              ? durability(
+                  o.item,
+                  durabilityBonus(qualityBonus(o.item, o.quality_id, bonusRows)),
+                  o,
+                )
+              : null;
             const wearable = !!(o.item?.slot_id || o.item?.slot_group);
             return (
               <li

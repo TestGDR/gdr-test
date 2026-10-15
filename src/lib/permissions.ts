@@ -123,6 +123,11 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
         description:
           "Pulire chat, missive e OFF vecchi ed eliminare gli account inattivi",
       },
+      {
+        key: "iscrizioni.gestire",
+        label: "Iscrizioni",
+        description: "Aprire e chiudere le iscrizioni al sito (pulsante Registrati della home)",
+      },
     ],
   },
   {
@@ -328,6 +333,7 @@ export const MANAGEMENT_PERMISSIONS = [
   "draghi.gestire",
   "utenti.gestire",
   "manutenzione.sito",
+  "iscrizioni.gestire",
   "chat.log",
   "messaggi.log",
 ];

@@ -7,6 +7,7 @@ import { ACCESS_COOKIE, getClientIp, logAccess, type AccessEvent } from "@/lib/a
 import { normalizeCharacterName, validateCharacterName } from "@/lib/character-name";
 import { LEGAL_VERSION } from "@/lib/legal";
 import { sendWelcomeEmail } from "@/lib/mailer";
+import { getSignupState } from "@/lib/signups";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
@@ -84,6 +85,10 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   const characterName = normalizeCharacterName(String(formData.get("character_name") ?? ""));
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+
+  // Iscrizioni chiuse dalla Gestione (le blocca anche il database)
+  const signups = await getSignupState();
+  if (!signups.open) return { error: signups.message ? `Iscrizioni chiuse: ${signups.message}` : "Le iscrizioni sono chiuse." };
 
   // I controlli nel browser si possono aggirare: si ripetono tutti qui
   if (REQUIRED_CONSENTS.some((key) => formData.get(key) !== "on")) {

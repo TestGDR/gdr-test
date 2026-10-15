@@ -107,6 +107,8 @@ export type DamageInput = {
   margin: number;
   extremeRange?: boolean;
   effects?: readonly string[];
+  // tipo di danno contro il materiale dell'armatura (Gestione -> Oggetti)
+  material?: { label: string; factor: number } | null;
 };
 
 export type DamageResult = {
@@ -141,6 +143,13 @@ export function resolveDamage(i: DamageInput): DamageResult {
     base = Math.ceil(base * COMBAT.attackKinds.strong.damageMultiplier);
   if (i.extremeRange) base = Math.ceil(base / 2);
   log.push(`danno ${base}`);
+  // 1b. tipo di danno contro il materiale (es. taglio contro piastre x0,5)
+  if (i.material && i.material.factor !== 1) {
+    base = Math.ceil(base * i.material.factor);
+    log.push(
+      `contro ${i.material.label} ×${i.material.factor.toLocaleString("it-IT")} → ${base}`,
+    );
+  }
   // 2. SP effettivo
   const effectiveSp = Math.max(0, i.armorSp - (i.pierce ?? 0));
   // 3. dopo l'armatura

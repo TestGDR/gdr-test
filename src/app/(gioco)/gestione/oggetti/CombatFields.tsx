@@ -133,6 +133,26 @@ export default function CombatFields({
                 ))}
               </select>
             </label>
+            <label
+              className="block"
+              title="Un secondo modo di colpire, scelto da chi attacca (es. spada: di taglio o in affondo)"
+            >
+              <span className={lbl}>Colpisce anche</span>
+              <select
+                value={v.damage_type_alt ?? ""}
+                onChange={(e) =>
+                  set({ damage_type_alt: e.target.value || null })
+                }
+                className="input w-36! py-1.5"
+              >
+                <option value="">— no —</option>
+                {DAMAGE_TYPES.filter((d) => d.id !== v.damage_type).map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="block">
               <span className={lbl}>Mani</span>
               <select

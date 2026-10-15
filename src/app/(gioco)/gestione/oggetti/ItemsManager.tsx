@@ -13,12 +13,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { importCombatCatalog } from "./actions";
 import CombatFields from "./CombatFields";
+import { MaterialModsTab, QualityBonusTable } from "./QualityBonuses";
 
 const TABS = [
   { id: "oggetti", label: "Oggetti" },
   { id: "assegna", label: "Assegna ai PG" },
   { id: "categorie", label: "Categorie" },
   { id: "qualita", label: "Qualità (fabbro)" },
+  { id: "danni", label: "Danni e armature" },
   { id: "parti", label: "Parti del corpo" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -76,6 +78,7 @@ export default function ItemsManager({
       {tab === "assegna" && <GiveTab slots={slots} items={items} />}
       {tab === "categorie" && <CategoriesTab categories={categories} />}
       {tab === "qualita" && <QualitiesTab qualities={qualities} />}
+      {tab === "danni" && <MaterialModsTab />}
       {tab === "parti" && <SlotsTab slots={slots} />}
     </div>
   );
@@ -1024,24 +1027,7 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
 function QualitiesTab({ qualities }: { qualities: Quality[] }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  type Row = Pick<
-    Quality,
-    | "name"
-    | "upgrade_cost"
-    | "success_pct"
-    | "hit_bonus"
-    | "damage_bonus"
-    | "pierce_bonus"
-    | "aff_bonus"
-    | "sp_bonus"
-  >;
-  const BONUS = [
-    ["hit_bonus", "colpire"],
-    ["damage_bonus", "danno"],
-    ["pierce_bonus", "perf."],
-    ["aff_bonus", "AFF"],
-    ["sp_bonus", "SP"],
-  ] as const;
+  type Row = Pick<Quality, "name" | "upgrade_cost" | "success_pct">;
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [added, setAdded] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
@@ -1050,11 +1036,6 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
       name: q.name,
       upgrade_cost: q.upgrade_cost,
       success_pct: q.success_pct,
-      hit_bonus: q.hit_bonus ?? 0,
-      damage_bonus: q.damage_bonus ?? 0,
-      pierce_bonus: q.pierce_bonus ?? 0,
-      aff_bonus: q.aff_bonus ?? 0,
-      sp_bonus: q.sp_bonus ?? 0,
     };
   const set = (q: Quality, p: Partial<Row>) =>
     setRows((r) => ({ ...r, [q.id]: { ...row(q), ...p } }));
@@ -1063,8 +1044,7 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
     return (
       r.name.trim() !== q.name ||
       r.upgrade_cost !== q.upgrade_cost ||
-      r.success_pct !== q.success_pct ||
-      BONUS.some(([k]) => r[k] !== (q[k] ?? 0))
+      r.success_pct !== q.success_pct
     );
   };
 
@@ -1100,176 +1080,160 @@ function QualitiesTab({ qualities }: { qualities: Quality[] }) {
   }
 
   return (
-    <div className="max-w-3xl space-y-3">
-      <p className="text-sm text-muted">
-        I livelli di qualità degli oggetti, dal più basso al più alto. Gli
-        oggetti nuovi partono dal primo. Per ogni livello: quanto costa al
-        fabbro arrivarci dal livello prima e la probabilità che il lavoro
-        riesca. Se fallisce, il PG perde metà del costo e l&apos;oggetto resta
-        com&apos;era. Il fabbro migliora gli oggetti che si indossano o si
-        impugnano. I bonus valgono in combattimento: al colpire, al danno, al
-        Perforante, all&apos;AFF massima di armi e scudi e all&apos;SP massimo
-        delle armature.
-      </p>
-      <ul className="space-y-1.5">
-        {qualities.map((q, i) => (
-          <li key={q.id} className="flex flex-wrap items-center gap-2">
-            <span className="w-6 text-center text-xs text-muted">{i + 1}</span>
-            <input
-              value={row(q).name}
-              onChange={(e) => set(q, { name: e.target.value })}
-              maxLength={40}
-              aria-label={`Nome del livello ${q.name}`}
-              className="input flex-1 py-1 text-sm"
-            />
-            {i === 0 ? (
-              <span className="w-[13.5rem] text-xs text-muted">
-                livello di partenza
+    <div className="space-y-6">
+      <div className="max-w-3xl space-y-3">
+        <p className="text-sm text-muted">
+          I livelli di qualità degli oggetti, dal più basso al più alto. Gli
+          oggetti nuovi partono dal primo. Per ogni livello: quanto costa al
+          fabbro arrivarci dal livello prima e la probabilità che il lavoro
+          riesca. Se fallisce, il PG perde metà del costo e l&apos;oggetto resta
+          com&apos;era. Il fabbro migliora solo armi, scudi e armature (non
+          gioielli, vestiti o consumabili). Cosa dà ogni livello lo decidi qui
+          sotto, per tipo di oggetto.
+        </p>
+        <ul className="space-y-1.5">
+          {qualities.map((q, i) => (
+            <li key={q.id} className="flex flex-wrap items-center gap-2">
+              <span className="w-6 text-center text-xs text-muted">
+                {i + 1}
               </span>
-            ) : (
-              <>
-                <label className="flex items-center gap-1 text-xs text-muted">
-                  costo
-                  <input
-                    type="number"
-                    min={0}
-                    value={row(q).upgrade_cost}
-                    onChange={(e) =>
-                      set(q, {
-                        upgrade_cost: Math.max(
-                          0,
-                          Math.trunc(Number(e.target.value)) || 0,
-                        ),
-                      })
-                    }
-                    className="input w-20! py-1 text-sm"
-                  />
-                </label>
-                <label className="flex items-center gap-1 text-xs text-muted">
-                  riuscita %
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={row(q).success_pct}
-                    onChange={(e) =>
-                      set(q, {
-                        success_pct: Math.min(
-                          100,
-                          Math.max(1, Math.trunc(Number(e.target.value)) || 1),
-                        ),
-                      })
-                    }
-                    className="input w-16! py-1 text-sm"
-                  />
-                </label>
-              </>
-            )}
-            <span className="flex w-full flex-wrap items-center gap-2 pl-8 text-xs text-muted">
-              bonus:
-              {BONUS.map(([k, l]) => (
-                <label key={k} className="flex items-center gap-1">
-                  {l}
-                  <input
-                    type="number"
-                    min={0}
-                    max={10}
-                    value={row(q)[k] ?? 0}
-                    onChange={(e) =>
-                      set(q, {
-                        [k]: Math.min(
-                          10,
-                          Math.max(0, Math.trunc(Number(e.target.value)) || 0),
-                        ),
-                      })
-                    }
-                    className="input w-14! py-0.5 text-xs"
-                  />
-                </label>
-              ))}
-            </span>
-            <button
-              type="button"
-              disabled={i === 0}
-              onClick={() => move(i, -1)}
-              aria-label="Sposta su"
-              className="btn-ghost px-2 py-1 text-xs disabled:opacity-30"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              disabled={i === qualities.length - 1}
-              onClick={() => move(i, 1)}
-              aria-label="Sposta giù"
-              className="btn-ghost px-2 py-1 text-xs disabled:opacity-30"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              disabled={!row(q).name.trim() || !changed(q)}
-              onClick={() =>
-                run(
-                  supabase
-                    .from("item_qualities")
-                    .update({ ...row(q), name: row(q).name.trim() })
-                    .eq("id", q.id),
-                  "Salvato.",
-                )
-              }
-              className="btn px-2 py-1 text-xs"
-            >
-              Salva
-            </button>
-            <button
-              type="button"
-              disabled={qualities.length <= 1}
-              onClick={() =>
-                window.confirm(
-                  `Eliminare ${q.name}? Gli oggetti di questa qualità tornano al livello più basso.`,
-                ) &&
-                run(
-                  supabase.from("item_qualities").delete().eq("id", q.id),
-                  "Eliminato.",
-                )
-              }
-              className="px-1 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
-            >
-              Elimina
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="flex gap-2">
-        <input
-          value={added}
-          onChange={(e) => setAdded(e.target.value)}
-          maxLength={40}
-          placeholder="Nuovo livello (in fondo)"
-          aria-label="Nuovo livello di qualità"
-          className="input flex-1 py-1.5 text-sm"
-        />
-        <button
-          type="button"
-          disabled={!added.trim()}
-          onClick={() =>
-            run(
-              supabase.from("item_qualities").insert({
-                name: added.trim(),
-                level: Math.max(0, ...qualities.map((q) => q.level)) + 1,
-                upgrade_cost: 100,
-                success_pct: 50,
-              }),
-              "Aggiunto.",
-            ).then((ok) => ok && setAdded(""))
-          }
-          className="btn px-3 py-1.5 text-sm"
-        >
-          Aggiungi
-        </button>
+              <input
+                value={row(q).name}
+                onChange={(e) => set(q, { name: e.target.value })}
+                maxLength={40}
+                aria-label={`Nome del livello ${q.name}`}
+                className="input flex-1 py-1 text-sm"
+              />
+              {i === 0 ? (
+                <span className="w-[13.5rem] text-xs text-muted">
+                  livello di partenza
+                </span>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1 text-xs text-muted">
+                    costo
+                    <input
+                      type="number"
+                      min={0}
+                      value={row(q).upgrade_cost}
+                      onChange={(e) =>
+                        set(q, {
+                          upgrade_cost: Math.max(
+                            0,
+                            Math.trunc(Number(e.target.value)) || 0,
+                          ),
+                        })
+                      }
+                      className="input w-20! py-1 text-sm"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-xs text-muted">
+                    riuscita %
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={row(q).success_pct}
+                      onChange={(e) =>
+                        set(q, {
+                          success_pct: Math.min(
+                            100,
+                            Math.max(
+                              1,
+                              Math.trunc(Number(e.target.value)) || 1,
+                            ),
+                          ),
+                        })
+                      }
+                      className="input w-16! py-1 text-sm"
+                    />
+                  </label>
+                </>
+              )}
+              <button
+                type="button"
+                disabled={i === 0}
+                onClick={() => move(i, -1)}
+                aria-label="Sposta su"
+                className="btn-ghost px-2 py-1 text-xs disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                disabled={i === qualities.length - 1}
+                onClick={() => move(i, 1)}
+                aria-label="Sposta giù"
+                className="btn-ghost px-2 py-1 text-xs disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                disabled={!row(q).name.trim() || !changed(q)}
+                onClick={() =>
+                  run(
+                    supabase
+                      .from("item_qualities")
+                      .update({ ...row(q), name: row(q).name.trim() })
+                      .eq("id", q.id),
+                    "Salvato.",
+                  )
+                }
+                className="btn px-2 py-1 text-xs"
+              >
+                Salva
+              </button>
+              <button
+                type="button"
+                disabled={qualities.length <= 1}
+                onClick={() =>
+                  window.confirm(
+                    `Eliminare ${q.name}? Gli oggetti di questa qualità tornano al livello più basso.`,
+                  ) &&
+                  run(
+                    supabase.from("item_qualities").delete().eq("id", q.id),
+                    "Eliminato.",
+                  )
+                }
+                className="px-1 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
+              >
+                Elimina
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="flex gap-2">
+          <input
+            value={added}
+            onChange={(e) => setAdded(e.target.value)}
+            maxLength={40}
+            placeholder="Nuovo livello (in fondo)"
+            aria-label="Nuovo livello di qualità"
+            className="input flex-1 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            disabled={!added.trim()}
+            onClick={() =>
+              run(
+                supabase.from("item_qualities").insert({
+                  name: added.trim(),
+                  level: Math.max(0, ...qualities.map((q) => q.level)) + 1,
+                  upgrade_cost: 100,
+                  success_pct: 50,
+                }),
+                "Aggiunto.",
+              ).then((ok) => ok && setAdded(""))
+            }
+            className="btn px-3 py-1.5 text-sm"
+          >
+            Aggiungi
+          </button>
+        </div>
+        <Note msg={msg} />
       </div>
-      <Note msg={msg} />
+      <QualityBonusTable qualities={qualities} />
     </div>
   );
 }

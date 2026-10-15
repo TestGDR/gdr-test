@@ -18,10 +18,18 @@ const CONSENTS: { key: ConsentKey; docs: LegalDocId[] }[] = [
 export default function RegisterButton({
   className = "btn",
   children = "Registrati",
+  disabled = false,
 }: {
   className?: string;
   children?: ReactNode;
+  disabled?: boolean; // iscrizioni chiuse (Gestione -> Iscrizioni)
 }) {
+  if (disabled)
+    return (
+      <button type="button" disabled title="Iscrizioni chiuse" className={`${className} cursor-not-allowed! opacity-50`}>
+        {children}
+      </button>
+    );
   return (
     <ModalButton label={children} title="Registrazione" className={className}>
       {() => <RegisterForm />}

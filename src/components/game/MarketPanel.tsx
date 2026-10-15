@@ -12,13 +12,15 @@ import {
 } from "@/components/scheda/Equipment";
 import type { MainCharacter } from "@/lib/main-character";
 import { durability } from "@/lib/rules/combat";
+import { bonusText, durabilityBonus, qualityBonus } from "@/lib/rules/quality";
+import { useQualityBonuses } from "@/lib/rules/useQualityBonuses";
 import { createClient } from "@/lib/supabase/client";
 
 type Mine = {
   id: string;
   equipped: boolean;
   quality_id: string | null;
-  quality: Pick<Quality, "name" | "level" | "aff_bonus" | "sp_bonus"> | null;
+  quality: Pick<Quality, "name" | "level"> | null;
   aff_current?: number | null;
   sp_current?: number | null;
   item: Item;
@@ -26,7 +28,7 @@ type Mine = {
 
 // Mercato (barra di destra): due banchi.
 // - Bottega: gli oggetti in vendita, divisi per sezione, comprati con le monete del conto
-// - Fabbro: migliora la qualita' degli oggetti che si indossano. Si paga in monete;
+// - Fabbro: migliora la qualita' di armi, scudi e armature. Si paga in monete;
 //   se fallisce si perde la meta' del costo e l'oggetto resta com'era
 // Quello che si compra o si migliora sta nell'inventario (scheda -> Equipaggiamento)
 export default function MarketPanel({
@@ -265,8 +267,11 @@ function Shop({
 }
 
 // ---------------------------------------------------------------------
-// Fabbro: migliora di un livello la qualita' degli oggetti che si indossano
+// Fabbro: migliora di un livello la qualita' di armi, scudi e armature
+// (gioielli, vestiti e consumabili no). Ogni livello da' i bonus del tipo
+// di oggetto: Gestione -> Oggetti -> Qualita'
 // ---------------------------------------------------------------------
+const FORGEABLE = ["arma", "scudo", "armatura"];
 function Smith({
   characterId,
   coins,
@@ -284,20 +289,24 @@ function Smith({
   const [mine, setMine] = useState<Mine[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const bonusRows = useQualityBonuses();
 
   const load = useCallback(
     () =>
       supabase
         .from("character_items")
         .select(
-          "id, equipped, quality_id, aff_current, sp_current, quality:item_qualities(name, level, aff_bonus, sp_bonus), item:items(*)",
+          "id, equipped, quality_id, aff_current, sp_current, quality:item_qualities(name, level), item:items(*)",
         )
         .eq("character_id", characterId)
         .order("acquired_at")
         .then(({ data }) =>
           setMine(
             ((data ?? []) as unknown as Mine[]).filter(
-              (m) => m.item && isWearable(m.item),
+              (m) =>
+                m.item &&
+                isWearable(m.item) &&
+                FORGEABLE.includes(m.item.kind ?? ""),
             ),
           ),
         ),
@@ -396,8 +405,7 @@ function Smith({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        Il fabbro migliora le armi e tutto ciò che si indossa, un livello alla
-        volta
+        Il fabbro migliora armi, scudi e armature, un livello alla volta
         {qualities.length > 0 &&
           ` (${qualities.map((q) => q.name).join(" → ")})`}
         . Il lavoro è subito pronto, ma può non riuscire: in quel caso perdi
@@ -422,7 +430,14 @@ function Smith({
         <ul className="space-y-1.5">
           {mine.map((m) => {
             const next = nextOf(m);
-            const wear = durability(m.item, m.quality, m);
+            const wear = durability(
+              m.item,
+              durabilityBonus(qualityBonus(m.item, m.quality_id, bonusRows)),
+              m,
+            );
+            const gives = next
+              ? bonusText(qualityBonus(m.item, next.id, bonusRows))
+              : "";
             return (
               <li
                 key={m.id}
@@ -475,6 +490,9 @@ function Smith({
                         <span className="text-accent">{next.upgrade_cost}</span>{" "}
                         monete · {next.success_pct}%
                       </span>
+                      {gives && (
+                        <span className="block text-[#d8c39a]/80">{gives}</span>
+                      )}
                     </span>
                     <button
                       type="button"

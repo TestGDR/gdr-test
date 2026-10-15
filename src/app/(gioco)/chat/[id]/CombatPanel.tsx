@@ -8,6 +8,7 @@ import {
   type LocationId,
 } from "@/lib/rules/combat-config";
 import { HP_STATE_LABEL } from "@/lib/rules/hp";
+import { DAMAGE_STYLE, type DamageType } from "@/lib/rules/quality";
 import {
   attack,
   catchBreath,
@@ -386,8 +387,17 @@ function Attack({
   const [contact, setContact] = useState(false);
   const [mounted, setMounted] = useState<"" | "cavallo" | "drago">("");
   const [charge, setCharge] = useState(false);
+  const [style, setStyle] = useState<string>("");
   const w = weapons.find((x) => x.id === weapon);
   const ranged = !!w?.ranged;
+  // armi con due tipi di danno (spade: di taglio o in affondo)
+  const styles = w?.damageTypes ?? [];
+  const damageType =
+    styles.length > 1
+      ? styles.includes(style as DamageType)
+        ? style
+        : styles[0]
+      : null;
 
   return (
     <div className={box}>
@@ -453,6 +463,22 @@ function Attack({
                   ))}
               </select>
             </label>
+            {styles.length > 1 && (
+              <label className="block">
+                <span className={field}>Colpisce</span>
+                <select
+                  value={damageType ?? ""}
+                  onChange={(e) => setStyle(e.target.value)}
+                  className="input w-36! py-1 text-sm"
+                >
+                  {styles.map((s) => (
+                    <option key={s} value={s}>
+                      {DAMAGE_STYLE[s]} ({s})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {kind === "aimed" && (
               <label className="block">
                 <span className={field}>Mira a</span>
@@ -556,6 +582,7 @@ function Attack({
                 contact,
                 mounted: mounted || null,
                 charge,
+                damageType,
               })
             }
             className="btn px-4 py-1.5 text-sm"

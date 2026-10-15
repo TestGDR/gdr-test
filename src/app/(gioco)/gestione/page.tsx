@@ -26,6 +26,12 @@ const PANELS = [
       "Pulizia di chat, missive e OFF vecchi; eliminazione dei personaggi inattivi.",
   },
   {
+    permission: "iscrizioni.gestire",
+    href: "/gestione/iscrizioni",
+    title: "Iscrizioni",
+    description: "Apri e chiudi le iscrizioni: con le iscrizioni chiuse il pulsante Registrati della home è disattivato.",
+  },
+  {
     permission: ["chat.log", "messaggi.log"],
     href: "/gestione/log",
     title: "Log",
