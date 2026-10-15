@@ -11,6 +11,7 @@ export type TroopType = {
   sort_order: number;
   category_id?: string | null; // gruppo (terrestri, navali...): migrazione 0145
   image_url?: string | null; // immagine facoltativa: migrazione 0147
+  labor_per_unit?: number; // manodopera per unita' (equipaggio): migrazione 0151
 };
 
 // Punti in piu' (o in meno) per ogni unita' di "troop_type_id" contro "against_id"
@@ -19,7 +20,19 @@ export type HouseTroop = { house_id: string; troop_type_id: string; quantity: nu
 export type Kingdom = { id: string; name: string; description: string; sort_order: number };
 export type FiefPoints = { attack: number; defense: number };
 
-export type ArmyLine = { type: TroopType; quantity: number; attack: number; defense: number };
+// strength: per quante volte contano ATT, DIF e modificatori della truppa (vedi groupStrength)
+export type ArmyLine = { type: TroopType; quantity: number; strength: number; attack: number; defense: number };
+
+// Truppe a gruppi (fanti, arcieri...): i valori sono riferiti a un drappello da
+// 10 uomini; un gruppo da 50 vale 6 drappelli e uno da 100 ne vale 12. Si scompone
+// il totale in gruppi da 100, poi da 50, poi da 10 (es. 170 = 100 + 50 + 2x10 = 20).
+// Navi e macchine da guerra contano invece una per una.
+export function groupStrength(quantity: number) {
+  const hundreds = Math.floor(quantity / 100);
+  const fifties = Math.floor((quantity % 100) / 50);
+  const tens = Math.floor((quantity % 50) / 10);
+  return hundreds * 12 + fifties * 6 + tens + (quantity % 10) / 10;
+}
 export type Power = {
   lines: ArmyLine[];
   units: number;
@@ -32,12 +45,20 @@ export type Power = {
   total: number;
 };
 
-// Potenza di una casata: truppe + strutture dei feudi
-export function housePower(troops: HouseTroop[], types: TroopType[], fief: FiefPoints = { attack: 0, defense: 0 }): Power {
+// Potenza di una casata: truppe + strutture dei feudi.
+// grouped(t): la truppa conta a drappelli (vedi groupStrength); senza, conta una per una
+export function housePower(
+  troops: HouseTroop[],
+  types: TroopType[],
+  fief: FiefPoints = { attack: 0, defense: 0 },
+  grouped: (t: TroopType) => boolean = () => false,
+): Power {
   const lines: ArmyLine[] = [];
   for (const t of types) {
     const quantity = troops.filter((x) => x.troop_type_id === t.id).reduce((n, x) => n + x.quantity, 0);
-    if (quantity > 0) lines.push({ type: t, quantity, attack: quantity * t.attack, defense: quantity * t.defense });
+    const strength = grouped(t) ? groupStrength(quantity) : quantity;
+    if (quantity > 0)
+      lines.push({ type: t, quantity, strength, attack: Math.round(strength * t.attack), defense: Math.round(strength * t.defense) });
   }
   const armyAttack = lines.reduce((n, l) => n + l.attack, 0);
   const armyDefense = lines.reduce((n, l) => n + l.defense, 0);
@@ -74,7 +95,7 @@ export function sumPowers(list: Power[]): Omit<Power, "lines"> {
 // (contro un esercito fatto per meta' di cavalieri, il bonus contro i
 // cavalieri vale per meta').
 export function versus(mine: ArmyLine[], enemy: ArmyLine[], matchups: Matchup[]) {
-  const enemyUnits = enemy.reduce((n, l) => n + l.quantity, 0);
+  const enemyUnits = enemy.reduce((n, l) => n + l.strength, 0);
   let base = 0;
   let bonus = 0;
   const details: { name: string; quantity: number; base: number; bonus: number }[] = [];
@@ -84,9 +105,9 @@ export function versus(mine: ArmyLine[], enemy: ArmyLine[], matchups: Matchup[])
     if (enemyUnits > 0)
       for (const e of enemy) {
         const m = matchups.find((x) => x.troop_type_id === l.type.id && x.against_id === e.type.id)?.modifier ?? 0;
-        perUnit += (m * e.quantity) / enemyUnits;
+        perUnit += (m * e.strength) / enemyUnits;
       }
-    const extra = Math.round(perUnit * l.quantity);
+    const extra = Math.round(perUnit * l.strength);
     base += b;
     bonus += extra;
     details.push({ name: l.type.name, quantity: l.quantity, base: b, bonus: extra });

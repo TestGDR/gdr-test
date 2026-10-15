@@ -10,7 +10,7 @@ type Data = {
   troops: HouseTroop[];
   kingdom: string | null;
   called: boolean | null; // null: migrazione 0143 non ancora eseguita
-  categories: { id: string; name: string }[]; // gruppi di truppe (terrestri, navali...)
+  categories: { id: string; name: string; single_units?: boolean }[]; // gruppi di truppe (terrestri, navali...)
   training: { troop_type_id: string; resource_id: string; amount: number }[] | null; // null: migrazione 0148 mancante
   treasury: Record<string, number>;
   upkeep: { resource_id: string; army: number }[];
@@ -48,7 +48,7 @@ export default function HouseArmy({
       supabase.from("house_kingdoms").select("kingdom:kingdoms(name)").eq("house_id", houseId).maybeSingle(),
       supabase.from("houses").select("army_called").eq("id", houseId).maybeSingle(),
       supabase.rpc("house_upkeep", { p_house: houseId }),
-      supabase.from("troop_categories").select("id, name").order("sort_order").order("name"),
+      supabase.from("troop_categories").select("*").order("sort_order").order("name"),
       supabase.from("troop_training_costs").select("*"),
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", houseId),
     ]);
@@ -61,7 +61,7 @@ export default function HouseArmy({
       kingdom: (k.data?.kingdom as unknown as { name: string } | null)?.name ?? null,
       called: house.error ? null : !!house.data?.army_called,
       upkeep: ((up.data ?? []) as { resource_id: string; army: number }[]).filter((u) => u.army > 0),
-      categories: (cg.data ?? []) as { id: string; name: string }[],
+      categories: (cg.data ?? []) as { id: string; name: string; single_units?: boolean }[],
       training: tr.error ? null : ((tr.data ?? []) as { troop_type_id: string; resource_id: string; amount: number }[]),
       treasury: Object.fromEntries((tre.data ?? []).map((x) => [x.resource_id as string, Number(x.amount)])),
     });
@@ -71,7 +71,8 @@ export default function HouseArmy({
   }, [load]);
 
   if (!data) return null;
-  const power = housePower(data.troops, data.types, fief);
+  // fanti, arcieri...: a drappelli da 10 (50 = x6, 100 = x12); navi e macchine una per una
+  const power = housePower(data.troops, data.types, fief, (t) => !data.categories.some((c) => c.id === t.category_id && c.single_units));
   const against = (id: string) =>
     data.matchups
       .filter((m) => m.troop_type_id === id)
@@ -139,28 +140,6 @@ export default function HouseArmy({
         </div>
       )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
-      {canCommand && data.training !== null && data.types.length > 0 && (
-        <TrainBox
-          types={data.types}
-          categories={data.categories}
-          training={data.training}
-          treasury={data.treasury}
-          resources={resources}
-          busy={busy}
-          onTrain={async (typeId, count, label) => {
-            if (!window.confirm(`Addestrare ${count} ${label}?`)) return;
-            setBusy(true);
-            setMsg(null);
-            const { error } = await supabase.rpc("train_troops", { p_house: houseId, p_troop_type: typeId, p_count: count });
-            setBusy(false);
-            setMsg(error ? { ok: false, text: error.message.length < 160 ? error.message : "Addestramento non riuscito." } : { ok: true, text: `${count} ${label} addestrati: sono già nell'esercito.` });
-            if (!error) {
-              load();
-              onChanged?.();
-            }
-          }}
-        />
-      )}
       {power.lines.length === 0 ? (
         <p className="text-sm text-muted">La casata non ha truppe.</p>
       ) : (
@@ -201,12 +180,60 @@ export default function HouseArmy({
         Truppe <strong>{num(power.army)}</strong> + feudi <strong>{num(power.fief)}</strong> = potenza{" "}
         <strong className="text-accent">{num(power.total)}</strong>
       </p>
+      {canCommand && power.lines.length > 0 && (
+        <DismissBox
+          lines={power.lines}
+          categories={data.categories}
+          busy={busy}
+          onDismiss={async (typeId, count, label) => {
+            if (!window.confirm(`Congedare ${count} ${label}? Non restituiscono Manodopera.`)) return;
+            setBusy(true);
+            setMsg(null);
+            const { error } = await supabase.rpc("dismiss_troops", { p_house: houseId, p_troop_type: typeId, p_count: count });
+            setBusy(false);
+            setMsg(
+              error
+                ? { ok: false, text: error.code === "PGRST202" ? "Per congedare le truppe va eseguita la migrazione 0149 in Supabase." : error.message.length < 160 ? error.message : "Congedo non riuscito." }
+                : { ok: true, text: `${count} ${label} congedati.` },
+            );
+            if (!error) {
+              load();
+              onChanged?.();
+            }
+          }}
+        />
+      )}
+      {canCommand && data.training !== null && data.types.length > 0 && (
+        <TrainBox
+          types={data.types}
+          categories={data.categories}
+          training={data.training}
+          treasury={data.treasury}
+          resources={resources}
+          busy={busy}
+          onTrain={async (typeId, count, label) => {
+            if (!window.confirm(`Addestrare ${count} ${label}?`)) return;
+            setBusy(true);
+            setMsg(null);
+            const { error } = await supabase.rpc("train_troops", { p_house: houseId, p_troop_type: typeId, p_count: count });
+            setBusy(false);
+            setMsg(error ? { ok: false, text: error.message.length < 160 ? error.message : "Addestramento non riuscito." } : { ok: true, text: `${count} ${label} addestrati: sono già nell'esercito.` });
+            if (!error) {
+              load();
+              onChanged?.();
+            }
+          }}
+        />
+      )}
     </section>
   );
 }
 
 // Addestrare nuove truppe con la manodopera dei feudi: gruppi da 10, 50 o 100
 const BATCHES = [10, 50, 100];
+// i gruppi "reclutabili anche una alla volta" (navi, macchine da guerra...) hanno anche l'1
+const batchesFor = (type: TroopType | undefined, categories: { id: string; single_units?: boolean }[]) =>
+  categories.some((c) => c.id === type?.category_id && c.single_units) ? [1, ...BATCHES] : BATCHES;
 function TrainBox({
   types,
   categories,
@@ -217,7 +244,7 @@ function TrainBox({
   onTrain,
 }: {
   types: TroopType[];
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; single_units?: boolean }[];
   training: { troop_type_id: string; resource_id: string; amount: number }[];
   treasury: Record<string, number>;
   resources: { id: string; name: string }[];
@@ -230,8 +257,11 @@ function TrainBox({
   // costo di un gruppo: 1 manodopera per soldato + costo della truppa ogni 10
   const cost = (count: number) => {
     const c: Record<string, number> = {};
-    if (labor) c[labor.id] = count;
-    for (const t of training.filter((x) => x.troop_type_id === typeId)) c[t.resource_id] = (c[t.resource_id] ?? 0) + (t.amount * count) / 10;
+    // navi, macchine da guerra (gruppi a unita' singole): costo per unita'; le altre truppe ogni 10
+    const perUnit = categories.some((x) => x.id === type?.category_id && x.single_units);
+    if (labor) c[labor.id] = count * (type?.labor_per_unit ?? 1);
+    for (const t of training.filter((x) => x.troop_type_id === typeId))
+      c[t.resource_id] = (c[t.resource_id] ?? 0) + (perUnit ? t.amount * count : Math.ceil((t.amount * count) / 10));
     return c;
   };
   const name = (id: string) => resources.find((r) => r.id === id)?.name ?? "?";
@@ -243,7 +273,7 @@ function TrainBox({
     <div className="space-y-2 border border-accent/40 bg-black/30 p-3">
       <h4 className="font-serif text-lg text-accent">Addestra nuove truppe</h4>
       <p className="text-xs text-muted">
-        Prendi uomini dalla Manodopera dei feudi e addestrali: ogni soldato costa 1 Manodopera, più il costo della truppa. Hai{" "}
+        Prendi uomini dalla Manodopera dei feudi e addestrali: ogni pulsante mostra quanta Manodopera e quante risorse servono. Hai{" "}
         <strong className="text-foreground">{labor ? (treasury[labor.id] ?? 0).toLocaleString("it-IT") : 0}</strong> Manodopera.
       </p>
       <select value={typeId} onChange={(e) => setTypeId(e.target.value)} aria-label="Truppa da addestrare" className="input max-w-sm py-1 text-sm">
@@ -258,7 +288,7 @@ function TrainBox({
         ))}
       </select>
       <div className="flex flex-wrap gap-2">
-        {BATCHES.map((n) => {
+        {batchesFor(type, categories).map((n) => {
           const c = cost(n);
           const lacks = Object.entries(c).some(([id, v]) => (treasury[id] ?? 0) < v);
           return (
@@ -270,7 +300,7 @@ function TrainBox({
               title={lacks ? "Il tesoro non basta" : `Addestra ${n} ${type?.name ?? ""}`}
               className="btn-ghost flex flex-col items-start px-3 py-1.5 text-left text-xs disabled:opacity-45"
             >
-              <span className="font-serif text-sm text-accent">+{n} soldati</span>
+              <span className="font-serif text-sm text-accent">+{n} unità</span>
               <span className="text-muted">
                 {Object.entries(c)
                   .map(([id, v]) => `${v.toLocaleString("it-IT")} ${name(id)}`)
@@ -280,6 +310,53 @@ function TrainBox({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// Congedare truppe: escono dall'esercito, niente Manodopera indietro, niente piu' mantenimento
+function DismissBox({
+  lines,
+  categories,
+  busy,
+  onDismiss,
+}: {
+  lines: { type: TroopType; quantity: number }[];
+  categories: { id: string; single_units?: boolean }[];
+  busy: boolean;
+  onDismiss: (typeId: string, count: number, label: string) => void;
+}) {
+  const [typeId, setTypeId] = useState(lines[0]?.type.id ?? "");
+  const line = lines.find((l) => l.type.id === typeId) ?? lines[0];
+  if (!line) return null;
+  return (
+    <div className="space-y-2 border border-border/60 bg-black/30 p-3">
+      <h4 className="font-serif text-lg text-accent">Congeda truppe</h4>
+      <p className="text-xs text-muted">
+        I soldati congedati tornano a casa: non restituiscono Manodopera, ma da subito non costano più mantenimento, né da richiamati né da
+        congedati.
+      </p>
+      <select value={line.type.id} onChange={(e) => setTypeId(e.target.value)} aria-label="Truppa da congedare" className="input max-w-sm py-1 text-sm">
+        {lines.map((l) => (
+          <option key={l.type.id} value={l.type.id}>
+            {l.type.name} ({l.quantity.toLocaleString("it-IT")})
+          </option>
+        ))}
+      </select>
+      <div className="flex flex-wrap gap-2">
+        {batchesFor(line.type, categories).map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={busy || line.quantity < n}
+            onClick={() => onDismiss(line.type.id, n, line.type.name)}
+            title={line.quantity < n ? "Non ci sono abbastanza soldati" : `Congeda ${n} ${line.type.name}`}
+            className="btn-ghost border-red-900 px-3 py-1.5 text-xs text-red-300 hover:border-red-500 disabled:opacity-40"
+          >
+            −{n} unità
+          </button>
+        ))}
       </div>
     </div>
   );

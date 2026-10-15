@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { housePower, sumPowers, versus, type TroopType } from "./armies.ts";
+import { groupStrength, housePower, sumPowers, versus, type TroopType } from "./armies.ts";
 
 const type = (id: string, attack: number, defense: number): TroopType => ({ id, name: id, description: "", attack, defense, sort_order: 0 });
 const types = [type("fanti", 2, 3), type("arcieri", 3, 1), type("cavalieri", 5, 4)];
@@ -46,4 +46,24 @@ test("confronto: forze e debolezze pesate sull'esercito nemico", () => {
   assert.equal(v.total, 450 + 200 - 100);
   // contro nessuno: solo i punti di base
   assert.equal(versus(fanti, [], matchups).bonus, 0);
+});
+
+test("drappelli: 10 uomini x1, 50 x6, 100 x12; il resto si scompone", () => {
+  assert.equal(groupStrength(10), 1);
+  assert.equal(groupStrength(50), 6);
+  assert.equal(groupStrength(100), 12);
+  assert.equal(groupStrength(170), 20); // 100 + 50 + 2x10
+  assert.equal(groupStrength(500), 60);
+});
+
+test("truppe a drappelli: ATT e DIF dal valore base del drappello; le navi una per una", () => {
+  const types: TroopType[] = [
+    { id: "arcieri", name: "Arcieri", description: "", attack: 5, defense: 2, sort_order: 0 },
+    { id: "galee", name: "Galee", description: "", attack: 5, defense: 0, sort_order: 0 },
+  ];
+  const p = housePower([troop("a", "arcieri", 100), troop("a", "galee", 3)], types, undefined, (t) => t.id === "arcieri");
+  const arcieri = p.lines.find((l) => l.type.id === "arcieri")!;
+  const galee = p.lines.find((l) => l.type.id === "galee")!;
+  assert.deepEqual([arcieri.attack, arcieri.defense], [60, 24]); // come nella tabella: 100 uomini = 60 / 24
+  assert.deepEqual([galee.attack, galee.defense], [15, 0]);
 });

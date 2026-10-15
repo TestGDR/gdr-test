@@ -187,8 +187,7 @@ const powerOf = (d: Armies, houseId: string) =>
   housePower(
     d.troops.filter((t) => t.house_id === houseId),
     d.types,
-    d.fiefs[houseId],
-  );
+    d.fiefs[houseId], grouped(d));
 
 // ---------------------------------------------------------------------
 // Potenza: ogni regno con le sue casate (in fondo quelle senza regno)
@@ -427,8 +426,7 @@ function HouseArmyEditor({ d, houseId }: { d: Armies; houseId: string }) {
   const power = housePower(
     d.types.map((t) => ({ house_id: houseId, troop_type_id: t.id, quantity: qty[t.id] ?? 0 })),
     d.types,
-    d.fiefs[houseId],
-  );
+    d.fiefs[houseId], grouped(d));
 
   async function save() {
     const keep = d.types.filter((t) => (qty[t.id] ?? 0) > 0);
@@ -453,7 +451,7 @@ function HouseArmyEditor({ d, houseId }: { d: Armies; houseId: string }) {
           <thead>
             <tr className="border-b border-border">
               <th className={th}>Truppa</th>
-              <th className={th}>Per unità (att. / dif.)</th>
+              <th className={th}>Base (att. / dif.)</th>
               <th className={th}>Quantità</th>
               <th className={th}>Punti</th>
             </tr>
@@ -475,7 +473,7 @@ function HouseArmyEditor({ d, houseId }: { d: Armies; houseId: string }) {
                     className="input w-32 py-1"
                   />
                 </td>
-                <td className="py-2 pr-3">{num((qty[t.id] ?? 0) * (t.attack + t.defense))}</td>
+                <td className="py-2 pr-3">{num((power.lines.find((l) => l.type.id === t.id)?.attack ?? 0) + (power.lines.find((l) => l.type.id === t.id)?.defense ?? 0))}</td>
               </tr>
             ))}
           </tbody>
@@ -599,6 +597,10 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
   const [order, setOrder] = useState(type?.sort_order ?? 0);
   const [category, setCategory] = useState(type?.category_id ?? "");
   const [image, setImage] = useState(type?.image_url ?? "");
+  const [crew, setCrew] = useState(type?.labor_per_unit ?? 1);
+  // gruppo con unita' singole (navi, macchine da guerra): costi e mantenimento per unita'
+  const perUnit = !!d.categories?.find((c) => c.id === category)?.single_units;
+  const hasCrew = d.types.some((t) => t.labor_per_unit !== undefined);
   const [train, setTrain] = useState<Record<string, number>>(
     Object.fromEntries((d.training ?? []).filter((u) => u.troop_type_id === type?.id).map((u) => [u.resource_id, u.amount])),
   );
@@ -627,6 +629,8 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         ...(d.categories ? { category_id: category || null } : {}),
         // l'immagine solo se c'e' (o c'era): cosi' si salva anche prima della migrazione 0147
         ...(image.trim() || type?.image_url ? { image_url: image.trim() || null } : {}),
+        // manodopera per unita': solo se la migrazione 0151 c'e'
+        ...(hasCrew ? { labor_per_unit: crew } : {}),
       };
       if (!row.name) return { error: { message: "Scrivi il nome della truppa." } };
       if (image.trim() && !image.trim().startsWith("https://")) return { error: { message: "L'indirizzo dell'immagine deve iniziare con https://" } };
@@ -693,10 +697,10 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={2000} className="input" />
       </Field>
       <div className="flex flex-wrap gap-3">
-        <Field label="Attacco per unità">
+        <Field label={perUnit ? "Attacco per unità" : "Attacco (drappello da 10)"}>
           <input type="number" min={0} value={attack} onChange={(e) => setAttack(int(e.target.value, 0, 1000000))} className="input w-32" />
         </Field>
-        <Field label="Difesa per unità">
+        <Field label={perUnit ? "Difesa per unità" : "Difesa (drappello da 10)"}>
           <input type="number" min={0} value={defense} onChange={(e) => setDefense(int(e.target.value, 0, 1000000))} className="input w-32" />
         </Field>
         <Field label="Ordine">
@@ -726,8 +730,22 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
       </div>
       {d.training !== null && (
         <div>
-          <p className="mb-1 text-xs tracking-wide text-muted uppercase">Costo di addestramento, ogni 10 soldati</p>
+          <p className="mb-1 text-xs tracking-wide text-muted uppercase">
+            Costo di addestramento, {perUnit ? "per singola unità" : "ogni 10 soldati"}
+          </p>
           <div className="flex flex-wrap gap-3">
+            {hasCrew && (
+              <label className="block text-xs text-accent">
+                Manodopera {perUnit ? "per unità" : "per soldato"}
+                <input
+                  type="number"
+                  min={0}
+                  value={crew}
+                  onChange={(e) => setCrew(int(e.target.value, 0, 100000))}
+                  className="input mt-1 block w-24 py-1"
+                />
+              </label>
+            )}
             {d.resources
               .filter((r) => r.name.toLowerCase() !== "manodopera")
               .map((r) => (
@@ -744,7 +762,9 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
               ))}
           </div>
           <p className="mt-1 text-xs text-muted">
-            Oltre a questo, ogni soldato costa 1 Manodopera. Esempio: 5 Oro ogni 10 → addestrare 50 soldati costa 25 Oro e 50 Manodopera.
+            {perUnit
+              ? "Navi e macchine da guerra: il costo e la Manodopera (l'equipaggio) valgono per ogni singola unità. Esempio: galea con 30 Legname e 25 Manodopera → 2 galee costano 60 Legname e 50 Manodopera."
+              : "Esempio: 5 Oro ogni 10 e 1 Manodopera per soldato → addestrare 50 soldati costa 25 Oro e 50 Manodopera."}
           </p>
         </div>
       )}
@@ -752,7 +772,9 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         <p className="text-xs text-amber-200">Per il mantenimento delle truppe va eseguita la migrazione 0143 in Supabase.</p>
       ) : (
         <div>
-          <p className="mb-1 text-xs tracking-wide text-muted uppercase">Mantenimento al mese, ogni 100 soldati (da richiamati)</p>
+          <p className="mb-1 text-xs tracking-wide text-muted uppercase">
+            Mantenimento al mese, {perUnit ? "per singola unità" : "ogni 100 soldati"} (da richiamati)
+          </p>
           <div className="flex flex-wrap gap-3">
             {d.resources.map((r) => (
               <label key={r.id} className="block text-xs text-muted">
@@ -771,7 +793,7 @@ function TroopTypeForm({ d, type, onDone }: { d: Armies; type: TroopType | null;
         </div>
       )}
       <div>
-        <p className="mb-1 text-xs tracking-wide text-muted uppercase">Forza o debolezza contro le altre truppe (punti per unità)</p>
+        <p className="mb-1 text-xs tracking-wide text-muted uppercase">Forza o debolezza contro le altre truppe ({perUnit ? "punti per unità" : "punti per drappello da 10, da −3 a +3"})</p>
         {hidden > 0 && (
           <p className="mb-1 text-xs text-muted">
             {hidden} {hidden === 1 ? "truppa non compare" : "truppe non compaiono"}: {hidden === 1 ? "è" : "sono"} di gruppi che non si affrontano con
@@ -1026,8 +1048,7 @@ function VersusTab(d: Armies & { houses: HouseLite[] }) {
       ids.reduce((p, id) => ({ attack: p.attack + (d.fiefs[id]?.attack ?? 0), defense: p.defense + (d.fiefs[id]?.defense ?? 0) }), {
         attack: 0,
         defense: 0,
-      }),
-    );
+      }), grouped(d));
     return { label: options.find((o) => o.key === key)?.label ?? "?", power };
   };
   const A = side(a);
@@ -1097,6 +1118,11 @@ function VersusTab(d: Armies & { houses: HouseLite[] }) {
   );
 }
 
+// le truppe che contano a drappelli: tutte tranne quelle dei gruppi a unita' singole
+function grouped(d: { categories: Category[] | null }) {
+  return (t: TroopType) => !d.categories?.some((c) => c.id === t.category_id && c.single_units);
+}
+
 // posizione del gruppo di una truppa nell'elenco (senza gruppo in fondo)
 function groupOrder(d: Armies, t: TroopType) {
   if (!d.categories) return 0;
@@ -1107,7 +1133,7 @@ function groupOrder(d: Armies, t: TroopType) {
 // ---------------------------------------------------------------------
 // Gruppi di truppe: terrestri, navali, macchine da guerra... e chi affronta chi
 // ---------------------------------------------------------------------
-type Category = { id: string; name: string; sort_order: number };
+type Category = { id: string; name: string; sort_order: number; single_units?: boolean };
 
 // Due truppe possono avere forza/debolezza tra loro? Si', se i loro gruppi si
 // affrontano (o se una delle due non ha ancora un gruppo)
@@ -1235,6 +1261,22 @@ function GroupRow({
       <span className="text-xs text-muted">
         {count} {count === 1 ? "truppa" : "truppe"}
       </span>
+      {cat.single_units !== undefined && (
+        <label className="flex items-center gap-1.5 text-xs" title="Oltre ai gruppi da 10, 50 o 100 (es. navi e macchine da guerra)">
+          <input
+            type="checkbox"
+            checked={cat.single_units}
+            disabled={busy}
+            onChange={(e) =>
+              run(
+                () => d.supabase.from("troop_categories").update({ single_units: e.target.checked }).eq("id", cat.id),
+                e.target.checked ? "Ora si recluta anche una unità alla volta." : "Ora si recluta solo a gruppi.",
+              )
+            }
+          />
+          reclutabili anche una alla volta
+        </label>
+      )}
       {name.trim() !== cat.name && (
         <button
           type="button"
