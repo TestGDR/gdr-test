@@ -168,7 +168,7 @@ export default function CombatFields({
           </div>
           <div className="flex flex-wrap gap-3">
             {num("aff_max", "AFF", 1, 99)}
-            {num("body_min", "BODY min.", 0, 10)}
+            {num("body_min", "VIG min.", 0, 10)}
             {num("pierce", "Perforante", 0, 20)}
             {v.weapon_category === "distanza" ? (
               <>

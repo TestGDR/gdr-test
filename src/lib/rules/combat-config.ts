@@ -191,6 +191,7 @@ export const COMBAT = {
   skills: {
     unarmed: "Lotta",
     dodge: "Schivare",
+    parry: "Parare", // la parata: RIF + Parare (se l'abilita' manca, quella dell'arma)
     shieldFree: "Armi da impatto", // parata con scudo e altra mano libera
     riding: "Equitazione",
     dragonRiding: "Cavalcare un Drago",
@@ -248,7 +249,7 @@ export const WEAPON_EFFECTS = [
   {
     id: "stordente",
     label: "Stordente",
-    help: "Se penetra con margine 5+, tiro BODY + Robustezza contro DV 12 o perde l'azione",
+    help: "Se penetra con margine 5+, tiro VIG + Robustezza contro DV 12 o perde l'azione",
   },
   {
     id: "rapida",

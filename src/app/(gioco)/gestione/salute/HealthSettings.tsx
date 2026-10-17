@@ -188,7 +188,7 @@ export default function HealthSettings({
                 <th className={th}>Stato</th>
                 <th className={th}>Oltre (% del carico)</th>
                 <th className={th}>Malus</th>
-                <th className={th}>Con BODY 5</th>
+                <th className={th}>Con VIG 5</th>
                 <th className={th} />
               </tr>
             </thead>

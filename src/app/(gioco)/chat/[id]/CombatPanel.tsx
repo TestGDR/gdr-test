@@ -142,7 +142,7 @@ export default function CombatPanel({
         <div className={box}>
           <p className="text-sm">
             Il personaggio è <strong className="text-red-300">morente</strong>:
-            prima di ogni sua azione deve fare il tiro salvezza (BODY + TEM +
+            prima di ogni sua azione deve fare il tiro salvezza (VIG + TEM +
             d10 contro DV 12, +1 a ogni round). Un altro personaggio può
             stabilizzarlo con Medicina.
           </p>
@@ -313,8 +313,9 @@ function Defense({
   return (
     <div className="space-y-2 border border-red-800/60 bg-red-950/20 p-3">
       <p className="text-sm text-red-200">
-        Sei attaccato: scrivi la tua azione e poi scegli come difenderti. Parare
-        e Schivare costano 1 Stamina; incassando il colpo va a segno.
+        Sei attaccato: scrivi la tua azione e poi scegli come difenderti.
+        Parare: RIF + Parare + d10 (+ bonus dello scudo). Schivare: RIF +
+        Schivare + d10. Costano 1 Stamina; incassando il colpo va a segno.
       </p>
       {weapons.length > 1 && (
         <label className="block">

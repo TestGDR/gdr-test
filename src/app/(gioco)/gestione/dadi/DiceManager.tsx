@@ -193,7 +193,7 @@ export default function DiceManager({ dice }: { dice: DiceTypeRow[] }) {
                 maxLength={200}
                 onChange={(e) => setEdit({ ...edit, formula: e.target.value })}
                 className="input py-1.5 font-mono"
-                placeholder="es. STAT + ABILITA + 1d10, 2d5+1, ARMA + BODY"
+                placeholder="es. STAT + ABILITA + 1d10, 2d5+1, ARMA + VIG"
               />
             </label>
             {formulaError ? (

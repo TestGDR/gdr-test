@@ -370,7 +370,7 @@ export async function rollFreeDice(
 
 // ---------------------------------------------------------------------
 // Raggira: prova contrapposta nascosta (regolamento, "Ingannare"):
-// EMP + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
+// CAR + Dissimulare + d10 contro EMP + Percepire Intenzioni + d10 del bersaglio.
 // A parita' vince chi difende. In chat non compare nulla: se il bersaglio
 // scopre l'inganno riceve, lui solo, il testo scritto da chi ha tentato il
 // raggiro. Chi raggira non viene a sapere com'e' andata
@@ -464,20 +464,20 @@ export async function rollRaggira(
     ["EMP"],
   );
   if ("error" in def) return { error: def.error };
-  // chi raggira usa Dissimulare (Empatia)
+  // chi raggira usa Dissimulare (Presenza), chi difende Percepire Intenzioni (Empatia)
   const att = rollFormula(
-    "EMP + ABILITA + 1d10",
+    "CAR + ABILITA + 1d10",
     PROVA_RULES,
     {
       vars: {
-        EMP: stat(me, "emp"),
+        CAR: stat(me, "pre"),
         ABILITA: await levelOf(characterId, "Dissimulare"),
       },
       varLabels: { ABILITA: "Dissimulare" },
       target: def.total,
     },
     secureRng,
-    ["EMP"],
+    ["CAR"],
   );
   if ("error" in att) return { error: att.error };
   const won = att.total > def.total; // a parita' vince chi difende

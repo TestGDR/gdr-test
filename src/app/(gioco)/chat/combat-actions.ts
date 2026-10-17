@@ -915,12 +915,17 @@ async function resolveHit(
     if (t.encumbrance) mods.push({ label: "ingombro", value: t.encumbrance });
     if (t.armPenalty)
       mods.push({ label: "ferita al braccio", value: t.armPenalty });
-    let skill = usable
-      ? t.skillList.find((s) => s.id === usable.item.weapon_skill_id)
-      : t.skillByName(COMBAT.skills.unarmed);
+    // si para con l'abilita' Parare, qualunque cosa si impugni; se nel catalogo
+    // non c'e', con quella dell'arma (Lotta a mani nude)
+    const parrySkill = t.skillByName(COMBAT.skills.parry);
+    let skill =
+      parrySkill ??
+      (usable
+        ? t.skillList.find((s) => s.id === usable.item.weapon_skill_id)
+        : t.skillByName(COMBAT.skills.unarmed));
     if (shield) {
-      // con lo scudo: abilita' dell'arma nell'altra mano (Armi da impatto se libera) + bonus dello scudo
-      if (!usable) skill = t.skillByName(COMBAT.skills.shieldFree);
+      // con lo scudo: + bonus dello scudo (senza Parare: Armi da impatto se l'altra mano e' libera)
+      if (!usable && !parrySkill) skill = t.skillByName(COMBAT.skills.shieldFree);
       mods.push({
         label: "scudo",
         value: shield.item.parry_bonus + (shield.quality?.parry_bonus ?? 0),
