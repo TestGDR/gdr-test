@@ -302,7 +302,7 @@ export default function GameShell({
       <ForumUnreadContext.Provider value={forumUnread.count}>
       <GossipPendingContext.Provider value={gossipPending}>
       <SheetActionsContext.Provider value={sheetActions}>
-      <div className="flex h-dvh flex-col overflow-hidden lg:bg-[#0a0908] lg:bg-[url('/images/ui/interno/sfondo-3.webp')] lg:bg-repeat">
+      <div className="flex h-dvh flex-col overflow-hidden lg:bg-[#0a0908] lg:bg-[url('/images/ui/interno/sfondo-4.webp')] lg:bg-repeat">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
         <DesktopTopBar
