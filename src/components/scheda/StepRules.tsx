@@ -10,6 +10,10 @@ import {
 import {
   choiceLabel,
   statCode,
+  traitBlockedBy,
+  traitCost,
+  traitCostLabel,
+  traitSkillOptions,
   type Skill,
   type Trait,
 } from "@/lib/rules/catalog";
@@ -160,10 +164,15 @@ export function StepTraits({
     .filter((t): t is Trait => !!t)
     .map((t) => ({
       kind: t.kind,
-      cost: t.cost,
+      cost: traitCost(t, chosen.find((x) => x.id === t.id)?.choice),
       name: t.name,
       uniqueGroup: t.unique_group,
     }));
+  // abilita' con punti: alcuni tratti non si prendono insieme a queste
+  const levels = Object.entries(data.skills ?? {}).map(([id, level]) => ({
+    name: skills.find((k) => k.id === id)?.name ?? "",
+    level,
+  }));
   const { available, spent, flawValue } = traitBudget(picks, limits);
 
   const toggle = (t: Trait) =>
@@ -210,6 +219,7 @@ export function StepTraits({
                 )
                 .map((t) => {
                   const pick = chosen.find((x) => x.id === t.id);
+                  const blocked = traitBlockedBy(t, levels);
                   return (
                     <li
                       key={t.id}
@@ -219,17 +229,27 @@ export function StepTraits({
                         <input
                           type="checkbox"
                           checked={!!pick}
+                          disabled={!!blocked && !pick}
                           onChange={() => toggle(t)}
                           className="mt-1"
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex justify-between gap-2">
                             <strong className="font-semibold">{t.name}</strong>
-                            <span className="text-accent">{t.cost}</span>
+                            <span className="text-accent">
+                              {pick?.choice && t.stat_costs
+                                ? traitCost(t, pick.choice)
+                                : traitCostLabel(t)}
+                            </span>
                           </span>
                           <span className="block text-xs text-muted">
                             {t.effect}
                           </span>
+                          {blocked && (
+                            <span className="block text-xs text-red-400">
+                              Non si prende con punti in {blocked}.
+                            </span>
+                          )}
                         </span>
                       </label>
                       {pick && t.choice !== "nessuna" && (
@@ -244,7 +264,7 @@ export function StepTraits({
                               : "Scegli la statistica..."}
                           </option>
                           {t.choice === "abilita"
-                            ? skills
+                            ? traitSkillOptions(t, skills)
                                 .filter((k) => k.active)
                                 .map((k) => (
                                   <option key={k.id} value={k.id}>
@@ -254,6 +274,7 @@ export function StepTraits({
                             : stats.map((s) => (
                                 <option key={s.id} value={s.id}>
                                   {s.label}
+                                  {t.stat_costs ? ` (${traitCost(t, s.id)})` : ""}
                                 </option>
                               ))}
                         </select>

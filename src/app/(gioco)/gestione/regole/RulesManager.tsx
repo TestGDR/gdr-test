@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Skill, Trait, TraitModifier } from "@/lib/rules/catalog";
+import { traitCostLabel, type Skill, type Trait, type TraitModifier } from "@/lib/rules/catalog";
 import { RULES, type StatId } from "@/lib/rules/config";
 import type { StatDef } from "@/lib/rules/stats";
 import { resetStatsCache } from "@/lib/rules/useStats";
@@ -684,7 +684,7 @@ function TraitsEditor({
                       >
                         {t.name}{" "}
                         <span className="text-xs font-normal text-muted">
-                          ({t.cost})
+                          ({traitCostLabel(t)})
                         </span>
                         {t.requires_master && (
                           <span className="ml-1 text-xs text-accent">

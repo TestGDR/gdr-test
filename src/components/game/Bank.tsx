@@ -26,6 +26,7 @@ export default function Bank() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [pgs, setPgs] = useState<Recipient[]>([]);
   const [npcs, setNpcs] = useState<Recipient[]>([]);
+  const [tab, setTab] = useState<"conto" | "movimenti">("conto");
 
   const fetchAll = useCallback(async () => {
     const { data: session } = await supabase.auth.getSession();
@@ -73,20 +74,41 @@ export default function Bank() {
   const paidToday = account.last_salary_on === romeToday();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <p className="text-center font-serif text-lg text-accent">Conto di {account.name}</p>
+    <div className="mx-auto max-w-3xl space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-2">
+        <p className="font-serif text-base text-accent">Conto di {account.name}</p>
+        <div className="ml-auto flex gap-1" role="tablist">
+          {(["conto", "movimenti"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-1 font-serif text-sm tracking-wide transition ${
+                tab === t ? "border-b-2 border-[#c08a4e] text-[#e6cdb0]" : "text-[#b8bec0] hover:text-[#e4e8e9]"
+              }`}
+            >
+              {t === "conto" ? "Conto" : `Movimenti (${movements.length})`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "conto" ? (
+      <>
       <div className="grid gap-3 sm:grid-cols-3">
         <Tile label="In banca" value={account.coins} note="monete sul conto" big />
         <Tile label="In tasca" value={account.pocket} note="monete con te" big />
-        <div className="rounded-md border border-border bg-black/40 p-4 text-center">
+        <div className="rounded-md border border-border bg-black/40 px-3 py-2 text-center">
           <p className="text-xs tracking-[0.2em] text-muted uppercase">Stipendio</p>
           {account.status !== "attivo" ? (
             <p className="mt-2 text-xs text-muted">Arriverà quando il PG sarà creato e avrà un ruolo in una casata.</p>
           ) : salary > 0 ? (
             <>
-              <p className="mt-1 font-serif text-3xl text-foreground">{salary}</p>
+              <p className="font-serif text-2xl text-foreground">{salary}</p>
               <p className="text-xs text-muted">al giorno · {account.house_role?.name}</p>
-              <p className={`mt-1 text-xs ${paidToday ? "text-green-300" : "text-amber-200"}`}>
+              <p className={`text-xs ${paidToday ? "text-green-300" : "text-amber-200"}`}>
                 {paidToday ? "Ritirato oggi" : "Si ritira al prossimo accesso"}
               </p>
             </>
@@ -99,7 +121,7 @@ export default function Bank() {
         Lo stipendio arriva sul conto da solo al primo accesso di ogni giorno (ora italiana).
       </p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <Box title="Preleva o deposita">
           <CashForm account={account} onDone={reload} />
         </Box>
@@ -107,9 +129,9 @@ export default function Bank() {
           <TransferForm account={account} pgs={pgs} npcs={npcs} onDone={reload} />
         </Box>
       </div>
-
+      </>
+      ) : (
       <section>
-        <h3 className="mb-2 border-b border-blood/50 pb-1 font-serif text-xl text-accent">Movimenti del conto</h3>
         {movements.length === 0 ? (
           <p className="text-sm text-muted">Nessun movimento.</p>
         ) : (
@@ -128,15 +150,16 @@ export default function Bank() {
           </ul>
         )}
       </section>
+      )}
     </div>
   );
 }
 
 function Tile({ label, value, note, big }: { label: string; value: number; note: string; big?: boolean }) {
   return (
-    <div className="rounded-md border border-border bg-black/40 p-4 text-center">
+    <div className="rounded-md border border-border bg-black/40 px-3 py-2 text-center">
       <p className="text-xs tracking-[0.2em] text-muted uppercase">{label}</p>
-      <p className={`mt-1 font-serif text-accent ${big ? "text-4xl" : "text-2xl"}`}>{value}</p>
+      <p className={`font-serif leading-tight text-accent ${big ? "text-3xl" : "text-2xl"}`}>{value}</p>
       <p className="text-xs text-muted">{note}</p>
     </div>
   );
@@ -144,8 +167,8 @@ function Tile({ label, value, note, big }: { label: string; value: number; note:
 
 function Box({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-md border border-border bg-black/40 p-4">
-      <h3 className="mb-3 font-serif text-lg text-accent">{title}</h3>
+    <section className="rounded-md border border-border bg-black/40 px-4 py-3">
+      <h3 className="mb-2 font-serif text-base text-accent">{title}</h3>
       {children}
     </section>
   );
@@ -184,10 +207,10 @@ function CashForm({ account, onDone }: { account: Account; onDone: () => void })
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <label className="block">
         <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Monete</span>
-        <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
+        <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="input py-1.5" />
       </label>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => move("preleva")} disabled={busy || !valid || n > account.coins} className="btn flex-1 px-3 py-1.5 text-sm">
@@ -245,7 +268,7 @@ function TransferForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3">
+    <form onSubmit={submit} className="space-y-2.5">
       <div className="flex gap-4 text-sm">
         {(["pg", "png"] as const).map((k) => (
           <label key={k} className="flex items-center gap-1.5">
@@ -270,7 +293,7 @@ function TransferForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={to === "pg" ? "Nome del personaggio" : "Nome del PNG"}
-          className="input"
+          className="input py-1.5"
         />
         <datalist id={`destinatari-${to}`}>
           {list.map((r) => (
@@ -282,11 +305,11 @@ function TransferForm({
       <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
         <label className="block">
           <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Monete</span>
-          <input type="number" min={1} max={account.coins} value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
+          <input type="number" min={1} max={account.coins} value={amount} onChange={(e) => setAmount(e.target.value)} className="input py-1.5" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Causale</span>
-          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Facoltativa" className="input" />
+          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Facoltativa" className="input py-1.5" />
         </label>
       </div>
       <button className="btn w-full py-1.5 text-sm" disabled={busy || !valid}>

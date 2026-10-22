@@ -10,6 +10,9 @@ type Data = {
   troops: HouseTroop[];
   kingdom: string | null;
   called: boolean | null; // null: migrazione 0143 non ancora eseguita
+  // riserva, guerra e draghi affamati (migrazione 0156; null se manca)
+  state: { reserve: number; atWar: boolean; hungry: boolean } | null;
+  isStaff: boolean;
   categories: { id: string; name: string; single_units?: boolean }[]; // gruppi di truppe (terrestri, navali...)
   training: { troop_type_id: string; resource_id: string; amount: number }[] | null; // null: migrazione 0148 mancante
   treasury: Record<string, number>;
@@ -41,7 +44,7 @@ export default function HouseArmy({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const [t, m, h, k, house, up, cg, tr, tre] = await Promise.all([
+    const [t, m, h, k, house, up, cg, tr, tre, st, staff] = await Promise.all([
       supabase.from("troop_types").select("*").order("sort_order").order("name"),
       supabase.from("troop_matchups").select("*"),
       supabase.from("house_troops").select("*").eq("house_id", houseId),
@@ -51,6 +54,8 @@ export default function HouseArmy({
       supabase.from("troop_categories").select("*").order("sort_order").order("name"),
       supabase.from("troop_training_costs").select("*"),
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", houseId),
+      supabase.from("houses").select("reserve_soldiers, at_war, dragons_hungry").eq("id", houseId).maybeSingle(),
+      supabase.rpc("house_staff"),
     ]);
     // tabelle non ancora create: il riquadro non compare
     if (t.error) return;
@@ -64,6 +69,8 @@ export default function HouseArmy({
       categories: (cg.data ?? []) as { id: string; name: string; single_units?: boolean }[],
       training: tr.error ? null : ((tr.data ?? []) as { troop_type_id: string; resource_id: string; amount: number }[]),
       treasury: Object.fromEntries((tre.data ?? []).map((x) => [x.resource_id as string, Number(x.amount)])),
+      state: st.error || !st.data ? null : { reserve: Number(st.data.reserve_soldiers), atWar: !!st.data.at_war, hungry: !!st.data.dragons_hungry },
+      isStaff: staff.data === true,
     });
   }, [supabase, houseId]);
   useEffect(() => {
@@ -138,6 +145,49 @@ export default function HouseArmy({
             </button>
           )}
         </div>
+      )}
+      {data.state && (
+        <ArmyState
+          state={data.state}
+          total={power.lines.reduce((n, l) => n + l.quantity, 0)}
+          called={!!data.called}
+          canCommand={canCommand}
+          isStaff={data.isStaff}
+          busy={busy}
+          onReserve={async (count) => {
+            setBusy(true);
+            setMsg(null);
+            const { error } = await supabase.rpc("set_army_reserve", { p_house: houseId, p_count: count });
+            setBusy(false);
+            setMsg(error ? { ok: false, text: error.message.length < 160 ? error.message : "Non salvato." } : { ok: true, text: `Riserva: ${num(count)} soldati.` });
+            if (!error) {
+              load();
+              onChanged?.();
+            }
+          }}
+          onWar={async (war) => {
+            if (!window.confirm(war ? "Mettere la casata in guerra? Le truppe in campo costano il triplo e la Manodopera cala." : "Riportare la casata in pace?")) return;
+            setBusy(true);
+            setMsg(null);
+            const { error } = await supabase.rpc("set_house_at_war", { p_house: houseId, p_war: war });
+            setBusy(false);
+            setMsg(error ? { ok: false, text: "Non riuscito." } : { ok: true, text: war ? "La casata è in guerra." : "La casata è in pace." });
+            if (!error) {
+              load();
+              onChanged?.();
+            }
+          }}
+          onFeed={async () => {
+            setBusy(true);
+            const { error } = await supabase.rpc("set_dragons_hungry", { p_house: houseId, p_hungry: false });
+            setBusy(false);
+            setMsg(error ? { ok: false, text: "Non riuscito." } : { ok: true, text: "I draghi non sono più Affamati." });
+            if (!error) {
+              load();
+              onChanged?.();
+            }
+          }}
+        />
       )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
       {power.lines.length === 0 ? (
@@ -226,6 +276,87 @@ export default function HouseArmy({
         />
       )}
     </section>
+  );
+}
+
+// Riserva, guerra e draghi affamati (migrazione 0156)
+function ArmyState({
+  state,
+  total,
+  called,
+  canCommand,
+  isStaff,
+  busy,
+  onReserve,
+  onWar,
+  onFeed,
+}: {
+  state: { reserve: number; atWar: boolean; hungry: boolean };
+  total: number;
+  called: boolean;
+  canCommand: boolean;
+  isStaff: boolean;
+  busy: boolean;
+  onReserve: (count: number) => void;
+  onWar: (war: boolean) => void;
+  onFeed: () => void;
+}) {
+  const [value, setValue] = useState(String(state.reserve));
+  const n = Math.floor(Number(value));
+  const valid = Number.isFinite(n) && n >= 0 && n <= total && n !== state.reserve;
+  const reserve = Math.min(state.reserve, total);
+  return (
+    <div className="space-y-2 border border-border/60 bg-black/30 px-3 py-2 text-sm">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          In campo <strong>{num(total - reserve)}</strong> · in riserva <strong>{num(reserve)}</strong>
+        </span>
+        {state.atWar && <span className="border border-red-700 bg-red-950/60 px-2 py-0.5 text-xs text-red-200">In guerra</span>}
+        {state.hungry && <span className="border border-amber-700 bg-amber-950/50 px-2 py-0.5 text-xs text-amber-200">Draghi Affamati</span>}
+        {isStaff && (
+          <span className="ml-auto flex gap-2">
+            {state.hungry && (
+              <button type="button" disabled={busy} onClick={onFeed} className="btn-ghost px-3 py-1 text-xs">
+                Togli Affamati
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={() => onWar(!state.atWar)} className={`px-3 py-1 text-xs ${state.atWar ? "btn-ghost" : "btn"}`}>
+              {state.atWar ? "Riporta in pace" : "Metti in guerra"}
+            </button>
+          </span>
+        )}
+      </p>
+      <p className="text-xs text-muted">
+        {!called
+          ? "Esercito congedato: tutti i soldati pagano un quarto del mantenimento."
+          : state.atWar
+            ? "In guerra le truppe in campo costano il triplo, più il foraggio; la riserva costa per intero. La Manodopera dei feudi cala."
+            : "I soldati in riserva pagano un quarto del mantenimento e si possono richiamare quando serve."}
+        {state.hungry && " I draghi non hanno avuto tutto il Bestiame: finché un mese non è pagato per intero, il loro mantenimento raddoppia."}
+      </p>
+      {canCommand && called && total > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-muted" htmlFor="riserva">
+            Soldati in riserva
+          </label>
+          <input
+            id="riserva"
+            type="number"
+            min={0}
+            max={total}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="input w-28! py-1 text-sm"
+          />
+          <button type="button" onClick={() => setValue(String(Math.round(total * 0.4)))} className="btn-ghost px-2 py-1 text-xs" title="Il 40% dell'esercito">
+            40%
+          </button>
+          <button type="button" disabled={busy || !valid} onClick={() => onReserve(n)} className="btn px-3 py-1 text-xs">
+            Salva riserva
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

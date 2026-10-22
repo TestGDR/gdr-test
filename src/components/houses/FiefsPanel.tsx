@@ -13,6 +13,7 @@ const TABS: { id: Tab; label: string }[] = [
 import { createClient } from "@/lib/supabase/client";
 import HouseArmy from "./HouseArmy";
 import HouseTrade from "./HouseTrade";
+import NpcMarket from "./NpcMarket";
 import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
 import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
 import type { MoodRow } from "@/lib/mood";
@@ -184,7 +185,12 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       {tab === "entrate" && economy("entrate")}
       {tab === "strutture" && economy("strutture")}
       {tab === "commerci" && (
-        <HouseTrade houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
+        <div className="space-y-4">
+          <HouseTrade houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
+          {data.house.playable && (
+            <NpcMarket houseId={data.house.id} canManage={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />
+          )}
+        </div>
       )}
       {tab === "esercito" && (
         <HouseArmy houseId={data.house.id} fief={fiefPoints} canCommand={!!data.builderId} resources={data.resources} onChanged={() => load().then(setData)} />

@@ -76,6 +76,8 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
+    // Rete di contatti: la prima spia in regalo (una volta sola; migrazione 0157)
+    await supabase.rpc("spy_init", { p_character: characterId });
     const [settings, levels, limit, missions, replies, spies, places, me] = await Promise.all([
       supabase.from("spy_settings").select("*").maybeSingle(),
       supabase.from("spy_levels").select("*").order("level"),

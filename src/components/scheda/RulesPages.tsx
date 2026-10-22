@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   choiceLabel,
   loadCatalog,
+  traitCost,
   traitHpBonus,
   type CharacterTrait,
   type Skill,
@@ -474,7 +475,7 @@ export function TraitsPage({
                             </span>
                             <span className="shrink-0 text-xs text-muted">
                               {kind === "vantaggio" ? "costo" : "valore"}{" "}
-                              {t.cost}
+                              {traitCost(t, o.choice)}
                             </span>
                           </p>
                           <p className="text-sm text-muted">{t.effect}</p>

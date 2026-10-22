@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   choiceLabel,
   loadCatalog,
+  traitCostLabel,
+  traitSkillOptions,
   type CharacterTrait,
   type Skill,
   type Trait,
@@ -513,7 +515,7 @@ export default function RulesManage({
                     )
                     .map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.cost})
+                        {t.name} ({traitCostLabel(t)})
                       </option>
                     ))}
                 </optgroup>
@@ -531,7 +533,7 @@ export default function RulesManage({
                     : "Quale statistica?"}
                 </option>
                 {picked.choice === "abilita"
-                  ? skills.map((k) => (
+                  ? traitSkillOptions(picked, skills).map((k) => (
                       <option key={k.id} value={k.id}>
                         {k.name}
                       </option>

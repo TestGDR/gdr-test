@@ -129,10 +129,8 @@ async function processCreation(
     loadFlow(supabase),
     supabase
       .from("traits")
-      .select(
-        "id, name, kind, cost, choice, unique_group, requires_master, active",
-      ),
-    supabase.from("skills").select("id, stat").eq("active", true),
+      .select("*"),
+    supabase.from("skills").select("id, stat, name").eq("active", true),
   ]);
   if (!character) return { error: "Personaggio non trovato." };
   if (mode === "submit") {
@@ -158,11 +156,15 @@ async function processCreation(
   const skillStats = Object.fromEntries(
     (activeSkills ?? []).map((s) => [s.id as string, s.stat as string]),
   );
+  const skillNames = Object.fromEntries(
+    (activeSkills ?? []).map((s) => [s.id as string, s.name as string]),
+  );
   const statList = await loadStats(supabase);
   const invalidStep = firstInvalidFlowStep(flow, data, {
     traits: catalog,
     skillIds,
     skillStats,
+    skillNames,
     stats: statList,
   });
   if (invalidStep !== null) {
@@ -177,7 +179,14 @@ async function processCreation(
   if (hasBlock(flow, "tratti"))
     for (const t of data.traits ?? []) {
       const info = catalog.find((x) => x.id === t.id);
-      if (info?.choice === "abilita" && !skillIds.has(t.choice ?? ""))
+      if (
+        info?.choice === "abilita" &&
+        (!skillIds.has(t.choice ?? "") ||
+          (info.choice_options?.length &&
+            !info.choice_options.some(
+              (n) => n.toLowerCase() === skillNames[t.choice ?? ""]?.toLowerCase(),
+            )))
+      )
         return {
           error: `Per "${info.name}" scegli un'abilità valida.`,
           invalidStep: traitsStep,

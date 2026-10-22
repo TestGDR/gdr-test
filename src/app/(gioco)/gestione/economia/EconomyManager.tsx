@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_ECONOMY, fiefTypeRows, sumAmounts, type EconomySettings } from "@/lib/fief-income";
 import { fiefTaxPct, fiefsTaxes, type TaxSettings } from "@/lib/taxes";
+import UpkeepRulesTab from "./UpkeepRulesTab";
 
 // ---------------------------------------------------------------------
 // Economia: risorse, tipi di feudo (introiti), strutture (costi e introiti),
@@ -58,6 +59,7 @@ const TABS = [
   { id: "tasse", label: "Tasse" },
   { id: "tesoro", label: "Tesoro delle casate" },
   { id: "umore", label: "Umore del popolo" },
+  { id: "eserciti", label: "Esercito e mercato" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -127,6 +129,7 @@ export default function EconomyManager({ houses, places }: { houses: HouseLite[]
         {tab === "tasse" && <TaxesTab {...cat} houses={houses} />}
         {tab === "tesoro" && <TreasuryTab {...cat} houses={houses} />}
         {tab === "umore" && <MoodTab {...cat} />}
+        {tab === "eserciti" && <UpkeepRulesTab supabase={cat.supabase} resources={cat.resources} structures={cat.structures} reload={cat.reload} />}
       </div>
     </section>
   );

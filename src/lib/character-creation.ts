@@ -91,6 +91,9 @@ export type TraitInfo = {
   unique_group: string | null;
   requires_master: boolean;
   active: boolean;
+  stat_costs?: Record<string, number> | null; // migrazione 0157
+  choice_options?: string[] | null;
+  incompatible_skills?: string[] | null;
 };
 
 const ids = (list: readonly { id: string }[]) => list.map((x) => x.id);

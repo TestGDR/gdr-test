@@ -31,7 +31,38 @@ export type Trait = {
   modifiers: TraitModifier[];
   sort_order: number;
   active: boolean;
+  // migrazione 0157 (assenti se non eseguita)
+  stat_costs?: Record<string, number> | null; // costo per statistica scelta
+  choice_options?: string[] | null; // abilita' tra cui scegliere (nomi); vuoto = tutte
+  incompatible_skills?: string[] | null; // non si prende con punti in queste abilita'
 };
+
+type TraitRules = Pick<Trait, "cost"> & {
+  stat_costs?: Record<string, number> | null;
+  choice_options?: string[] | null;
+  incompatible_skills?: string[] | null;
+};
+
+// Costo (o valore) del tratto: se dipende dalla statistica scelta, quello della statistica
+export function traitCost(t: TraitRules, choice?: string | null) {
+  const byStat = t.stat_costs && choice ? t.stat_costs[choice] : undefined;
+  return typeof byStat === "number" ? byStat : t.cost;
+}
+// Testo del costo per gli elenchi: "1–4" se dipende dalla statistica
+export function traitCostLabel(t: TraitRules) {
+  const v = Object.values(t.stat_costs ?? {});
+  return v.length ? `${Math.min(...v)}–${Math.max(...v)}` : String(t.cost);
+}
+// Abilita' che si possono scegliere per il tratto
+export function traitSkillOptions<S extends { name: string }>(t: TraitRules, skills: S[]) {
+  const only = (t.choice_options ?? []).map((n) => n.toLowerCase());
+  return only.length ? skills.filter((k) => only.includes(k.name.toLowerCase())) : skills;
+}
+// Abilita' (con punti) che impediscono il tratto, oppure null
+export function traitBlockedBy(t: TraitRules, skillLevels: { name: string; level: number }[]) {
+  const bad = (t.incompatible_skills ?? []).map((n) => n.toLowerCase());
+  return skillLevels.find((k) => k.level > 0 && bad.includes(k.name.toLowerCase()))?.name ?? null;
+}
 
 export type CharacterTrait = { trait_id: string; choice: string | null };
 

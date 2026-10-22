@@ -1666,6 +1666,7 @@ function DesktopLeft({
   inHouse: boolean;
 }) {
   const status = useCharacterStatus(character?.id ?? null);
+  const offPanels = zonePanels(ZONE_OFF, inHouse);
   const gamePanels: Panel[] = ["viaggio", "feudi", "mercato", "spie", "voci", "notizie-on"];
   return (
     <aside className="hidden w-64 shrink-0 flex-col gap-2 overflow-hidden p-2 lg:flex">
@@ -1689,9 +1690,8 @@ function DesktopLeft({
                 <img src={character.house.sigil_url} alt={`Casata ${character.house.name}`} className="h-5 w-5 object-contain" />
               </span>
             )}
-            <p className={`${character?.house && HOUSE_BANNERS.has(character.house.name.toLowerCase()) ? "" : "mt-5 pr-7"} font-serif text-[0.8125rem] leading-tight break-words text-[#b8bec0] [text-shadow:0_1px_2px_#000]`}>{character?.name ?? displayName}</p>
             {status?.place && (
-              <p className="mt-1 text-[0.6875rem] leading-snug text-[#b39a82]">
+              <p className={`${character?.house && HOUSE_BANNERS.has(character.house.name.toLowerCase()) ? "mt-1" : "mt-5 pr-7"} text-[0.6875rem] leading-snug text-[#b39a82]`}>
                 Posizione:
                 <span className="block text-[#b8bec0]">{status.place}</span>
               </p>
@@ -1745,10 +1745,28 @@ function DesktopLeft({
       {/* fuori gioco */}
       <Pannello title="Area off game">
         <ul>
-          {zonePanels(ZONE_OFF, inHouse).map((p) => (
-            <li key={p.id}>
-              <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
-            </li>
+          {offPanels.filter((p) => p.id === "notizie-off").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
+          ))}
+          {offPanels.filter((p) => p.id === "forum").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
+          ))}
+          <li>
+            <TicketTab list />
+          </li>
+          {offPanels.filter((p) => p.id === "ricerca").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
+          ))}
+          {offPanels.filter((p) => p.id === "assenze").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
           ))}
           <li>
             <UtilityButton
@@ -1762,9 +1780,11 @@ function DesktopLeft({
               }
             />
           </li>
-          <li>
-            <TicketTab list />
-          </li>
+          {offPanels.filter((p) => p.id === "faq").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
+          ))}
           <li>
             <ModalButton
               title="Archivio giocate"
@@ -1780,6 +1800,11 @@ function DesktopLeft({
               {() => <GameArchive />}
             </ModalButton>
           </li>
+          {offPanels.filter((p) => p.id === "calendario").map((p) => (
+  <li key={p.id}>
+                <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+              </li>
+          ))}
         </ul>
       </Pannello>
     </aside>

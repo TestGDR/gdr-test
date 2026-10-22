@@ -15,6 +15,7 @@ import {
   type TraitInfo,
 } from "@/lib/character-creation";
 import { validBirth } from "@/lib/game-date";
+import { traitBlockedBy, traitCost } from "@/lib/rules/catalog";
 import { RULES } from "@/lib/rules/config";
 import {
   skillLevelCap,
@@ -213,7 +214,7 @@ export function defaultConfig(kind: BlockKind): BlockConfig {
     case "statistiche":
       return { points: c.statPoints, min: c.statMin, max: c.statMax };
     case "abilita":
-      return { age_bonus: 10 };
+      return { age_bonus: 25 };
     case "tratti":
       return {
         advantage_points: c.advantagePoints,
@@ -301,6 +302,7 @@ export type FlowContext = {
   traits?: TraitInfo[];
   skillIds?: Set<string>;
   skillStats?: Record<string, string>; // id abilita' -> statistica collegata
+  skillNames?: Record<string, string>; // id abilita' -> nome (tratti incompatibili)
   stats?: readonly { id: string; code: string; label: string }[]; // statistiche attive (pannello)
 };
 
@@ -345,7 +347,9 @@ function traitError(
   data: CreationData,
   c: BlockConfig,
   catalog: TraitInfo[],
+  skillNames?: Record<string, string>,
 ): string | null {
+  const levels = Object.entries(data.skills ?? {}).map(([id, level]) => ({ name: skillNames?.[id] ?? "", level }));
   const picks: TraitPick[] = [];
   for (const t of data.traits ?? []) {
     const info = catalog.find((x) => x.id === t.id);
@@ -355,9 +359,12 @@ function traitError(
       return `"${info.name}" si ottiene solo con il permesso del Master.`;
     if (info.choice !== "nessuna" && !t.choice)
       return `Per "${info.name}" scegli ${info.choice === "abilita" ? "l'abilità" : "la statistica"}.`;
+    const blocked = skillNames ? traitBlockedBy(info, levels) : null;
+    if (blocked)
+      return `"${info.name}" non si prende con punti in ${blocked}.`;
     picks.push({
       kind: info.kind,
-      cost: info.cost,
+      cost: traitCost(info, t.choice),
       name: info.name,
       uniqueGroup: info.unique_group,
     });
@@ -437,7 +444,7 @@ export function validateBlock(
       return null;
     }
     case "tratti":
-      return ctx.traits ? traitError(data, c, ctx.traits) : null;
+      return ctx.traits ? traitError(data, c, ctx.traits, ctx.skillNames) : null;
     case "aspetto":
       return (data.appearance?.trim().length ?? 0) >= c.min_chars!
         ? null
