@@ -104,6 +104,7 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
   const [pgName, setPgName] = useState(row.character?.name ?? row.username);
   const [banHours, setBanHours] = useState<number | null>(24);
   const [reason, setReason] = useState("");
+  const [confirmName, setConfirmName] = useState("");
 
   function run(action: () => Promise<UserResult>, ok: string, after?: () => void) {
     setMsg(null);
@@ -191,20 +192,24 @@ function UserPanel({ row, locked, isMe, onDeleted }: { row: UserRow; locked: boo
       <section className="space-y-2">
         <h4 className="font-serif text-red-400">Eliminazione</h4>
         <p className="text-xs text-muted">Cancella per sempre l&apos;account con il personaggio, i messaggi e tutto ciò che gli appartiene. Non si può annullare.</p>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            const name = row.character?.name ?? row.username;
-            const typed = window.prompt(`Per eliminare definitivamente l'account, scrivi il nome "${name}"`);
-            if (typed === null) return;
-            if (typed.trim().toLowerCase() !== name.toLowerCase()) return setMsg({ ok: false, text: "Il nome non corrisponde: account non eliminato." });
-            run(() => deleteUser(row.id), "Account eliminato.", onDeleted);
-          }}
-          className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400 hover:border-red-500"
-        >
-          Elimina account
-        </button>
+        {/* conferma scrivendo il nome (nella pagina: alcuni browser non permettono le finestre di inserimento) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+            placeholder={`Scrivi "${row.character?.name ?? row.username}" per confermare`}
+            aria-label="Nome da scrivere per confermare l'eliminazione"
+            className="input min-w-56 flex-1 py-1"
+          />
+          <button
+            type="button"
+            disabled={pending || confirmName.trim().toLowerCase() !== (row.character?.name ?? row.username).toLowerCase()}
+            onClick={() => run(() => deleteUser(row.id), "Account eliminato.", onDeleted)}
+            className="btn-ghost border-red-900 px-3 py-1 text-xs text-red-400 hover:border-red-500"
+          >
+            Elimina account
+          </button>
+        </div>
       </section>
 
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}

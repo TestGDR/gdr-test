@@ -40,7 +40,6 @@ import {
   FaqIcon,
   SpyIcon,
   CastleIcon,
-  ChevronIcon,
   DragonIcon,
   GearIcon,
   HornIcon,
@@ -76,6 +75,7 @@ import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
 import OnlineModal, { BubbleIcon } from "./OnlineModal";
 import UtilityButton from "./UtilityPanel";
+import GameArchive from "./GameArchive";
 import AvailabilityDot from "./AvailabilityDot";
 import { QuestContext, useQuestMode } from "./quest";
 import { usePresence, type OnlinePlayer } from "./presence";
@@ -84,6 +84,7 @@ import SalaryCollector from "./SalaryCollector";
 import WeatherView from "./WeatherView";
 import DragonPanel from "@/components/draghi/DragonPanel";
 import Modal from "@/components/ui/Modal";
+import { HpBar, ListCaption, MapTab, Pannello, TabDivider, TabLabel, listBtn, tabBtn, useCharacterStatus } from "./DesktopLayout";
 
 // ---------------------------------------------------------------------
 // Zona attuale (titolo in alto + riquadro in colonna sinistra):
@@ -178,8 +179,9 @@ export default function GameShell({
   const pathname = usePathname();
   const inChat = pathname.startsWith("/chat/"); // cellulare: la chat occupa tutto lo schermo
   const [area, setArea] = useState<Area>({ title: "Westeros" });
-  const [leftOpen, setLeftOpen] = useState(true); // desktop
-  const [rightOpen, setRightOpen] = useState(true); // desktop
+  // su computer le colonne restano sempre aperte
+  const leftOpen = true;
+  const rightOpen = true;
   const [drawerOpen, setDrawerOpen] = useState(false); // cellulare
   const [drawerPath, setDrawerPath] = useState(pathname);
   if (pathname !== drawerPath) {
@@ -300,10 +302,18 @@ export default function GameShell({
       <ForumUnreadContext.Provider value={forumUnread.count}>
       <GossipPendingContext.Provider value={gossipPending}>
       <SheetActionsContext.Provider value={sheetActions}>
-      <div className="flex h-dvh flex-col overflow-hidden">
+      <div className="flex h-dvh flex-col overflow-hidden lg:bg-[#0a0908] lg:bg-[url('/images/ui/interno/sfondo-3.webp')] lg:bg-repeat">
         {/* Barra in alto: titolo al centro, con due icone per lato sempre accanto a lui.
             Cellulare: al posto del titolo l'immagine del personaggio, a destra missive e OFF */}
-        <header className="relative z-30 flex min-h-14 shrink-0 items-center py-2.5 justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:px-4 lg:pt-2 lg:pb-5">
+        <DesktopTopBar
+          pathname={pathname}
+          canManage={canManage}
+          canEditDocs={canEditDocs}
+          hasCharacter={!!character}
+          unread={unread.counts}
+          onOpenMessages={openMessages}
+        />
+        <header className="relative z-30 flex min-h-14 shrink-0 items-center py-2.5 justify-center border-b border-border bg-black/85 pr-2 pl-11 backdrop-blur-sm lg:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -376,8 +386,18 @@ export default function GameShell({
         </header>
 
         <div className="relative flex min-h-0 flex-1">
-          {/* Sfondo: pietra scura */}
-          <div className="stone-bg pointer-events-none absolute inset-0 -z-10" />
+          {/* Sfondo: pietra scura (cellulare; sul computer la texture della pagina) */}
+          <div className="stone-bg pointer-events-none absolute inset-0 -z-10 lg:hidden" />
+
+          {/* Computer: colonna sinistra (personaggio e menu) */}
+          <DesktopLeft
+            character={character}
+            displayName={displayName}
+            onOpenPanel={openPanel}
+            onOpenDragon={character && hasDragon ? () => setDragonOpen((n) => n + 1) : null}
+            newRequests={playRequests.count}
+            inHouse={!!character?.house}
+          />
 
           {/* Colonna sinistra: desktop fissa e richiudibile, cellulare a scomparsa */}
           {drawerOpen && (
@@ -390,7 +410,7 @@ export default function GameShell({
               cosi' non si deforma durante la transizione */}
           <aside
             inert={!leftOpen}
-            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:relative lg:z-10 lg:shrink-0 lg:translate-x-0 lg:overflow-hidden lg:bg-black/40 lg:shadow-[8px_0_28px_rgb(0_0_0/0.85)] ${
+            className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-border bg-panel transition-[translate,width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0" : "-translate-x-full"
             } ${leftOpen ? "lg:w-64 lg:opacity-100" : "lg:w-0 lg:border-transparent lg:opacity-0"}`}
           >
@@ -429,18 +449,24 @@ export default function GameShell({
             </div>
           </aside>
 
-          <EdgeToggle side="left" open={leftOpen} onClick={() => setLeftOpen((v) => !v)} />
-
           {/* Centro: mappa, luoghi e chat */}
-          <main className={`min-w-0 flex-1 overflow-y-auto lg:p-5 lg:pb-5 ${inChat ? "flex flex-col p-0" : "p-3 pb-20"}`}>{children}</main>
+          <main className={`min-w-0 flex-1 overflow-y-auto lg:px-4 lg:py-4 ${inChat ? "flex flex-col p-0" : "p-3 pb-20"}`}>{children}</main>
 
-          <EdgeToggle side="right" open={rightOpen} onClick={() => setRightOpen((v) => !v)} />
+          {/* Computer: colonna destra (localita' e presenti) */}
+          <DesktopRight
+            area={area}
+            userId={userId}
+            online={online}
+            onOpenOnline={() => setOnlineOpen(true)}
+            onChangeAvailability={changeAvailability}
+            onOpenSheet={setSheetId}
+          />
 
           {/* Colonna destra: icone (in basso su cellulare) */}
           <nav
             aria-label="Menu di gioco"
             inert={!rightOpen}
-            className={`${inChat ? "max-lg:hidden " : ""}fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:relative lg:z-10 lg:h-auto lg:shrink-0 lg:flex-col lg:justify-start lg:gap-2 lg:border-t-0 lg:border-l lg:bg-black/40 lg:px-0 lg:py-4 lg:shadow-[-8px_0_28px_rgb(0_0_0/0.85)] ${
+            className={`${inChat ? "max-lg:hidden " : ""}fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around gap-1 overflow-x-auto border-t border-blood/60 bg-black/90 px-2 transition-[width,opacity,border-color] duration-300 ease-in-out motion-reduce:transition-none lg:hidden ${
               rightOpen
                 ? "lg:w-40 lg:overflow-visible lg:border-border lg:opacity-100"
                 : "lg:w-0 lg:overflow-hidden lg:border-transparent lg:opacity-0"
@@ -628,33 +654,6 @@ export default function GameShell({
   );
 }
 
-// Linguetta per aprire/chiudere una colonna (solo desktop)
-function EdgeToggle({
-  side,
-  open,
-  onClick,
-}: {
-  side: "left" | "right";
-  open: boolean;
-  onClick: () => void;
-}) {
-  // freccia verso la colonna quando e' chiusa, verso il centro quando e' aperta
-  const pointsLeft = side === "left" ? open : !open;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`${open ? "Chiudi" : "Apri"} colonna ${side === "left" ? "sinistra" : "destra"}`}
-      // linguetta attaccata alla colonna: stesso fondo, nessun bordo dal lato della colonna
-      className={`relative z-20 hidden w-5 shrink-0 items-center justify-center self-center border border-border bg-[#0b0a0a] py-4 text-muted hover:text-accent lg:flex ${
-        side === "left" ? "-ml-px rounded-r-md border-l-0" : "-mr-px rounded-l-md border-r-0"
-      }`}
-    >
-      <ChevronIcon left={pointsLeft} />
-    </button>
-  );
-}
-
 function LeftColumn({
   area,
   userId,
@@ -828,6 +827,7 @@ function CharacterPicture({
   balloon,
   small,
   medieval,
+  bronze,
 }: {
   character: MainCharacter | null;
   displayName: string;
@@ -835,8 +835,11 @@ function CharacterPicture({
   balloon?: boolean;
   small?: boolean; // cornice sottile (barra in alto del cellulare)
   medieval?: boolean; // cornice di ferro con piastre chiodate
+  bronze?: boolean; // cornice di bronzo con i gigli agli angoli (computer)
 }) {
-  const frame = medieval
+  const frame = bronze
+    ? "cornice-ritratto"
+    : medieval
     ? `frame-medieval ${small ? "frame-medieval-sm" : ""} block`
     : `frame-gold ${small ? "frame-gold-sm" : ""} block`;
   if (!character)
@@ -1399,6 +1402,7 @@ function PanelButton({
   onOpen,
   className,
   caption,
+  list = false,
 }: {
   panel: Panel;
   icon: ReactNode;
@@ -1406,6 +1410,7 @@ function PanelButton({
   onOpen: (p: Panel) => void;
   className: string;
   caption?: string; // nome sotto l'icona (menu del cellulare)
+  list?: boolean; // nelle colonne del computer: nome accanto all'icona
 }) {
   const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
   const unseen = useContext(NewsUnseenContext);
@@ -1426,7 +1431,7 @@ function PanelButton({
       aria-label={panelLabel(panel, newRequests, newNews)}
     >
       {icon}
-      {caption && <Caption>{caption}</Caption>}
+      {caption && (list ? <ListCaption>{caption}</ListCaption> : <Caption>{caption}</Caption>)}
       {calling && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
           {newRequests}
@@ -1518,3 +1523,420 @@ function RightRail({
     </>
   );
 }
+
+// =====================================================================
+// Computer: barra in alto a schede, colonne laterali
+// =====================================================================
+function DesktopTopBar({
+  pathname,
+  canManage,
+  canEditDocs,
+  hasCharacter,
+  unread,
+  onOpenMessages,
+}: {
+  pathname: string;
+  canManage: boolean;
+  canEditDocs: boolean;
+  hasCharacter: boolean;
+  unread: Record<MessageKind, number>;
+  onOpenMessages: (kind: MessageKind) => void;
+}) {
+  const router = useRouter();
+  const inPlace = pathname.startsWith("/chat/") || pathname === "/mappa";
+  const badge = (n: number) =>
+    n > 0 && <span className="absolute top-3 right-5 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">{n}</span>;
+  const action =
+    "group flex flex-1 items-center justify-center px-1.5 py-1 text-[#d4b394] transition hover:text-[#f3e2cc] [&_svg]:h-5 [&_svg]:w-5";
+  return (
+    <header className="relative z-30 hidden h-[70px] shrink-0 items-stretch bg-black/40 shadow-[0_6px_18px_rgb(0_0_0/0.7)] lg:flex">
+      {/* linea in fondo alla barra (immagine che si ripete) */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-[5px] -z-20 h-3 bg-[url('/images/ui/interno/linea-top.png')] bg-repeat-x" />
+      {/* logo */}
+      <h1 className="flex w-64 shrink-0 items-center justify-center px-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logo-westeros-trono.png" alt="Westeros GDR" width={1200} height={434} className="h-[58px] w-auto drop-shadow-[0_3px_8px_rgb(0_0_0/0.9)]" />
+      </h1>
+      {/* schede */}
+      <nav aria-label="Menu principale" className="flex min-w-0 flex-1 items-center justify-center">
+        <MapTab active={pathname.startsWith("/mappa")} icon={<CompassIcon />} />
+        <TabDivider />
+        {hasCharacter && (
+          <>
+            <button type="button" className={tabBtn} onClick={() => onOpenMessages("missiva")} aria-label={unread.missiva > 0 ? `Missive: ${unread.missiva} non lette` : "Missive"}>
+              <QuillIcon />
+              <TabLabel>Missive</TabLabel>
+              {badge(unread.missiva)}
+            </button>
+            <TabDivider />
+            <button type="button" className={tabBtn} onClick={() => onOpenMessages("off")} aria-label={unread.off > 0 ? `Messaggi OFF: ${unread.off} non letti` : "Messaggi OFF"}>
+              <BubbleIcon />
+              <TabLabel>Messaggi</TabLabel>
+              {badge(unread.off)}
+            </button>
+            <TabDivider />
+          </>
+        )}
+        <GuideButton
+          book="ambientazione"
+          label="Ambientazione"
+          canEdit={canEditDocs}
+          className={tabBtn}
+          trigger={
+            <>
+              <CastleIcon />
+              <TabLabel>Ambient</TabLabel>
+            </>
+          }
+        />
+        <TabDivider />
+        <GuideButton
+          book="manuale"
+          label="Manuale di Gioco"
+          canEdit={canEditDocs}
+          className={tabBtn}
+          trigger={
+            <>
+              <BookIcon />
+              <TabLabel>Guide</TabLabel>
+            </>
+          }
+        />
+      </nav>
+      {/* castello e comandi */}
+      <div className="relative w-[300px] shrink-0 overflow-hidden border-l border-[#7a5530]/60">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/ui/interno/castello-sx.webp" alt="" aria-hidden width={324} height={115} className="absolute inset-0 h-full w-full object-cover object-bottom" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
+        <div className="absolute right-0 bottom-0 flex h-[44px] w-[190px] items-center justify-end bg-[url('/images/ui/interno/targa-comandi.png')] bg-[length:100%_100%] bg-no-repeat pr-2 pl-7 [&>*+*]:border-l [&>*+*]:border-[#7a5530]/60">
+          <button
+            type="button"
+            onClick={() => (inPlace ? router.refresh() : router.push("/mappa"))}
+            className={action}
+            title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+          >
+            <RefreshIcon />
+            <span className="sr-only">Aggiorna</span>
+          </button>
+          {canManage && (
+            <Link href="/gestione" className={action} title="Gestione">
+              <GearIcon />
+              <span className="sr-only">Gestione</span>
+            </Link>
+          )}
+          <form action={logout} className="flex flex-1 justify-center">
+            <button className={action} title="Esci">
+              <PowerIcon />
+              <span className="sr-only">Esci</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// Ticket come scheda della barra in alto: lampeggia finche' ci sono risposte da leggere
+function TicketTab({ list = false }: { list?: boolean }) {
+  const { count, open } = useContext(TicketContext);
+  return (
+    <button type="button" onClick={open} className={`${list ? listBtn : tabBtn} ${count > 0 ? "blink-call" : ""}`} aria-label={count > 0 ? `Ticket: ${count} da leggere` : "Ticket"}>
+      <TicketIcon />
+      {list ? <ListCaption>Ticket</ListCaption> : <TabLabel>Ticket</TabLabel>}
+      {count > 0 && (
+        <span className={`${list ? "ml-auto" : "absolute top-3 right-5"} min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow`}>{count}</span>
+      )}
+    </button>
+  );
+}
+
+function DesktopLeft({
+  character,
+  displayName,
+  onOpenPanel,
+  onOpenDragon,
+  newRequests,
+  inHouse,
+}: {
+  character: MainCharacter | null;
+  displayName: string;
+  onOpenPanel: (p: Panel) => void;
+  onOpenDragon: (() => void) | null;
+  newRequests: number;
+  inHouse: boolean;
+}) {
+  const status = useCharacterStatus(character?.id ?? null);
+  const gamePanels: Panel[] = ["viaggio", "feudi", "mercato", "spie", "voci", "notizie-on"];
+  return (
+    <aside className="hidden w-64 shrink-0 flex-col gap-2 overflow-hidden p-2 lg:flex">
+      {/* personaggio */}
+      <Pannello>
+        <div className="flex gap-3">
+          <CharacterPicture character={character} displayName={displayName} size="h-[95px] w-[86px]" bronze />
+          <div className="relative min-w-0 flex-1 pt-1">
+            {character?.house && HOUSE_BANNERS.has(character.house.name.toLowerCase()) ? (
+              // stendardo della casata, appeso al centro sopra il nome
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/images/casate/stendardo-${character.house.name.toLowerCase()}.png`}
+                alt={`Casata ${character.house.name}`}
+                title={`Casata ${character.house.name}`}
+                className="mx-auto -mt-3 mb-1 block h-[62px] w-auto drop-shadow-[0_3px_4px_#000]"
+              />
+            ) : character?.house?.sigil_url && (
+              <span className="pennone-casata absolute -top-4 right-0 flex h-12 w-8 items-start justify-center pt-1.5" title={`Casata ${character.house.name}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={character.house.sigil_url} alt={`Casata ${character.house.name}`} className="h-5 w-5 object-contain" />
+              </span>
+            )}
+            <p className={`${character?.house && HOUSE_BANNERS.has(character.house.name.toLowerCase()) ? "" : "mt-5 pr-7"} font-serif text-[0.8125rem] leading-tight break-words text-[#b8bec0] [text-shadow:0_1px_2px_#000]`}>{character?.name ?? displayName}</p>
+            {status?.place && (
+              <p className="mt-1 text-[0.6875rem] leading-snug text-[#b39a82]">
+                Posizione:
+                <span className="block text-[#b8bec0]">{status.place}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {status && (
+          <div className="mt-2 space-y-1">
+            <HpBar hp={status.hp} maxHp={status.maxHp} />
+            <p className="flex justify-between font-serif text-[0.6875rem] text-[#b8bec0]">
+              <span>PF: {status.hp}/{status.maxHp}</span>
+              <span>PX: {status.px.toLocaleString("it-IT")}</span>
+            </p>
+          </div>
+        )}
+      </Pannello>
+
+      {/* menu del gioco */}
+      <Pannello title="Menu gioco">
+        <ul>
+          {character && (
+            <li>
+              <SheetButton
+                characterId={character.id}
+                className={listBtn}
+                trigger={
+                  <>
+                    <UsersIcon />
+                    <ListCaption>Scheda personaggio</ListCaption>
+                  </>
+                }
+              />
+            </li>
+          )}
+          {zonePanels(gamePanels, inHouse).map((p) => (
+            <li key={p.id}>
+              <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+            </li>
+          ))}
+          {onOpenDragon && (
+            <li>
+              <button type="button" onClick={onOpenDragon} className={listBtn}>
+                <DragonIcon />
+                <ListCaption>Il mio drago</ListCaption>
+              </button>
+            </li>
+          )}
+        </ul>
+      </Pannello>
+
+      {/* fuori gioco */}
+      <Pannello title="Area off game">
+        <ul>
+          {zonePanels(ZONE_OFF, inHouse).map((p) => (
+            <li key={p.id}>
+              <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
+            </li>
+          ))}
+          <li>
+            <UtilityButton
+              mode="utility"
+              className={listBtn}
+              trigger={
+                <>
+                  <ToolsIcon />
+                  <ListCaption>Utility</ListCaption>
+                </>
+              }
+            />
+          </li>
+          <li>
+            <TicketTab list />
+          </li>
+          <li>
+            <ModalButton
+              title="Archivio giocate"
+              size="xl"
+              className={listBtn}
+              label={
+                <>
+                  <ArchiveIcon />
+                  <ListCaption>Archivio giocate</ListCaption>
+                </>
+              }
+            >
+              {() => <GameArchive />}
+            </ModalButton>
+          </li>
+        </ul>
+      </Pannello>
+    </aside>
+  );
+}
+
+function DesktopRight({
+  area,
+  userId,
+  online,
+  onOpenOnline,
+  onChangeAvailability,
+  onOpenSheet,
+}: {
+  area: Area;
+  userId: string;
+  online: OnlinePlayer[];
+  onOpenOnline: () => void;
+  onChangeAvailability: (value: Availability) => void;
+  onOpenSheet: (characterId: string) => void;
+}) {
+  const me = online.find((p) => p.userId === userId);
+  const here = me ? online.filter((p) => p.placeKey === me.placeKey) : [];
+  const action = "flex w-full items-center gap-3 bg-[url('/images/ui/interno/pulsante.png')] bg-[length:100%_100%] bg-no-repeat px-3 py-2 text-left text-[#d4b394] transition hover:brightness-125 hover:text-[#f3e2cc] [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0";
+  return (
+    <aside className="relative isolate hidden w-72 shrink-0 flex-col gap-2 overflow-hidden pt-[44px] pr-[26px] pb-[70px] pl-[18px] lg:flex">
+      {/* sfondo di pietra: testa e coda fisse, il corpo si ripete per tutta l'altezza */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex flex-col">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/ui/interno/col-dx-testa.webp" alt="" width={439} height={69} className="block h-auto w-full shrink-0" />
+        <div className="min-h-0 flex-1 bg-[url('/images/ui/interno/col-dx-corpo.webp')] bg-[length:100%_auto] bg-repeat-y" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/ui/interno/col-dx-coda.webp" alt="" width={439} height={148} className="block h-auto w-full shrink-0" />
+      </div>
+      <Pannello>
+        <div className="relative h-24 overflow-hidden border border-[#7a5530]/80 shadow-[inset_0_0_12px_rgb(0_0_0/0.8)]">
+          {area.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={area.image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Image src={defaultAreaImage} alt="" fill sizes="256px" className="object-cover" />
+          )}
+        </div>
+        <h3 className="mt-2 border-b border-[#7a5530]/60 pb-1 font-serif text-[0.9375rem] text-[#b8bec0] [text-shadow:0_1px_2px_#000]">{area.title}</h3>
+        <div className="mt-2 flex justify-center">
+          <div className="parchment px-5 py-1.5 text-center font-serif text-[0.6875rem] font-semibold tracking-[0.06em] whitespace-nowrap uppercase">
+            <GameDateLabel />
+          </div>
+        </div>
+        <div className="mt-2 space-y-1">
+          <ModalButton
+            title={area.title}
+            size="lg"
+            className={action}
+            label={
+              <>
+                <InfoIcon />
+                <ListCaption>Scheda luogo</ListCaption>
+              </>
+            }
+          >
+            {() => <PlaceInfo area={area} />}
+          </ModalButton>
+          <button type="button" onClick={onOpenOnline} className={action}>
+            <UsersIcon />
+            <ListCaption>Presenti online</ListCaption>
+            <span className="ml-auto rounded-full bg-[#c08a4e]/80 px-2 text-xs font-semibold text-black">{online.length}</span>
+          </button>
+          <ModalButton
+            title="Meteo"
+            size="lg"
+            className={action}
+            label={
+              <>
+                <WeatherIcon />
+                <ListCaption>Meteo</ListCaption>
+              </>
+            }
+          >
+            {() => <WeatherView regionId={area.weatherRegionId ?? null} />}
+          </ModalButton>
+          <UtilityButton
+            mode="servizi"
+            className={action}
+            trigger={
+              <>
+                <KeyIcon />
+                <ListCaption>Locande e servizi</ListCaption>
+              </>
+            }
+          />
+        </div>
+      </Pannello>
+
+      {/* chi e' qui con me */}
+      <Pannello title={me?.place === "chat" ? `Presenti in ${me.placeLabel}` : "Presenti sulla mappa"} className="flex min-h-0 flex-1 flex-col">
+        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto text-sm">
+          {here.map((p) => (
+            <li
+              key={p.userId}
+              className={`flex items-center gap-2 ${p.live ? "" : "opacity-50"}`}
+              title={p.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
+            >
+              <AvailabilityDot value={p.availability} onChange={p.userId === userId ? onChangeAvailability : undefined} />
+              {p.sigil && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.sigil} alt="" title={`Casata ${p.house}`} className="h-4 w-4 shrink-0 object-contain" />
+              )}
+              <button
+                type="button"
+                onClick={() => p.characterId && onOpenSheet(p.characterId)}
+                disabled={!p.characterId}
+                title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
+                className="font-name truncate text-left text-[0.8125rem] text-[#b8bec0] hover:underline disabled:no-underline"
+              >
+                {p.name}
+              </button>
+              {!p.active && <span title="Personaggio non ancora attivo" className="text-xs text-amber-200">⧗</span>}
+            </li>
+          ))}
+          {here.length === 0 && <li className="text-xs text-muted">Nessuno.</li>}
+        </ul>
+      </Pannello>
+    </aside>
+  );
+}
+
+const KeyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="8" cy="15" r="4" />
+    <path d="M11 12 L20 3 M17 6 l3 3 M14 9 l2 2" />
+  </svg>
+);
+
+// nomi delle voci nelle colonne del computer
+// Casate con lo stendardo disegnato (public/images/casate/stendardo-<nome>.png)
+const HOUSE_BANNERS = new Set(["blackfyre", "brightfyre", "celtigar", "darklyn", "staunton", "thaerion", "velaryon", "vhassar"]);
+
+const SIDE_NAMES: Record<Panel, string> = {
+  viaggio: "Viaggio",
+  feudi: "Feudi e possedimenti",
+  mercato: "Mercato",
+  spie: "Spie",
+  voci: "Voci e pettegolezzi",
+  "notizie-on": "Notizie ON",
+  "notizie-off": "Notizie OFF",
+  forum: "Forum",
+  ricerca: "Ricerca gioco",
+  assenze: "Assenze",
+  calendario: "Calendario",
+  faq: "FAQ",
+};
+
+
+const ArchiveIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4M9 12h6M9 15h6M9 18h4" />
+  </svg>
+);

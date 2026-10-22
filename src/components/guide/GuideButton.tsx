@@ -59,6 +59,8 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // la voce cliccata dal giocatore: solo lei resta evidenziata (quella aperta all'inizio no)
+  const [clickedId, setClickedId] = useState<string | null>(null);
   const [bodies, setBodies] = useState<Record<string, Body>>({});
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Page[] | null>(null);
@@ -132,6 +134,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
   function openPage(page: Page) {
     setOpen((prev) => new Set(prev).add(page.section_id));
     setSelectedId(page.id);
+    setClickedId(page.id);
     setResults(null);
   }
 
@@ -143,8 +146,8 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
     after?.(res);
   }
 
-  async function search(e: FormEvent) {
-    e.preventDefault();
+  async function search(e?: FormEvent) {
+    e?.preventDefault();
     // Caratteri con significato speciale nei filtri di Supabase
     const q = query.replace(/[,()*%_\\:"]/g, " ").trim();
     if (!q) return setResults(null);
@@ -236,12 +239,29 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
 
   return (
     // Libro aperto: copertina di cuoio, a sinistra l'indice, a destra il contenuto
-    <div className={`book book-${book} flex h-full flex-col p-2 md:flex-row md:p-4`}>
-      {/* Pagina sinistra: macrosezioni (si aprono/chiudono) e sezioni */}
-      <aside className="book-page book-page-left max-h-60 shrink-0 space-y-3 overflow-y-auto px-8 py-8 md:max-h-none md:w-80">
-        {loadError && <p className="text-sm text-red-800">Impossibile caricare i contenuti.</p>}
-        {sections === null && !loadError && <p className="text-sm text-[#7a6248]">Caricamento...</p>}
-        {sections?.length === 0 && <p className="text-sm text-[#7a6248]">Nessun contenuto.</p>}
+    <div className={`guida guida-${book} flex h-full flex-col gap-3 p-2 md:flex-row md:p-3`}>
+      {/* Indice: titolo, ricerca, macrosezioni (si aprono/chiudono) e sezioni */}
+      <aside className="guida-indice flex max-h-72 shrink-0 flex-col md:max-h-none md:w-80">
+        <h2 className="guida-indice-titolo">{label}</h2>
+        {!editing && (
+          <form onSubmit={search} className="guida-cerca">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="h-4 w-4 shrink-0">
+              <circle cx="11" cy="11" r="6" />
+              <path d="M20 20l-4.5-4.5" />
+            </svg>
+            <input
+              id={`cerca-${book}`}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Cerca nell'${label.toLowerCase()}...`}
+              className="min-w-0 flex-1 bg-transparent text-sm text-[#d9cfc3] placeholder:text-[#8a8077] focus:outline-none"
+            />
+          </form>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        {loadError && <p className="px-3 text-sm text-red-400">Impossibile caricare i contenuti.</p>}
+        {sections === null && !loadError && <p className="px-3 text-sm text-[#8a8077]">Caricamento...</p>}
+        {sections?.length === 0 && <p className="px-3 text-sm text-[#8a8077]">Nessun contenuto.</p>}
 
         {sections?.map((section) => {
           const isOpen = open.has(section.id);
@@ -249,8 +269,8 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
           return (
             <div
               key={section.id}
-              className={`border transition ${
-                dropTarget === `s:${section.id}` ? "border-[#8b2a14]" : "border-transparent"
+              className={`guida-sezione border transition ${
+                dropTarget === `s:${section.id}` ? "border-[#c08a4e]" : "border-transparent"
               } ${drag?.id === section.id ? "opacity-40" : ""}`}
               {...dragProps("section", section.id)}
               {...dropProps(`s:${section.id}`, () => dropOnSection(section.id), () => true)}
@@ -260,7 +280,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
                 <button
                   type="button"
                   onClick={() => toggle(section.id)}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left font-serif text-sm font-bold tracking-wider text-[#8b2a14] uppercase hover:text-[#5a1408]"
+                  className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left font-serif text-[0.8125rem] tracking-[0.12em] text-[#d4b394] uppercase hover:text-[#f3e2cc]"
                   aria-expanded={isOpen}
                 >
                   <Chevron up={isOpen} />
@@ -298,24 +318,22 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
                       {...dragProps("page", p.id)}
                       {...dropProps(`p:${p.id}`, () => dropOnPage(p.id), (d) => d.type === "page")}
                       className={`flex items-center border-t-2 ${
-                        dropTarget === `p:${p.id}` ? "border-[#8b2a14]" : "border-transparent"
+                        dropTarget === `p:${p.id}` ? "border-[#c08a4e]" : "border-transparent"
                       } ${drag?.id === p.id ? "opacity-40" : ""}`}
                     >
                       {editing && <DragHandle />}
                       <button
                         type="button"
                         onClick={() => openPage(p)}
-                        className={`min-w-0 flex-1 py-0.5 pl-6 text-left text-[0.8125rem] transition ${
-                          p.id === selectedId
-                            ? "font-bold text-[#5a1408] before:mr-1 before:content-['➤']"
-                            : "text-[#3b2a1a] hover:underline"
+                        className={`guida-voce min-w-0 flex-1 py-1 pr-2 pl-7 text-left text-[0.8125rem] transition ${
+                          p.id === clickedId ? "guida-voce-attiva" : "guida-voce-libera text-[#b8bec0] hover:text-[#f3e2cc]"
                         }`}
                       >
                         {p.title}
                       </button>
                     </li>
                   ))}
-                  {items.length === 0 && <li className="py-0.5 pl-6 text-xs text-[#7a6248] italic">Nessuna sezione.</li>}
+                  {items.length === 0 && <li className="py-1 pl-7 text-xs text-[#8a8077] italic">Nessuna sezione.</li>}
                   {editing && (
                     <li className="pt-1 pl-6">
                       <InlineAdd
@@ -331,36 +349,35 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
         })}
 
         {editing && sections && (
-          <div className="border border-dashed border-[#8b2a14]/50 p-2">
+          <div className="m-2 border border-dashed border-[#c08a4e]/50 p-2">
             <InlineAdd
               placeholder="Nuova macrosezione"
               onAdd={(title) => act(() => createSection(book, title), (res) => res.id && setOpen((prev) => new Set(prev).add(res.id!)))}
             />
-            <p className="mt-1.5 text-[0.625rem] leading-snug text-[#7a6248]">
+            <p className="mt-1.5 text-[0.625rem] leading-snug text-[#8a8077]">
               Trascina ⠿ per riordinare. Una sezione rilasciata sul titolo di una macrosezione va in fondo a quella.
             </p>
           </div>
         )}
+        </div>
       </aside>
 
-      {/* Dorso con gli anelli (solo schermi larghi) */}
-      <div className="book-spine hidden md:block" aria-hidden />
-
-      {/* Pagina destra: ricerca + documento. In modifica l'editor resta su fondo scuro */}
-      <section className={`flex min-h-0 min-w-0 flex-1 flex-col px-10 py-8 ${editing ? "book-page-editing" : "book-page book-page-right"}`}>
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+      {/* Pagina: percorso, pulsanti e documento. In modifica l'editor resta su fondo scuro */}
+      <section className={`flex min-h-0 min-w-0 flex-1 flex-col ${editing ? "book-page-editing px-10 py-6" : "guida-pagina"}`}>
+        <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
+          <p className="guida-percorso">
+            {label}
+            {selected && !editing && <span> · {sections?.find((x) => x.id === selected.section_id)?.title}</span>}
+          </p>
           {!editing && (
-            <form onSubmit={search} className="flex min-w-0 flex-1 items-center gap-2">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`Cerca in ${label}`}
-                className="min-w-0 flex-1 border-0 border-b border-[#8a6a3e]/60 bg-transparent px-1 py-1 text-sm text-[#3b2a1a] placeholder:text-[#7a6248] focus:border-[#8b2a14] focus:outline-none"
-              />
-              <button className="book-btn" disabled={searching}>
-                Cerca
-              </button>
-            </form>
+            <button
+              type="button"
+              className="book-btn ml-auto"
+              disabled={searching}
+              onClick={() => (query.trim() ? search() : document.getElementById(`cerca-${book}`)?.focus())}
+            >
+              ⌕ Cerca
+            </button>
           )}
           {canEdit && (
             <button
@@ -370,7 +387,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
                 setResults(null);
                 setError(null);
               }}
-              className={`${editing ? "btn text-xs tracking-widest uppercase" : "book-btn"} ml-auto`}
+              className={`${editing ? "btn text-xs tracking-widest uppercase ml-auto" : "book-btn"}`}
             >
               {editing ? "✓ Fine modifica" : "✎ Modifica"}
             </button>
@@ -428,7 +445,7 @@ function GuideBrowser({ book, label, canEdit }: { book: Book; label: string; can
             </div>
           ) : selected ? (
             <article className="guide-content on-parchment">
-              <h2>{selected.title}</h2>
+              <h2 className="guida-titolo">{selected.title}</h2>
               {bodies[selected.id] === undefined ? (
                 <p>Caricamento...</p>
               ) : (

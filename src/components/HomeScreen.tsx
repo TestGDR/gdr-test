@@ -5,7 +5,7 @@ import { LoginButton } from "@/components/auth/LoginPanel";
 import RegisterButton from "@/components/auth/RegisterModal";
 import { getSignupState } from "@/lib/signups";
 import homeBg from "../../public/images/home-bg.jpg";
-import logo from "../../public/images/logo-westeros.png";
+import logo from "../../public/images/logo-westeros-trono.png";
 
 // Schermata d'ingresso: la usano la home e la pagina di login (con un avviso
 // facoltativo, es. link scaduto o sessione chiusa per inattivita')
@@ -33,9 +33,9 @@ export default async function HomeScreen({ notice }: { notice?: ReactNode }) {
           src={logo}
           alt="Westeros GDR"
           priority
-          sizes="400px"
-          // Il nero del logo si fonde con lo sfondo (blend "screen")
-          className="h-auto w-full max-w-[25rem] mix-blend-screen"
+          sizes="(min-width: 640px) 560px, 90vw"
+          // logo con il Trono di Spade, su sfondo trasparente
+          className="h-auto w-full max-w-[35rem] drop-shadow-[0_6px_18px_rgb(0_0_0/0.85)]"
         />
 
         {notice && <div className="mt-6 max-w-md">{notice}</div>}

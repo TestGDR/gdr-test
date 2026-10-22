@@ -10,7 +10,7 @@ export default async function Header() {
   } = await supabase.auth.getUser();
 
   return (
-    <header className="bar relative border-b">
+    <header className="bar relative">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 text-sm">
         <div className="flex items-center gap-3 font-serif tracking-wide">
           <GuideButton book="manuale" label="Manuale di Gioco" />

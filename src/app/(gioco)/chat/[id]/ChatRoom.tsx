@@ -1119,7 +1119,7 @@ function MessageRow({
     minute: "2-digit",
   });
   const to = message.recipient ? (
-    <span className="text-muted normal-case"> → {message.recipient}</span>
+    <span className="font-serif text-[0.9rem] font-normal tracking-wide text-[#b8bec0] normal-case [font-variant:small-caps]"> → {message.recipient}</span>
   ) : null;
   const card = "max-lg:border-b max-lg:border-border/50 max-lg:py-3";
 
@@ -1129,13 +1129,11 @@ function MessageRow({
       /^(tira|effettua|attacca) /.test(message.content);
     return (
       <div className={card}>
-        <div className="flex items-start gap-2 rounded-md border border-[#c9a45c]/40 bg-[#c9a45c]/10 px-3 py-2 text-sm">
-          <span aria-hidden className="text-lg leading-none">
-            🎲
-          </span>
+        <div className="chat-dado flex items-center gap-3 px-3 py-1.5 text-sm text-[#d9cfc3]">
+          <DieIcon />
           <p className="min-w-0 flex-1">
-            <span className="mr-2 text-xs text-muted">{time}</span>
-            <strong className="font-serif text-accent">
+            <span className="mr-3 text-xs text-[#8a8077]">{time}</span>
+            <strong className="font-serif tracking-wide text-[#d4b394] uppercase">
               {message.character_name}
             </strong>{" "}
             {/* i tiri vecchi non avevano il verbo nel testo */}
@@ -1150,21 +1148,27 @@ function MessageRow({
   // Narrazione del master: scheda come le azioni, con scritto "Master"
   if (message.kind === "master") {
     return (
-      <div className="border-l-2 border-accent bg-gradient-to-b from-[#45100b] to-[#2d0a07] px-3 py-2.5 shadow-lg shadow-black/70 sm:px-4 sm:py-3 max-lg:mt-2">
-        <div className="mb-2 flex items-center gap-2.5">
-          <span
-            className="min-w-0 flex-1 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-accent uppercase"
-            title={`Narrazione di ${message.character_name}`}
-          >
-            Master
-            {to && <span className="text-sm font-normal">{to}</span>}
-          </span>
-          {tools}
-          <span className="shrink-0 text-xs text-muted">{time}</span>
+      <div className="chat-card chat-card-master max-lg:mt-2">
+        <div className="min-w-0">
+          {/* "MASTER" al centro; strumenti e ora a destra */}
+          <div className="mb-1.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+            <span aria-hidden />
+            <span
+              className="min-w-0 truncate text-center font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase"
+              title={`Narrazione di ${message.character_name}`}
+            >
+              Master
+              {to}
+            </span>
+            <span className="flex items-center justify-end gap-2.5">
+              {tools}
+              <span className="shrink-0 text-xs text-[#b8bec0]">{time}</span>
+            </span>
+          </div>
+          <p className="chat-text whitespace-pre-line">
+            <FormattedText text={message.content} />
+          </p>
         </div>
-        <p className="chat-text whitespace-pre-line">
-          <FormattedText text={message.content} />
-        </p>
       </div>
     );
   }
@@ -1226,9 +1230,18 @@ function MessageRow({
   }
 
   return (
-    <div className="border-l-2 border-blood bg-black/80 px-3 py-2.5 shadow-lg shadow-black/70 sm:px-4 sm:py-3 max-lg:mt-2">
-      <div className="mb-2 flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-accent/50 bg-black/60 font-serif text-accent">
+    <div className="chat-card flex gap-4 max-lg:mt-2">
+      <span className="chat-ritratto hidden shrink-0 items-center justify-center overflow-hidden font-serif text-2xl text-[#d4b394] sm:flex">
+        {who?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={who.avatar} alt="" className="h-full w-full object-cover" />
+        ) : (
+          message.character_name[0]
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+      <div className="mb-1.5 flex items-center gap-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-accent/50 bg-black/60 font-serif text-accent sm:hidden">
           {who?.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -1250,12 +1263,12 @@ function MessageRow({
             className="h-7 w-7 shrink-0 object-contain"
           />
         )}
-        <span className="min-w-0 flex-1 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-accent uppercase">
+        <span className="min-w-0 flex-1 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase">
           {message.character_name}
-          {to && <span className="text-sm font-normal">{to}</span>}
+          {to}
         </span>
         {tools}
-        <span className="shrink-0 text-xs text-muted">
+        <span className="shrink-0 text-xs text-[#b8bec0]">
           {time}
           {message.edited_at && (
             <span title="L'autore ha corretto questa azione"> · modificata</span>
@@ -1269,7 +1282,18 @@ function MessageRow({
           <FormattedText text={message.content} />
         </span>
       </p>
+      </div>
     </div>
+  );
+}
+
+// Dado a venti facce, a linee dorate come le altre icone della land
+function DieIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden className="h-5 w-5 shrink-0 text-[#d4b394]">
+      <path d="M12 2.5 20.5 7.3v9.4L12 21.5 3.5 16.7V7.3Z" />
+      <path d="M12 2.5 7.5 9.5h9Z M7.5 9.5 12 17l4.5-7.5 M7.5 9.5 3.5 16.7 12 17l8.5-.3-4-7.2 M12 17v4.5 M3.5 7.3l4 2.2 M20.5 7.3l-4 2.2" />
+    </svg>
   );
 }
 
@@ -1323,8 +1347,16 @@ function PresenceBar({
   onMaster: (() => void) | null; // solo master, moderatori e admin
   masterOn: boolean;
 }) {
+  // l'elenco dei presenti si apre in una finestra cliccando "Presenti in chat"
+  const [listOpen, setListOpen] = useState(false);
   return (
     <div className="flex items-center gap-3 border border-border bg-black/60 px-3 py-1.5 max-lg:border-x-0 max-lg:border-t-0">
+      <button
+        type="button"
+        onClick={() => setListOpen(true)}
+        className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+        title="Mostra chi è presente in chat"
+      >
       <svg
         width="16"
         height="16"
@@ -1337,20 +1369,18 @@ function PresenceBar({
       >
         <path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10" />
       </svg>
-      <span className="shrink-0 font-serif text-xs font-semibold tracking-[0.16em] text-accent uppercase max-sm:hidden">
+      <span className="shrink-0 font-serif text-xs font-semibold tracking-[0.16em] text-accent uppercase group-hover:underline">
         Presenti in chat
       </span>
-      <ol className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none]">
+      <span className="shrink-0 rounded-full bg-[#c08a4e]/80 px-2 text-xs font-semibold text-black">{present.length}</span>
+      </button>
+      <Modal open={listOpen} onClose={() => setListOpen(false)} title="Presenti in chat" size="md">
+      <ol className="space-y-1.5 p-2 text-sm">
         {present.length === 0 && (
           <li className="text-muted">Nessuno sta giocando</li>
         )}
-        {present.map((p, i) => (
-          <li key={p.id} className="flex items-center gap-1">
-            {i > 0 && (
-              <span aria-hidden className="text-muted">
-                ›
-              </span>
-            )}
+        {present.map((p) => (
+          <li key={p.id} className="flex items-center gap-2">
             <span
               className={
                 mine.has(p.id)
@@ -1379,6 +1409,7 @@ function PresenceBar({
           </li>
         ))}
       </ol>
+      </Modal>
       {/* nessun PNG da portare: si creano in Gestione -> PNG */}
       {canNpc && npcs.length === 0 && !present.some((p) => p.isNpc) && (
         <Link

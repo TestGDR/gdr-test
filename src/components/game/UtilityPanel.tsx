@@ -6,7 +6,6 @@ import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import Bank from "./Bank";
-import GameArchive from "./GameArchive";
 import { DragonIcon } from "./icons";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
@@ -28,25 +27,36 @@ const BOXES = [
   { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
   { id: "png", label: "Anagrafe PNG", icon: <AddressBookIcon />, color: "text-[#9fb4c9]" },
   { id: "casate-png", label: "Casate PNG", icon: <ShieldIcon />, color: "text-[#9fb4c9]" },
-  { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[2.2]"><DragonIcon /></span>, color: "text-orange-400" },
-  { id: "giocate", label: "Archivio giocate", icon: <ScrollArchiveIcon />, color: "text-[#c98a8a]" },
+  { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[1.4]"><DragonIcon /></span>, color: "text-orange-400" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
   { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
 ] as const;
 type Section = (typeof BOXES)[number]["id"];
 
-// Pulsante della barra in alto: apre l'Utility giocatore
-export default function UtilityButton({ className, trigger }: { className: string; trigger: ReactNode }) {
+// quali box mostra la finestra: tutti (cellulare), le utility o i servizi (Locande e servizi)
+type Mode = "tutto" | "utility" | "servizi";
+const SERVICES: Section[] = ["stanze", "banca"];
+const boxesFor = (mode: Mode) =>
+  BOXES.filter((b) => mode === "tutto" || (mode === "servizi") === SERVICES.includes(b.id));
+
+// Pulsante che apre l'Utility giocatore (o, con mode="servizi", Locande e servizi)
+export default function UtilityButton({ className, trigger, mode = "tutto" }: { className: string; trigger: ReactNode; mode?: Mode }) {
   // I dati si caricano a ogni apertura, cosi' sono sempre aggiornati
   const [openCount, setOpenCount] = useState(0);
   return (
-    <ModalButton label={trigger} title="Utility giocatore" size="xl" className={className} onOpen={() => setOpenCount((c) => c + 1)}>
-      {() => (openCount > 0 ? <UtilityPanel key={openCount} /> : null)}
+    <ModalButton
+      label={trigger}
+      title={mode === "servizi" ? "Locande e servizi" : "Utility giocatore"}
+      size={mode === "tutto" ? "xl" : "utility"}
+      className={className}
+      onOpen={() => setOpenCount((c) => c + 1)}
+    >
+      {() => (openCount > 0 ? <UtilityPanel key={openCount} mode={mode} /> : null)}
     </ModalButton>
   );
 }
 
-function UtilityPanel() {
+function UtilityPanel({ mode }: { mode: Mode }) {
   const supabase = useMemo(() => createClient(), []);
   const [tab, setTab] = useState<Section | null>(null); // null = schermata dei box
   const [houseId, setHouseId] = useState<string | null>(null); // casata aperta dentro la modale
@@ -102,10 +112,12 @@ function UtilityPanel() {
     <div className="flex h-full flex-col">
       {tab === null ? (
         // Schermata iniziale: i box
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
-          <h2 className="mb-8 text-center font-serif text-4xl tracking-[0.15em] text-accent uppercase">Utility</h2>
-          <ul className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {BOXES.map((b) => (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+          <h2 className="mb-5 text-center font-serif text-2xl tracking-[0.15em] text-accent uppercase">
+            {mode === "servizi" ? "Locande e servizi" : "Utility"}
+          </h2>
+          <ul className={`mx-auto grid gap-3 sm:grid-cols-2 ${mode === "servizi" ? "max-w-md" : "max-w-3xl lg:grid-cols-3"}`}>
+            {boxesFor(mode).map((b) => (
               <li key={b.id}>
                 <button
                   type="button"
@@ -115,10 +127,10 @@ function UtilityPanel() {
                     setQuery("");
                     setLetter(null);
                   }}
-                  className="group flex h-36 w-full flex-col items-center justify-center gap-4 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
+                  className="group flex h-24 w-full flex-col items-center justify-center gap-2 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
                 >
-                  <span className={`${b.color} transition group-hover:scale-110`}>{b.icon}</span>
-                  <span className="font-serif text-sm tracking-[0.2em] text-muted uppercase group-hover:text-foreground">{b.label}</span>
+                  <span className={`${b.color} transition group-hover:scale-110 [&_svg]:h-7 [&_svg]:w-7`}>{b.icon}</span>
+                  <span className="text-center font-serif text-xs tracking-[0.14em] text-muted uppercase group-hover:text-foreground">{b.label}</span>
                 </button>
               </li>
             ))}
@@ -226,7 +238,6 @@ function UtilityPanel() {
         {tab === "stanze" && <RoomBooking />}
         {tab === "banca" && <Bank />}
         {tab === "draghi" && <DragonRegistry />}
-        {tab === "giocate" && <GameArchive />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
         {/* Pagina della casata aperta, al posto dell'elenco */}
@@ -289,14 +300,6 @@ function Portrait({ pg }: { pg: Pg }) {
 
 // Icone dei box
 const big = { width: 44, height: 44, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true };
-
-function ScrollArchiveIcon() {
-  return (
-    <svg {...big}>
-      <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM7.5 11v1.5h9V11h-9Zm0 3.5V16h9v-1.5h-9Zm0 3.5v1.5h6V18h-6Z" />
-    </svg>
-  );
-}
 
 function AddressBookIcon() {
   return (

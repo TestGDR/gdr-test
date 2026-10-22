@@ -35,7 +35,9 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
   }
 
   return (
-    <div className="mx-auto w-full max-w-[38.125rem]">{/* mappa 600px + cornice 2 x 5px */}
+    // al centro dello spazio, con il nome sopra
+    <div className="mx-auto flex w-full max-w-[38.125rem] flex-col">
+      <h1 className="mb-2 text-center font-serif text-xl tracking-[0.15em] text-accent uppercase">{map.name}</h1>
       <div className="frame-ornate relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.image_url} alt={map.name} className="block w-full select-none" draggable={false} />
@@ -57,11 +59,6 @@ export default function MapView({ map, locations, rooms, groups, houses, rentals
             </span>
           </button>
         ))}
-      </div>
-
-      <div className="mt-3 text-center">
-        <h1 className="font-serif text-xl tracking-[0.15em] text-accent uppercase">{map.name}</h1>
-        {map.description && <p className="mt-1 text-sm leading-relaxed text-muted">{map.description}</p>}
       </div>
 
       <Modal open={!!open} onClose={close} title={open?.name ?? ""} size="area">

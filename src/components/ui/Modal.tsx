@@ -14,6 +14,7 @@ export type ModalSize =
   | "md"
   | "lg"
   | "xl"
+  | "utility"
   | "tall"
   | "area"
   | "sheet"
@@ -26,6 +27,8 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   md: "w-[min(32rem,calc(100vw-2rem))] max-h-[90vh]",
   lg: "w-[min(46rem,calc(100vw-2rem))] max-h-[90vh]",
   xl: "w-[min(80rem,calc(100vw-2rem))] h-[min(52rem,calc(100vh-2rem))]",
+  // Utility e Locande e servizi: piu' piccola
+  utility: "w-[min(56rem,calc(100vw-2rem))] h-[min(40rem,calc(100vh-2rem))]",
   // stretta (es. elenco online): alta quanto serve, al massimo 600px; oltre, l elenco scorre dentro
   tall: "w-[min(37.5rem,calc(100vw-1rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)

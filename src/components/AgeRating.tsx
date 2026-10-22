@@ -62,19 +62,19 @@ const DESCRIPTORS: { label: string; icon: ReactNode }[] = [
 
 export default function AgeRating() {
   return (
-    <ul className="flex flex-wrap items-end justify-center gap-2" aria-label="Classificazione dei contenuti">
+    <ul className="flex flex-wrap items-center justify-center gap-2" aria-label="Classificazione dei contenuti">
       <li
         title="Vietato ai minori di 18 anni"
-        className="flex h-14 w-12 flex-col items-center justify-center rounded-sm border-2 border-white bg-red-700 text-white"
+        className="flex h-12 w-12 flex-col items-center justify-center rounded-sm border-2 border-white bg-red-700 text-white"
       >
-        <span className="text-2xl leading-none font-black">18</span>
+        <span className="text-xl leading-none font-black">18</span>
         <span className="mt-0.5 text-[0.5rem] font-semibold tracking-wider">ANNI</span>
       </li>
       {DESCRIPTORS.map((d) => (
         <li
           key={d.label}
           title={d.label}
-          className="flex h-12 w-12 items-center justify-center rounded-sm border-2 border-white bg-black text-white"
+          className="flex h-12 w-12 items-center justify-center bg-[url('/images/ui/riquadro-icona.png')] bg-[length:100%_100%] text-[#e6cdb0] drop-shadow-[0_2px_4px_rgb(0_0_0/0.8)]"
         >
           {d.icon}
           <span className="sr-only">{d.label}</span>

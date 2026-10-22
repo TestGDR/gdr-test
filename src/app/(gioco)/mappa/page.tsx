@@ -48,7 +48,7 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
   const groups = strip<RoomGroup>(groupRows);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto flex max-w-3xl flex-col justify-center lg:min-h-full">
       <GameArea title={map.name} image={map.image_url} description={map.description} weatherRegionId={map.weather_region_id} />
       {character?.status !== "attivo" && <InactiveBanner />}
 
