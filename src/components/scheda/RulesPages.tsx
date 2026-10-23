@@ -1,5 +1,6 @@
 "use client";
 
+import { TraitsNote } from "./CustomFields";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   choiceLabel,
@@ -494,6 +495,7 @@ export function TraitsPage({
           })}
         </div>
       )}
+      <TraitsNote characterId={character.id} />
     </div>
   );
 }

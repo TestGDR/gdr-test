@@ -15,6 +15,10 @@ import { PaperRow } from "./PaperSheet";
 
 type FieldDef = { id: string; c: BlockConfig };
 
+// Campo della creazione con la spiegazione di vantaggi e svantaggi: non sta
+// nella pagina Dati ma in fondo alla pagina Tratti (gia' riservata)
+export const TRAITS_NOTE_KEY = "vantaggi_svantaggi";
+
 // Campi personalizzati della creazione (Gestione -> Creazione personaggio)
 function useCustomFields(characterId: string) {
   const supabase = useMemo(() => createClient(), []);
@@ -58,6 +62,7 @@ export function CustomFieldRows({ character }: { character: Character }) {
   const rows = defs.filter(
     ({ c }) =>
       c.key &&
+      c.key !== TRAITS_NOTE_KEY &&
       (c.visibility === "pubblico" ||
         (c.visibility === "riservato" && priv !== null)),
   );
@@ -201,6 +206,23 @@ export function CustomFieldsManage({
           </span>
         )}
       </div>
+    </section>
+  );
+}
+
+// Pagina Tratti: la spiegazione di vantaggi e svantaggi scritta in iscrizione
+export function TraitsNote({ characterId }: { characterId: string }) {
+  const { defs, priv } = useCustomFields(characterId);
+  const def = defs?.find((d) => d.c.key === TRAITS_NOTE_KEY);
+  if (!def) return null;
+  const v = def.c.visibility === "pubblico" ? null : priv?.[TRAITS_NOTE_KEY];
+  if (v === undefined || v === null || v === "") return null;
+  return (
+    <section className="mt-6">
+      <h4 className="mb-2 border-b border-accent/30 pb-1 font-serif text-lg text-accent">
+        {def.c.label || "Vantaggi e svantaggi"}
+      </h4>
+      <p className="text-sm whitespace-pre-line">{customValueText(def.c, v)}</p>
     </section>
   );
 }
