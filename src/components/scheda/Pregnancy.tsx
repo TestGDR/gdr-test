@@ -238,7 +238,7 @@ export default function PregnancyRow({
                   ? "Hai già tentato oggi: potrai riprovare domani."
                   : undefined
               }
-              className="border border-[#7a1d16]/60 px-2 py-1 font-serif text-xs text-[#7a1d16] transition hover:bg-[#7a1d16]/10 disabled:opacity-50"
+              className="border border-[#c9a45c] bg-gradient-to-b from-[#8e1d16] to-[#5c0f0b] px-2.5 py-1 font-serif text-[0.6875rem] font-semibold tracking-[0.08em] whitespace-nowrap text-[#f6e6c8] uppercase shadow-[0_2px_4px_rgb(0_0_0/0.45)] transition hover:brightness-115 disabled:opacity-50"
             >
               {busy
                 ? "..."
