@@ -109,7 +109,7 @@ export type RoomGroup = {
 
 // dado e sistema (entrate, uscite, modalita' master) li scrive solo il server
 // sussurro: privato tra due personaggi (lo leggono solo loro e gli admin)
-// intuizione: raggiro scoperto, lo leggono solo il bersaglio e gli admin (lo scrive il server)
+// intuizione: il raggiro; il bersaglio lo legge se lo scopre, gli admin sempre (lo scrive il server)
 export type MessageKind = "azione" | "fuori_gioco" | "master" | "dado" | "sistema" | "sussurro" | "intuizione";
 
 export type Message = {

@@ -440,6 +440,8 @@ export default function ChatRoom({
     }
     addMessage(data, true);
     setText("");
+    // dopo un messaggio speciale (OFF, master, sussurro...) si torna a Parlato / Azione
+    if (kind !== "azione") setKind("azione");
     return true;
   }
 
@@ -700,6 +702,7 @@ export default function ChatRoom({
                     key={m.id}
                     message={m}
                     who={cast[m.character_id]}
+                    forMe={!!m.recipient_id && mine.has(m.recipient_id)}
                     tools={
                       (editable || removable) && (
                         <span className="flex shrink-0 items-center gap-2 text-xs">
@@ -1109,9 +1112,11 @@ function MessageRow({
   message,
   who,
   tools,
+  forMe = false,
 }: {
   message: Message;
   who?: Who;
+  forMe?: boolean; // il messaggio e' rivolto a un mio personaggio (raggiro scoperto)
   tools?: ReactNode; // modifica (autore) e cancella (chi modera)
 }) {
   const time = new Date(message.created_at).toLocaleTimeString("it-IT", {
@@ -1201,8 +1206,8 @@ function MessageRow({
     );
   }
 
-  // Raggiro scoperto: lo vede solo il bersaglio (e gli admin), nemmeno chi ha tentato l'inganno
-  if (message.kind === "intuizione") {
+  // Raggiro scoperto: lo vede il bersaglio, come intuizione
+  if (message.kind === "intuizione" && forMe) {
     return (
       <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 text-sm text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
@@ -1212,6 +1217,27 @@ function MessageRow({
           {message.character_name} (lo vedi solo tu)
         </strong>
         {message.content}
+      </p>
+    );
+  }
+
+  // Ogni raggiro, riuscito o scoperto: gli admin lo vedono con l'esito e i tiri
+  if (message.kind === "intuizione") {
+    const r = (message.roll_data ?? {}) as { discovered?: boolean; attack?: string; defense?: string };
+    return (
+      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 text-sm text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
+        <span className="mr-2 text-xs text-muted">{time}</span>
+        <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
+          <span aria-hidden>👁 </span>
+          Raggiro di {message.character_name} su {message.recipient || "…"}
+          {r.discovered === undefined ? "" : r.discovered ? " · scoperto" : " · riuscito"} (solo admin)
+        </strong>
+        {message.content}
+        {r.attack && r.defense && (
+          <span className="mt-0.5 block text-xs text-muted">
+            {r.attack} contro {r.defense}
+          </span>
+        )}
       </p>
     );
   }

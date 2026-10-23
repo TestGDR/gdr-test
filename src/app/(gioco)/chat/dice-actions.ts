@@ -483,8 +483,8 @@ export async function rollRaggira(
   const won = att.total > def.total; // a parita' vince chi difende
   const admin = createAdminClient();
   if (!admin) return { error: "Configurazione del server incompleta." };
-  // i controlli (presenza in chat di entrambi) valgono sempre; il messaggio
-  // segreto parte solo se il bersaglio ha scoperto l'inganno
+  // il messaggio parte sempre, con l'esito e i tiri (migrazione 0159): il bersaglio
+  // lo legge solo se ha scoperto l'inganno, gli admin sempre
   const { error } = await admin.rpc("post_secret_insight", {
     p_user: user.id,
     p_room: roomId,
@@ -492,6 +492,7 @@ export async function rollRaggira(
     p_recipient: targetId,
     p_content: text,
     p_discovered: !won,
+    p_data: { attack: att.text, defense: def.text, attack_total: att.total, defense_total: def.total },
   });
   if (!error && RAGGIRA_DEBUG) {
     const margin = att.total - def.total;
@@ -506,7 +507,7 @@ export async function rollRaggira(
   }
   if (!error) return {};
   if (error.code === "PGRST202")
-    return { error: "Per il raggiro nascosto va eseguita la migrazione 0140 in Supabase." };
+    return { error: "Per il raggiro nascosto va eseguita la migrazione 0159 in Supabase." };
   return { error: error.message.length < 200 ? error.message : "Tentativo non riuscito." };
 }
 
