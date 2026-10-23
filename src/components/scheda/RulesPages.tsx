@@ -65,7 +65,7 @@ function useRulesData(characterId: string) {
         .eq("character_id", characterId),
       supabase
         .from("character_traits")
-        .select("trait_id, choice")
+        .select("*")
         .eq("character_id", characterId),
     ]);
     setData({
@@ -479,6 +479,11 @@ export function TraitsPage({
                             </span>
                           </p>
                           <p className="text-sm text-muted">{t.effect}</p>
+                          {o.note && (
+                            <p className="mt-0.5 text-sm text-foreground italic">
+                              {o.note}
+                            </p>
+                          )}
                         </li>
                       );
                     })}

@@ -6,6 +6,7 @@ import HouseLoader from "@/components/houses/HouseLoader";
 import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import Bank from "./Bank";
+import ChangePassword from "./ChangePassword";
 import { DragonIcon } from "./icons";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +31,7 @@ const BOXES = [
   { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[1.4]"><DragonIcon /></span>, color: "text-orange-400" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
   { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
+  { id: "password", label: "Cambio password", icon: <LockIcon />, color: "text-[#d4b394]" },
 ] as const;
 type Section = (typeof BOXES)[number]["id"];
 
@@ -237,6 +239,7 @@ function UtilityPanel({ mode }: { mode: Mode }) {
         {/* Stanze in affitto */}
         {tab === "stanze" && <RoomBooking />}
         {tab === "banca" && <Bank />}
+        {tab === "password" && <ChangePassword />}
         {tab === "draghi" && <DragonRegistry />}
 
         {/* Casate giocabili: aprono la pagina della casata */}
@@ -327,6 +330,14 @@ function CoinsIcon() {
       <path d="M3 12.2v2.6C3 16.2 5.7 17.4 9 17.4c.6 0 1.2 0 1.8-.1A6 6 0 0 1 11 13c-.6.1-1.3.1-2 .1-2.6 0-4.8-.4-6-1Z" opacity=".65" />
       <circle cx="16.5" cy="16.5" r="5" />
       <path d="M16.5 13.5v6M14.8 15h2.6a1 1 0 0 1 0 2h-1.8a1 1 0 0 0 0 2h2.6" stroke="#000" strokeWidth="1.1" fill="none" opacity=".6" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg {...big}>
+      <path d="M12 2a5 5 0 0 0-5 5v3H5.5A1.5 1.5 0 0 0 4 11.5v9A1.5 1.5 0 0 0 5.5 22h13a1.5 1.5 0 0 0 1.5-1.5v-9a1.5 1.5 0 0 0-1.5-1.5H17V7a5 5 0 0 0-5-5Zm-3 5a3 3 0 0 1 6 0v3H9V7Zm3 6.5a1.8 1.8 0 0 1 .9 3.36V19h-1.8v-2.14A1.8 1.8 0 0 1 12 13.5Z" />
     </svg>
   );
 }

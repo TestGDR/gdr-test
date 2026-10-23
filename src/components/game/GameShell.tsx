@@ -1335,7 +1335,7 @@ function TopActions({ canManage }: { canManage: boolean }) {
     <div className="absolute top-1/2 right-3 hidden -translate-y-1/2 items-start gap-1 lg:flex">
       <button
         type="button"
-        onClick={() => (inPlace ? router.refresh() : router.push("/mappa"))}
+        onClick={() => (inPlace ? window.location.reload() : router.push("/mappa"))}
         className={btn}
         aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
         title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
@@ -1481,7 +1481,7 @@ function RightRail({
         <button
           type="button"
           onClick={() => {
-            if (pathname.startsWith("/chat/") || pathname === "/mappa") router.refresh();
+            if (pathname.startsWith("/chat/") || pathname === "/mappa") window.location.reload();
             else router.push("/mappa");
           }}
           className={`${railBtn} lg:hidden`}
@@ -1555,7 +1555,7 @@ function DesktopTopBar({
       {/* logo */}
       <h1 className="flex w-64 shrink-0 items-center justify-center px-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/logo-westeros-trono.png" alt="Westeros GDR" width={1200} height={434} className="h-[58px] w-auto drop-shadow-[0_3px_8px_rgb(0_0_0/0.9)]" />
+        <img src="/images/logo-westeros-trono-icone.png" alt="Westeros GDR" width={1200} height={434} className="h-[58px] w-auto drop-shadow-[0_3px_8px_rgb(0_0_0/0.9)]" />
       </h1>
       {/* schede */}
       <nav aria-label="Menu principale" className="flex min-w-0 flex-1 items-center justify-center">
@@ -1611,7 +1611,7 @@ function DesktopTopBar({
         <div className="absolute right-0 bottom-0 flex h-[44px] w-[190px] items-center justify-end bg-[url('/images/ui/interno/targa-comandi.png')] bg-[length:100%_100%] bg-no-repeat pr-2 pl-7 [&>*+*]:border-l [&>*+*]:border-[#7a5530]/60">
           <button
             type="button"
-            onClick={() => (inPlace ? router.refresh() : router.push("/mappa"))}
+            onClick={() => (inPlace ? window.location.reload() : router.push("/mappa"))}
             className={action}
             title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
           >

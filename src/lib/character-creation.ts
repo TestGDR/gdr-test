@@ -68,7 +68,7 @@ export type CreationData = {
   story?: string;
   items?: string[]; // oggetti di partenza scelti (disponibili all'iscrizione)
   skills?: Record<string, number>; // id abilita' -> livello
-  traits?: { id: string; choice?: string }[]; // vantaggi e svantaggi scelti
+  traits?: { id: string; choice?: string; note?: string }[]; // vantaggi e svantaggi scelti (note: tratti narrativi)
   height?: string;
   eye_color?: string;
   hair_color?: string;
@@ -94,6 +94,7 @@ export type TraitInfo = {
   stat_costs?: Record<string, number> | null; // migrazione 0157
   choice_options?: string[] | null;
   incompatible_skills?: string[] | null;
+  narrative?: boolean; // migrazione 0158
 };
 
 const ids = (list: readonly { id: string }[]) => list.map((x) => x.id);
@@ -153,16 +154,20 @@ export function sanitizeCreationData(raw: unknown): CreationData {
     const seen = new Set<string>();
     out.traits = input.traits
       .filter(
-        (t): t is { id: string; choice?: unknown } =>
+        (t): t is { id: string; choice?: unknown; note?: unknown } =>
           !!t && typeof t === "object" && uuid((t as { id?: unknown }).id),
       )
       .filter((t) => !seen.has(t.id) && !!seen.add(t.id))
       .slice(0, 10)
-      .map((t) =>
-        typeof t.choice === "string" && t.choice
-          ? { id: t.id, choice: t.choice.slice(0, 60) }
-          : { id: t.id },
-      );
+      .map((t) => ({
+        id: t.id,
+        ...(typeof t.choice === "string" && t.choice
+          ? { choice: t.choice.slice(0, 60) }
+          : {}),
+        ...(typeof t.note === "string" && t.note.trim()
+          ? { note: t.note.slice(0, 300) }
+          : {}),
+      }));
   }
   out.appearance = text(input.appearance, TEXT_MAX);
   out.story = text(input.story, STORY_MAX);

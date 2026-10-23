@@ -184,7 +184,13 @@ export function StepTraits({
   const setChoice = (id: string, choice: string) =>
     update({
       traits: chosen.map((x) =>
-        x.id === id ? { id, choice: choice || undefined } : x,
+        x.id === id ? { ...x, choice: choice || undefined } : x,
+      ),
+    });
+  const setNote = (id: string, note: string) =>
+    update({
+      traits: chosen.map((x) =>
+        x.id === id ? { ...x, note: note || undefined } : x,
       ),
     });
 
@@ -235,7 +241,14 @@ export function StepTraits({
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex justify-between gap-2">
-                            <strong className="font-semibold">{t.name}</strong>
+                            <strong className="font-semibold">
+                              {t.name}
+                              {t.narrative && (
+                                <span className="ml-1.5 text-[0.6875rem] font-normal text-muted italic">
+                                  narrativo
+                                </span>
+                              )}
+                            </strong>
                             <span className="text-accent">
                               {pick?.choice && t.stat_costs
                                 ? traitCost(t, pick.choice)
@@ -252,6 +265,15 @@ export function StepTraits({
                           )}
                         </span>
                       </label>
+                      {pick && t.narrative && (
+                        <input
+                          value={pick.note ?? ""}
+                          maxLength={300}
+                          onChange={(e) => setNote(t.id, e.target.value)}
+                          placeholder="Scrivi una riga: chi è, che cosa, perché..."
+                          className="input mt-2 py-1 text-sm"
+                        />
+                      )}
                       {pick && t.choice !== "nessuna" && (
                         <select
                           value={pick.choice ?? ""}
@@ -341,6 +363,7 @@ export function TraitsSummary({
             </span>{" "}
             {t.name}
             {ch && <span className="text-accent"> · {ch}</span>}
+            {x.note && <span className="text-muted italic"> · {x.note}</span>}
           </span>
         );
       })}

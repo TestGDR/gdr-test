@@ -35,6 +35,7 @@ export type Trait = {
   stat_costs?: Record<string, number> | null; // costo per statistica scelta
   choice_options?: string[] | null; // abilita' tra cui scegliere (nomi); vuoto = tutte
   incompatible_skills?: string[] | null; // non si prende con punti in queste abilita'
+  narrative?: boolean; // migrazione 0158: niente bonus, il giocatore scrive una riga
 };
 
 type TraitRules = Pick<Trait, "cost"> & {
@@ -64,7 +65,7 @@ export function traitBlockedBy(t: TraitRules, skillLevels: { name: string; level
   return skillLevels.find((k) => k.level > 0 && bad.includes(k.name.toLowerCase()))?.name ?? null;
 }
 
-export type CharacterTrait = { trait_id: string; choice: string | null };
+export type CharacterTrait = { trait_id: string; choice: string | null; note?: string | null };
 
 type StatName = { id: string; code: string; label: string };
 export const statLabel = (id: string, list: readonly StatName[] = RULES.stats) =>

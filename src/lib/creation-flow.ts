@@ -357,6 +357,8 @@ function traitError(
       return "Uno dei tratti scelti non esiste più: toglilo.";
     if (info.requires_master)
       return `"${info.name}" si ottiene solo con il permesso del Master.`;
+    if (info.narrative && !t.note?.trim())
+      return `Per "${info.name}" scrivi una riga che lo racconta.`;
     if (info.choice !== "nessuna" && !t.choice)
       return `Per "${info.name}" scegli ${info.choice === "abilita" ? "l'abilità" : "la statistica"}.`;
     const blocked = skillNames ? traitBlockedBy(info, levels) : null;

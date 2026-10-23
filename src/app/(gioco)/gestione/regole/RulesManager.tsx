@@ -528,6 +528,14 @@ function TraitsEditor({
               />
               Attivo
             </label>
+            <label className="flex items-center gap-2 pb-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!edit.narrative}
+                onChange={(e) => setEdit({ ...edit, narrative: e.target.checked })}
+              />
+              Narrativo (niente bonus: il giocatore scrive una riga)
+            </label>
           </div>
 
           <div>

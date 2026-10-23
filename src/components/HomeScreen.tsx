@@ -5,7 +5,7 @@ import { LoginButton } from "@/components/auth/LoginPanel";
 import RegisterButton from "@/components/auth/RegisterModal";
 import { getSignupState } from "@/lib/signups";
 import homeBg from "../../public/images/home-bg.jpg";
-import logo from "../../public/images/logo-westeros-trono.png";
+import logo from "../../public/images/logo-westeros-trono-icone.png";
 
 // Schermata d'ingresso: la usano la home e la pagina di login (con un avviso
 // facoltativo, es. link scaduto o sessione chiusa per inattivita')

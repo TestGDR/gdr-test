@@ -9,6 +9,7 @@ import { LEGAL_VERSION } from "@/lib/legal";
 import { sendWelcomeEmail } from "@/lib/mailer";
 import { getSignupState } from "@/lib/signups";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 import { createClient, requireUser } from "@/lib/supabase/server";
 
 export type AuthState = { error?: string; message?: string };
@@ -213,4 +214,35 @@ export async function logout() {
   await supabase.auth.signOut();
   (await cookies()).delete(ACCESS_COOKIE);
   redirect("/");
+}
+
+// Utility -> Cambio password: serve quella attuale, poi la nuova due volte.
+// La password attuale si controlla con un client a parte (non tocca la sessione).
+export async function changePassword(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const { supabase } = await requireUser();
+  const { data: me } = await supabase.auth.getUser();
+  const email = me.user?.email;
+  const current = String(formData.get("current") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (!current) return { error: "Scrivi la password attuale." };
+  if (password.length < 8) return { error: "La nuova password deve avere almeno 8 caratteri." };
+  if (password !== formData.get("password_confirm")) return { error: "Le due password nuove non coincidono." };
+  if (password === current) return { error: "La nuova password deve essere diversa da quella attuale." };
+  if (!email) return { error: "Account senza email: usa \"Password dimenticata?\"." };
+
+  const { createClient: createPlainClient } = await import("@supabase/supabase-js");
+  const check = createPlainClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error: wrong } = await check.auth.signInWithPassword({ email, password: current });
+  if (wrong) return { error: "La password attuale non è corretta." };
+  await check.auth.signOut({ scope: "local" });
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    if (error.code === "same_password") return { error: "La nuova password deve essere diversa da quella attuale." };
+    if (error.code === "weak_password") return { error: "Password troppo debole." };
+    return { error: "Non è stato possibile cambiare la password. Riprova." };
+  }
+  return { message: "Password cambiata. Dal prossimo accesso usa quella nuova." };
 }

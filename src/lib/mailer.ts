@@ -47,7 +47,7 @@ export async function sendWelcomeEmail(params: {
 Grazie per aver scelto di giocare con noi. Questi sono i tuoi dati di accesso:
 
 Nome del personaggio: ${characterName}
-Password: quella che hai scelto al momento della registrazione
+Password: quella che hai scelto durante l'iscrizione
 
 Accedi da: ${siteUrl}
 
@@ -66,7 +66,7 @@ Se dimentichi la password puoi reimpostarla con "Password dimenticata?" nella fi
             <tr><td style="padding:12px 16px;color:#968d89;font-size:13px">Nome del personaggio</td>
                 <td style="padding:12px 16px;font-size:16px;font-weight:bold">${name}</td></tr>
             <tr><td style="padding:12px 16px;color:#968d89;font-size:13px;border-top:1px solid #3a2c2a">Password</td>
-                <td style="padding:12px 16px;font-size:14px;border-top:1px solid #3a2c2a">quella che hai scelto al momento della registrazione</td></tr>
+                <td style="padding:12px 16px;font-size:14px;border-top:1px solid #3a2c2a">quella che hai scelto durante l'iscrizione</td></tr>
           </table>
           <p style="margin:0 0 24px;text-align:center">
             <a href="${escapeHtml(siteUrl)}" style="display:inline-block;background:#a3201b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;letter-spacing:1px">ENTRA NEL GIOCO</a>

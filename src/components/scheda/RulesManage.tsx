@@ -53,6 +53,7 @@ export default function RulesManage({
   });
   const [addTrait, setAddTrait] = useState("");
   const [addChoice, setAddChoice] = useState("");
+  const [addNote, setAddNote] = useState(""); // tratti narrativi
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -65,7 +66,7 @@ export default function RulesManage({
         .eq("character_id", character.id),
       supabase
         .from("character_traits")
-        .select("trait_id, choice")
+        .select("*")
         .eq("character_id", character.id),
     ]);
     setSkills(catalog.skills);
@@ -197,13 +198,17 @@ export default function RulesManage({
       });
     setBusy(true);
     setMsg(null);
+    if (t.narrative && !addNote.trim())
+      return setMsg({ ok: false, text: "Scrivi la riga del tratto narrativo." });
     const { error } = await supabase.from("character_traits").insert({
       character_id: character.id,
       trait_id: t.id,
       choice: t.choice === "nessuna" ? null : addChoice,
+      ...(t.narrative ? { note: addNote.trim().slice(0, 300) } : {}),
     });
     setAddTrait("");
     setAddChoice("");
+    setAddNote("");
     done(error, `${t.name} aggiunto.`);
   }
 
@@ -482,6 +487,9 @@ export default function RulesManage({
                         · {choiceLabel(t, o.choice, skills)}
                       </span>
                     )}
+                    {o.note && (
+                      <span className="text-muted italic"> · {o.note}</span>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -521,6 +529,15 @@ export default function RulesManage({
                 </optgroup>
               ))}
             </select>
+            {picked?.narrative && (
+              <input
+                value={addNote}
+                maxLength={300}
+                onChange={(e) => setAddNote(e.target.value)}
+                placeholder="La riga del tratto"
+                className="input w-64! py-1.5"
+              />
+            )}
             {picked && picked.choice !== "nessuna" && (
               <select
                 value={addChoice}

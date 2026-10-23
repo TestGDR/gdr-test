@@ -466,6 +466,8 @@ async function processCreation(
         character_id: characterId,
         trait_id: t.id,
         choice: t.choice ?? null,
+        // la riga dei tratti narrativi (migrazione 0158)
+        ...(t.note?.trim() ? { note: t.note.trim().slice(0, 300) } : {}),
       }))
     : [];
   if (traitRows.length) await admin.from("character_traits").upsert(traitRows);

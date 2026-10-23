@@ -216,7 +216,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "equipaggiamento", label: "Equipaggiamento" },
 ];
 
-// pagine della scheda di un PNG che i giocatori non possono leggere
+// pagine della scheda che i giocatori non possono leggere: quelle dei PNG
+// e quelle dei PG degli altri (il proprio PG si vede tutto, lo staff vede tutto)
 const NPC_LOCKED: Tab[] = ["caratteristiche", "abilita", "tratti", "storia"];
 
 // Pagina oscurata: righe finte sfocate e l'avviso sopra
@@ -239,7 +240,7 @@ function LockedPage() {
       </div>
       <div className="absolute inset-0 flex items-center justify-center p-6">
         <p className="border border-border bg-black/80 px-6 py-4 text-center font-serif text-lg tracking-wide text-accent shadow-lg">
-          Non accessibile ai giocatori
+          Non hai i permessi necessari per leggere questa zona della scheda PG
         </p>
       </div>
     </div>
@@ -291,8 +292,15 @@ function CharacterSheet({
       .rpc("has_permission", { perm: "png.gestire" })
       .then(({ data }) => setCanNpc(data === true));
   }, [supabase, character.is_npc]);
+  // PG di un altro giocatore: le stesse pagine le vede solo lo staff
+  const [isStaff, setIsStaff] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (isOwn || character.is_npc) return;
+    supabase.rpc("is_staff").then(({ data }) => setIsStaff(data === true));
+  }, [supabase, isOwn, character.is_npc]);
   const locked = (t: Tab) =>
-    !!character.is_npc && !canNpc && NPC_LOCKED.includes(t);
+    NPC_LOCKED.includes(t) &&
+    (character.is_npc ? !canNpc : !isOwn && isStaff !== true);
   const canManage =
     active &&
     (!!info?.is_admin ||
