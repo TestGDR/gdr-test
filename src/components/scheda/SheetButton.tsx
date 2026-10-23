@@ -1198,7 +1198,7 @@ function MaritalValue({ character }: { character: Character }) {
       {label}
       {partnerId ? (
         <>
-          {" con "}
+          {character.marital_status === "fidanzato" ? " di " : " con "}
           <button
             type="button"
             onClick={() => setOpen(partnerId)}
@@ -1210,7 +1210,12 @@ function MaritalValue({ character }: { character: Character }) {
           <SheetModal characterId={open} onClose={() => setOpen(null)} />
         </>
       ) : (
-        character.partner_npc && <> con {character.partner_npc} (PNG)</>
+        character.partner_npc && (
+          <>
+            {character.marital_status === "fidanzato" ? " di " : " con "}
+            {character.partner_npc} (PNG)
+          </>
+        )
       )}
     </span>
   );

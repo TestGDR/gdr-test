@@ -11,14 +11,15 @@ export const MARITAL_STATUSES = [
 export function maritalLabel(
   status: string | null | undefined,
   sex: string | null,
-  short = false, // nella scheda: "Fidanzato" invece di "Fidanzato ufficialmente"
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  short = false, // nella scheda: etichetta breve (oggi uguale)
 ) {
   const f = sex === "donna";
   switch (status) {
     case "libero":
       return f ? "Nubile" : "Celibe";
     case "fidanzato":
-      return (f ? "Fidanzata" : "Fidanzato") + (short ? "" : " ufficialmente");
+      return f ? "Promessa" : "Promesso";
     case "sposato":
       return f ? "Sposata" : "Sposato";
     case "divorziato":
