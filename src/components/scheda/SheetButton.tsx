@@ -863,7 +863,7 @@ function DataPage({
     .filter(Boolean)
     .join(" ");
   const section = (icon: string, title: string) => (
-    <h4 className="mt-1 mb-1 flex items-center gap-2 border-b border-[#3b2a1a]/40 pb-1 font-serif text-base tracking-wide text-[#2a1d12] [font-variant:small-caps]">
+    <h4 className="mt-1 mb-1 flex items-center gap-2 border-b border-[#3b2a1a]/40 pb-1 font-serif text-base font-bold tracking-wide text-[#2a1d12] [font-variant:small-caps]">
       <span className="text-[#5a1a12]">
         <SheetIcon name={icon} size={19} />
       </span>
@@ -895,7 +895,7 @@ function DataPage({
               </button>
             )}
           </h3>
-          {subtitle && <p className="mt-0.5 font-serif text-[0.6875rem] tracking-[0.16em] text-[#3b2a1a] uppercase">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 font-serif text-[0.6875rem] font-bold tracking-[0.16em] text-[#3b2a1a] uppercase">{subtitle}</p>}
           <div aria-hidden className="mx-auto mt-1 flex max-w-xs items-center gap-2 text-[#7a5530]">
             <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#7a5530]" />
             <span className="text-xs">◆</span>

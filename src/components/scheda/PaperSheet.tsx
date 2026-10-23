@@ -69,7 +69,7 @@ export function PaperRow({
           <SheetIcon name={rowIcon(label, table.sex)} size={18} />
         </span>
         <span className="w-[6rem] shrink-0 text-[0.8125rem] text-[#3b2a1a]">{label}</span>
-        <div className={`min-w-0 flex-1 ${wrap ? "" : "truncate "}text-[0.8125rem] text-[#2a1d12]`}>{value}</div>
+        <div className={`min-w-0 flex-1 ${wrap ? "" : "truncate "}text-[0.75rem] text-[#2a1d12]`}>{value}</div>
         {right && <span className="shrink-0 text-sm text-[#4a3826]">{right}</span>}
       </div>
     );
