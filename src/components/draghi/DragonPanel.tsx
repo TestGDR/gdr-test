@@ -71,7 +71,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
 
   return (
     <div className="flex h-full bg-[#e2d0a8] bg-[url('/images/scheda-drago.webp')] bg-cover bg-center">
-      <div className={`min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4 sm:px-8 sm:py-5 ${INK}`}>
+      <div className={`min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-6 sm:py-3 ${INK}`}>
         {!data ? (
           <p className="py-20 text-center italic">Caricamento...</p>
         ) : !data.dragon ? (
@@ -104,7 +104,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
               type="button"
               onClick={() => setTab(t.id)}
               aria-pressed={tab === t.id}
-              className={`flex-1 rounded-l-none border-y border-r py-3 font-serif text-[0.6875rem] tracking-[0.18em] uppercase shadow-[2px_2px_4px_rgb(0_0_0/0.35)] transition [writing-mode:vertical-rl] ${
+              className={`flex-1 rounded-l-none border-y border-r py-2 font-serif text-[0.625rem] tracking-[0.1em] uppercase shadow-[2px_2px_4px_rgb(0_0_0/0.35)] transition [writing-mode:vertical-rl] ${
                 tab === t.id
                   ? "-ml-1 border-[#3a2410] bg-[#6b2a14] text-[#f4e9cd]"
                   : "border-[#3a2410]/60 bg-[#5a3a1e] text-[#e8d8b4] hover:bg-[#6b4424]"
@@ -129,15 +129,15 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
 // ---------------------------------------------------------------------
 function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
   return (
-    <header className="mb-4 flex items-center gap-3">
-      <Ring size="h-10 w-10 sm:h-12 sm:w-12" title={dragon.sex === "maschio" ? "Maschio" : "Femmina"}>
+    <header className="mb-3 flex items-center gap-3">
+      <Ring size="h-9 w-9 sm:h-10 sm:w-10" title={dragon.sex === "maschio" ? "Maschio" : "Femmina"}>
         <span className="font-serif text-xl">{dragon.sex === "maschio" ? "♂" : "♀"}</span>
       </Ring>
       <div className="min-w-0 flex-1 text-center">
         <p className="text-[0.6875rem] tracking-[0.3em] text-[#6b4a2e] uppercase">{stageLabel(dragon.stage, stages)}</p>
-        <h2 className="truncate font-serif text-xl tracking-wide text-[#3b2a1a] sm:text-3xl">{dragonName(dragon)}</h2>
+        <h2 className="truncate font-serif text-xl tracking-wide text-[#3b2a1a] sm:text-2xl">{dragonName(dragon)}</h2>
       </div>
-      <Ring size="h-10 w-10 sm:h-12 sm:w-12" title={[dragon.color1, dragon.color2].filter(Boolean).join(" e ")}>
+      <Ring size="h-9 w-9 sm:h-10 sm:w-10" title={[dragon.color1, dragon.color2].filter(Boolean).join(" e ")}>
         <span className="flex gap-0.5">
           {[dragon.color1, dragon.color2].filter(Boolean).map((c) => (
             <span key={c} className="h-4 w-4 rounded-full border border-black/50" style={{ background: colorHex(c) }} />
@@ -155,18 +155,17 @@ function Header({ dragon, stages }: { dragon: Dragon; stages: DragonStage[] }) {
 function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: DragonStage[]; riderName: string }) {
   const mods = useMods(dragon);
   return (
-    <div className="space-y-5">
-      <div className="mx-auto max-w-xl">
-        <DragonBars dragon={dragon} stages={stages} variant="parchment" />
-      </div>
-      <div className="relative mx-auto flex max-w-xl items-center justify-center">
+    <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="relative flex items-center justify-center">
         <HexFrame dragon={dragon} />
       </div>
+      <div className="space-y-4">
+      <DragonBars dragon={dragon} stages={stages} variant="parchment" />
 
-      {/* caratteristiche: due per lato, come su una scheda incisa */}
-      <div className="mx-auto grid max-w-xl grid-cols-4 items-start gap-1 sm:flex sm:justify-between sm:px-2">
-        {STATS.map((s, i) => (
-          <div key={s.key} className={`relative flex flex-col items-center gap-1 ${i === 1 || i === 2 ? "sm:mt-6" : ""}`}>
+      {/* caratteristiche */}
+      <div className="grid grid-cols-4 items-start gap-1">
+        {STATS.map((s) => (
+          <div key={s.key} className="relative flex flex-col items-center gap-1">
             <Ring size="h-11 w-11 sm:h-14 sm:w-14">
               <span className="font-serif text-lg sm:text-xl">{dragon.stats[s.key] ?? 0}</span>
             </Ring>
@@ -181,10 +180,11 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
       </p>
 
       {/* targhette */}
-      <div className="flex flex-wrap justify-center gap-2 pt-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Ribbon>{stageLabel(dragon.stage, stages)}</Ribbon>
         <Ribbon>{dragon.sex === "maschio" ? "Maschio" : "Femmina"}</Ribbon>
         <Ribbon tone="teal">{[dragon.color1, dragon.color2].filter(Boolean).join(" · ")}</Ribbon>
+      </div>
       </div>
     </div>
   );
@@ -194,7 +194,7 @@ function Overview({ dragon, stages, riderName }: { dragon: Dragon; stages: Drago
 function HexFrame({ dragon }: { dragon: Dragon }) {
   const hex = "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)";
   return (
-    <div className="relative h-[15rem] w-[13rem] sm:h-[22rem] sm:w-[19rem]">
+    <div className="relative h-[15rem] w-[13rem] sm:h-[20rem] sm:w-[17.3rem]">
       <svg viewBox="0 0 100 115" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
         <polygon points="50,1 99,29 99,86 50,114 1,86 1,29" fill="none" stroke={LINE} strokeWidth="1.1" />
         <polygon points="50,4.5 96,31 96,84 50,110.5 4,84 4,31" fill="none" stroke={LINE} strokeWidth="2.6" strokeDasharray="0.6 1.4" strokeOpacity=".7" />
@@ -406,13 +406,15 @@ function Growth({
     if (!res.error) onChanged();
   }
 
-  const box = "space-y-3 border border-[#6b4a2e]/40 bg-[#f4e9cd]/50 p-4";
+  const box = "space-y-2 border border-[#6b4a2e]/40 bg-[#f4e9cd]/50 px-4 py-3";
   const button = "border border-[#3a2410] bg-[#6b2a14] px-4 py-1.5 font-serif text-xs tracking-widest text-[#f4e9cd] uppercase shadow transition hover:bg-[#7e3218] disabled:opacity-40";
 
   return (
-    <div className="mx-auto max-w-xl space-y-5">
+    <div className="space-y-4">
       {msg && <p className={`text-center text-sm font-semibold ${msg.ok ? "text-[#2f5a2a]" : "text-[#8b2a14]"}`}>{msg.text}</p>}
 
+      <div className="grid items-start gap-4 sm:grid-cols-2">
+      <div className="space-y-4">
       <section className={box}>
         <SectionTitle>Nome e immagine</SectionTitle>
         <div className="flex flex-wrap items-center gap-2">
@@ -455,7 +457,7 @@ function Growth({
 
       <section className={box}>
         <SectionTitle>Maturazione</SectionTitle>
-        <DragonBars dragon={dragon} stages={stages} variant="parchment" />
+        {/* le barre di maturazione e fedelta' sono nella pagina Scheda */}
         <p className="text-sm">
           {adult ? (
             <>È adulto: è ormai formato e le sue caratteristiche non crescono più. Puoi ancora completare le abilità.</>
@@ -516,10 +518,11 @@ function Growth({
           })()
         )}
       </section>
+      </div>
 
       <section className={box}>
         <SectionTitle>Crescita con i PX</SectionTitle>
-        <p className="text-center text-xs italic">
+        <p className="text-center text-[0.6875rem] leading-snug italic">
           Alzare una voce di 1 costa {skillFactor} PX × il nuovo valore. In questa fase ogni caratteristica arriva al massimo a{" "}
           {statCap}; un&apos;abilità non supera mai la sua caratteristica.
         </p>
@@ -552,19 +555,19 @@ function Growth({
                 const price = skillFactor * (it.cur + 1);
                 const full = it.cur >= it.max;
                 return (
-                  <li key={it.key} className="flex items-center gap-3 py-1.5 text-sm">
+                  <li key={it.key} className="flex items-center gap-3 py-0.5 text-sm">
                     <span className="flex-1 font-serif">
                       {it.label}
                       {it.note && <span className="ml-2 text-xs text-[#6b4a2e] italic">{it.note}</span>}
                     </span>
-                    <span className="w-8 text-center font-serif text-lg">{it.cur}</span>
+                    <span className="w-8 text-center font-serif text-base">{it.cur}</span>
                     <button
                       type="button"
                       disabled={busy || full || px < price}
                       onClick={() =>
                         run(() => supabase.rpc("dragon_buy", { p_dragon: dragon.id, p_key: it.key }), `${it.label} sale a ${it.cur + 1}.`)
                       }
-                      className="w-32 border border-[#6b4a2e] px-2 py-1 text-xs hover:bg-[#c9a05a]/30 disabled:opacity-35"
+                      className="w-28 border border-[#6b4a2e] px-2 py-0 text-xs leading-5 hover:bg-[#c9a05a]/30 disabled:opacity-35"
                     >
                       {full ? (group.title === "Caratteristiche" && adult ? "formato" : "al massimo") : `+1 · ${price} PX`}
                     </button>
@@ -575,6 +578,7 @@ function Growth({
           </div>
         ))}
       </section>
+      </div>
 
       {dragon.unspent_points > 0 && (
         <section className={box}>

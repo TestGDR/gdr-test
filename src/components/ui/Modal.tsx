@@ -33,9 +33,9 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   tall: "w-[min(37.5rem,calc(100vw-1rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
   // chat di una macroarea: altezza fissa 700px (meno su schermi bassi)
   area: "w-[min(46rem,calc(100vw-2rem))] h-[min(43.75rem,calc(100dvh-1rem))]",
-  // scheda del drago: foglio alto, il contenuto gestisce da se' lo scorrimento
+  // scheda del drago: foglio largo e basso (le pagine stanno su due colonne)
   sheet:
-    "w-[min(51.25rem,calc(100vw-1rem))] h-[min(58.75rem,calc(100dvh-1rem))]",
+    "w-[min(58rem,calc(100vw-1rem))] h-[min(40rem,calc(100dvh-1rem))]",
   // ricerca gioco e assenze: alta al massimo 600px, il contenuto scorre dentro
   panel:
     "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",

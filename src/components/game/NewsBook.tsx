@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { NewsForm, sanitize, when, type News } from "./NewsPanel";
 
-// Notizie ON come un libro aperto (stile del Manuale):
+// Notizie ON e OFF come un libro aperto (stile del Manuale):
 // a destra solo l'ultima notizia, a sinistra l'indice con l'archivio delle
-// notizie sostituite. Le scrive chi ha il permesso "Notizie ON"
-export default function NewsBook({ canWrite }: { canWrite: boolean }) {
+// notizie sostituite. Le scrive chi ha il permesso "Notizie ON" o "Notizie OFF"
+export default function NewsBook({ canWrite, kind = "on" }: { canWrite: boolean; kind?: "on" | "off" }) {
+  const label = kind === "on" ? "Notizie ON" : "Notizie OFF";
   const supabase = useMemo(() => createClient(), []);
   const [list, setList] = useState<News[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -22,13 +23,13 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
     supabase
       .from("news")
       .select("id, title, body, created_at, updated_at")
-      .eq("kind", "on")
+      .eq("kind", kind)
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) setError("Impossibile caricare le notizie.");
         setList(data ?? []);
       });
-  }, [supabase, version]);
+  }, [supabase, version, kind]);
 
   const latest = list?.[0] ?? null;
   const archive = list?.slice(1) ?? [];
@@ -65,7 +66,7 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
     <div className="guida flex h-full flex-col gap-3 p-2 md:flex-row md:p-3">
       {/* Indice: ultima notizia e archivio */}
       <aside className="guida-indice flex max-h-72 shrink-0 flex-col md:max-h-none md:w-80">
-        <h2 className="guida-indice-titolo">Notizie ON</h2>
+        <h2 className="guida-indice-titolo">{label}</h2>
         <div className="min-h-0 flex-1 overflow-y-auto pt-2 pr-1">
         {list === null && !error && <p className="px-3 text-sm text-[#8a8077]">Caricamento...</p>}
         {list?.length === 0 && <p className="px-3 text-sm text-[#8a8077]">Nessuna notizia.</p>}
@@ -100,7 +101,7 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
       <section className={`flex min-h-0 min-w-0 flex-1 flex-col ${editing ? "book-page-editing px-10 py-6" : "guida-pagina"}`}>
         <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
           <p className="guida-percorso">
-            Notizie ON{selected && !editing && <span> · {selected.id === latest?.id ? "Ultima notizia" : "Archivio"}</span>}
+            {label}{selected && !editing && <span> · {selected.id === latest?.id ? "Ultima notizia" : "Archivio"}</span>}
           </p>
         {canWrite && !editing && (
           <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-2">
@@ -131,7 +132,7 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
                 </p>
               )}
               <NewsForm
-                kind="on"
+                kind={kind}
                 news={editing === "new" ? null : editing}
                 onDone={(saved) => {
                   setEditing(null);
@@ -152,7 +153,7 @@ export default function NewsBook({ canWrite }: { canWrite: boolean }) {
               <div dangerouslySetInnerHTML={{ __html: sanitize(selected.body) }} />
             </article>
           ) : (
-            list && <p className="py-10 text-center text-[#7a6248] italic">Nessuna notizia dal mondo di gioco, per ora.</p>
+            list && <p className="py-10 text-center text-[#7a6248] italic">{kind === "on" ? "Nessuna notizia dal mondo di gioco, per ora." : "Nessuna notizia dallo staff, per ora."}</p>
           )}
         </div>
       </section>

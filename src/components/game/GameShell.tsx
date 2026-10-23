@@ -56,7 +56,6 @@ import {
   UsersIcon,
   WeatherIcon,
 } from "./icons";
-import NewsPanel from "./NewsPanel";
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel from "./AbsencesPanel";
@@ -552,7 +551,7 @@ export default function GameShell({
               ? "faq"
             : panel === "voci"
               ? "panel600"
-              : panel === "notizie-on" || panel === "forum"
+              : panel === "notizie-on" || panel === "notizie-off" || panel === "forum"
                 ? "xl"
                 : "lg"
         }
@@ -562,7 +561,7 @@ export default function GameShell({
         {panelSession > 0 && (
           <>
         {panel === "notizie-on" && <NewsBook key={panelSession} canWrite={canWriteNewsOn} />}
-        {panel === "notizie-off" && <NewsPanel key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
+        {panel === "notizie-off" && <NewsBook key={panelSession} kind="off" canWrite={canWriteNewsOff} />}
         {panel === "ricerca" && (
           <PlayRequestsPanel
             key={panelSession}
