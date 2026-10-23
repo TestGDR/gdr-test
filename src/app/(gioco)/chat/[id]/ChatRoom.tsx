@@ -180,9 +180,11 @@ export default function ChatRoom({
           const msg = payload.new as Message;
           const own = mine.has(msg.character_id);
           if (msg.kind === "sistema") {
-            // entrate, uscite e modalita' master: si rileggono presenti e limiti
+            // entrate e uscite: si rileggono solo i presenti, senza ricaricare la chat;
+            // la modalita' master cambia i limiti delle azioni: quelli arrivano dal server
             addMessage(msg, own);
-            router.refresh();
+            if (/modalit[aà] master/i.test(msg.content)) router.refresh();
+            else loadPresence();
             return;
           }
           if (!own) playEvent("chat");
@@ -237,7 +239,7 @@ export default function ChatRoom({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, roomId, mine, router, snapshotAt]);
+  }, [supabase, roomId, mine, router, snapshotAt, loadPresence]);
 
   // Dopo un'ora dall'invio l'azione sparisce dalla chat (resta nel database)
   const [clock, setClock] = useState(() => Date.now()); // per i 5 minuti in cui un'azione si puo' correggere
