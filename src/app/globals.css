@@ -842,3 +842,24 @@ textarea.input {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Missive ricevute: righe dell'elenco con la busta in un cerchio */
+.missiva-riga-elenco {
+  border: 1px solid rgb(138 106 60 / 0.7);
+  background: linear-gradient(180deg, rgb(32 21 12 / 0.92), rgb(16 10 6 / 0.92));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6);
+  transition: border-color 0.15s;
+}
+.missiva-riga-elenco:hover {
+  border-color: #c9a45c;
+}
+.missiva-sigillata {
+  border-color: #c9a45c;
+  background: linear-gradient(180deg, rgb(52 32 16 / 0.95), rgb(24 14 8 / 0.95));
+}
+.missiva-busta {
+  border: 1px solid #c08a4e;
+  color: #e6cdb0;
+  background: radial-gradient(circle, rgb(60 38 18), rgb(20 12 6));
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.5);
+}

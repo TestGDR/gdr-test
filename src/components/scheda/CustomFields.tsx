@@ -11,6 +11,7 @@ import {
 } from "@/lib/creation-flow";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
+import AdminText, { useIsAdmin } from "./AdminText";
 import { PaperRow } from "./PaperSheet";
 
 type FieldDef = { id: string; c: BlockConfig };
@@ -211,18 +212,40 @@ export function CustomFieldsManage({
 }
 
 // Pagina Tratti: la spiegazione di vantaggi e svantaggi scritta in iscrizione
+// (la scrive il giocatore in iscrizione; dopo la corregge solo un admin)
 export function TraitsNote({ characterId }: { characterId: string }) {
-  const { defs, priv } = useCustomFields(characterId);
+  const { supabase, defs, priv, setPriv } = useCustomFields(characterId);
+  const isAdmin = useIsAdmin();
   const def = defs?.find((d) => d.c.key === TRAITS_NOTE_KEY);
-  if (!def) return null;
-  const v = def.c.visibility === "pubblico" ? null : priv?.[TRAITS_NOTE_KEY];
-  if (v === undefined || v === null || v === "") return null;
+  if (!def || def.c.visibility === "pubblico") return null;
+  const v = priv?.[TRAITS_NOTE_KEY];
+  const text = v === undefined || v === null ? "" : customValueText(def.c, v);
+  if (!text && !isAdmin) return null;
   return (
     <section className="mt-6">
       <h4 className="mb-2 border-b border-accent/30 pb-1 font-serif text-lg text-accent">
         {def.c.label || "Vantaggi e svantaggi"}
       </h4>
-      <p className="text-sm whitespace-pre-line">{customValueText(def.c, v)}</p>
+      <AdminText
+        key={text}
+        value={text}
+        canEdit={isAdmin}
+        multiline
+        maxLength={def.c.max_len ?? 2000}
+        emptyLabel="Il giocatore non ha scritto nulla."
+        className="text-sm"
+        onSave={async (t) => {
+          const data = { ...(priv ?? {}) };
+          if (t) data[TRAITS_NOTE_KEY] = t;
+          else delete data[TRAITS_NOTE_KEY];
+          const { error } = await supabase
+            .from("character_private_fields")
+            .upsert({ character_id: characterId, data });
+          if (error) return "Non salvato.";
+          setPriv(data);
+          return null;
+        }}
+      />
     </section>
   );
 }

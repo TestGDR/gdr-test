@@ -14,8 +14,31 @@ import type { Contact } from "./MessagesModal";
 // ---------------------------------------------------------------------
 
 type Method = "paggio" | "corvo" | "staffetta";
-type Inbox = { id: number; method: Method; delivered_at: string; opened: boolean; signed: boolean | null; sender_name: string | null; sender_id: string | null; body: string | null };
-type Sent = { id: number; recipient_name: string; method: Method; created_at: string; deliver_at: string; signed: boolean; body: string };
+type Inbox = {
+  id: number;
+  method: Method;
+  delivered_at: string;
+  opened: boolean;
+  signed: boolean | null;
+  sender_name: string | null;
+  sender_id: string | null;
+  body: string | null;
+  from_name?: string | null; // luogo di partenza (dopo l'apertura)
+  sender_house?: string | null; // casata del mittente (aperto e firmato)
+  archived?: boolean;
+};
+type Sent = {
+  id: number;
+  recipient_name: string;
+  method: Method;
+  created_at: string;
+  deliver_at: string;
+  signed: boolean;
+  body: string;
+  to_name?: string | null; // luogo di arrivo
+  recipient_house?: string | null;
+  archived?: boolean;
+};
 type Opened = { id: number; method: Method; delivered_at: string; signed: boolean; sender_name: string | null; sender_id: string | null; body: string };
 type Preview = { method: Method | null; minutes: number | null; risky: boolean; from_name: string | null }; // method null: nessuna strada
 
@@ -29,7 +52,20 @@ function duration(min: number) {
 }
 
 type Tab = "ricevuti" | "inviati" | "scrivi" | "castello";
-type Raven = { id: number; sender_name: string; recipient_name: string; signed: boolean; from_name: string | null; to_name: string | null; created_at: string; deliver_at: string; body: string };
+type Raven = {
+  id: number;
+  sender_name: string;
+  recipient_name: string;
+  signed: boolean;
+  from_name: string | null;
+  to_name: string | null;
+  created_at: string;
+  deliver_at: string;
+  body: string;
+  sender_house?: string | null;
+  recipient_house?: string | null;
+  archived?: boolean;
+};
 
 export default function Scrolls({
   me,
@@ -92,7 +128,33 @@ export default function Scrolls({
     setInbox((prev) =>
       prev?.map((x) => (x.id === id ? { ...x, opened: true, signed: s.signed, sender_name: s.sender_name, sender_id: s.sender_id, body: s.body } : x)) ?? prev,
     );
+    loadInbox().then(setInbox);
     onRead();
+  }
+
+  // Elenco: gettare o archiviare piu' cartigli insieme
+  async function discardMany(ids: number[]) {
+    if (!ids.length || !window.confirm(`Gettare via ${ids.length === 1 ? "il cartiglio selezionato" : `i ${ids.length} cartigli selezionati`}? Non potrai più rileggerli.`)) return;
+    await Promise.all(ids.map((id) => supabase.rpc("discard_scroll", { p_scroll: id })));
+    setInbox((prev) => prev?.filter((x) => !ids.includes(x.id)) ?? prev);
+    onRead();
+  }
+  async function discardSent(ids: number[]) {
+    if (!ids.length || !window.confirm(`Gettare ${ids.length === 1 ? "la copia selezionata" : `le ${ids.length} copie selezionate`}?`)) return;
+    await Promise.all(ids.map((id) => supabase.rpc("discard_scroll", { p_scroll: id })));
+    setSent((prev) => prev?.filter((x) => !ids.includes(x.id)) ?? prev);
+  }
+  async function archiveSent(ids: number[], archived: boolean) {
+    if (!ids.length) return;
+    const { error } = await supabase.rpc("archive_sent_scrolls", { p_ids: ids, p_archived: archived });
+    if (error) return window.alert("Per l'archivio va eseguita la migrazione 0162 in Supabase.");
+    setSent((prev) => prev?.map((x) => (ids.includes(x.id) ? { ...x, archived } : x)) ?? prev);
+  }
+  async function archiveMany(ids: number[], archived: boolean) {
+    if (!ids.length) return;
+    const { error } = await supabase.rpc("archive_scrolls", { p_ids: ids, p_archived: archived });
+    if (error) return window.alert("Per l'archivio va eseguita la migrazione 0161 in Supabase.");
+    setInbox((prev) => prev?.map((x) => (ids.includes(x.id) ? { ...x, archived } : x)) ?? prev);
   }
 
   async function discard(id: number, from: "ricevuti" | "inviati") {
@@ -130,7 +192,7 @@ export default function Scrolls({
       <div className="flex min-h-0 flex-1">
       {/* il corvo sullo scrittoio (solo schermi larghi) */}
       <div aria-hidden className="missiva-corvo hidden w-[250px] shrink-0 lg:block" />
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className={`min-h-0 flex-1 p-4 sm:p-6 ${tab !== "scrivi" && !opened ? "flex flex-col" : "overflow-y-auto"}`}>
         {opened ? (
           <OpenedScroll
             s={opened}
@@ -147,11 +209,11 @@ export default function Scrolls({
             onDiscard={() => discard(opened.id, "ricevuti")}
           />
         ) : tab === "ricevuti" ? (
-          <InboxGrid inbox={inbox} onOpen={open} />
+          <InboxList inbox={inbox} onOpen={open} onDiscard={discardMany} onArchive={archiveMany} />
         ) : tab === "castello" && isAdmin ? (
           <CastleArchive />
         ) : tab === "inviati" ? (
-          <SentList sent={sent} onDiscard={(id) => discard(id, "inviati")} />
+          <SentList sent={sent} onDiscard={discardSent} onArchive={archiveSent} />
         ) : me.status !== "attivo" ? (
           <p className="py-10 text-center text-[#c9b48a]">Le missive sono messaggi in gioco: potrai scriverle quando il tuo personaggio sarà attivo.</p>
         ) : (
@@ -189,34 +251,402 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 // ---------------------------------------------------------------------
-// Ricevuti: cartigli arrotolati; quelli chiusi hanno il sigillo intatto
-function InboxGrid({ inbox, onOpen }: { inbox: Inbox[] | null; onOpen: (id: number) => void }) {
-  if (inbox === null) return <p className="text-center text-[#c9b48a]">Caricamento...</p>;
-  if (inbox.length === 0) return <p className="py-10 text-center text-[#c9b48a] italic">Nessun cartiglio ti è stato consegnato.</p>;
+// Ricevuti, inviati e archivio del castello: stesso elenco con ricerca,
+// filtri per persona e casata, selezione, pagine e archivio
+type Row = {
+  id: number;
+  title: string;
+  strong: boolean; // da leggere: evidenziato
+  lines: ReactNode[];
+  date: string;
+  archived: boolean;
+  search: string; // testo in cui cercare
+  person: string | null; // per il filtro (mittente o destinatario)
+  houses: string[];
+  icon: ReactNode;
+  body?: ReactNode; // se c'e', cliccando si apre sotto la riga
+};
+const PAGE = 5;
+function MissiveList({
+  rows,
+  personLabel,
+  special = [],
+  onOpen,
+  onDelete,
+  deleteLabel = "Elimina selezionati",
+  onArchive,
+  empty,
+}: {
+  rows: Row[] | null;
+  personLabel: string; // "Tutti i mittenti", "Tutti i destinatari"
+  special?: { value: string; label: string; test: (r: Row) => boolean }[];
+  onOpen?: (id: number) => void;
+  onDelete: (ids: number[]) => void;
+  deleteLabel?: string;
+  onArchive: (ids: number[], archived: boolean) => void;
+  empty: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [person, setPerson] = useState("");
+  const [house, setHouse] = useState("");
+  const [showArchive, setShowArchive] = useState(false);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [page, setPage] = useState(0);
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  if (rows === null) return <p className="text-center text-[#c9b48a]">Caricamento...</p>;
+  const archivedCount = rows.filter((x) => x.archived).length;
+  const people = [...new Set(rows.map((x) => x.person).filter((n): n is string => !!n))].sort();
+  const houses = [...new Set(rows.flatMap((x) => x.houses))].sort();
+  const q = query.trim().toLowerCase();
+  const spec = special.find((x) => x.value === person);
+  const list = rows.filter(
+    (x) =>
+      x.archived === showArchive &&
+      (!q || x.search.toLowerCase().includes(q)) &&
+      (!person || (spec ? spec.test(x) : x.person === person)) &&
+      (!house || x.houses.includes(house)),
+  );
+  const pages = Math.max(1, Math.ceil(list.length / PAGE));
+  const current = Math.min(page, pages - 1);
+  const shown = list.slice(current * PAGE, current * PAGE + PAGE);
+  const sel = picked.filter((id) => list.some((x) => x.id === id));
+  const toggle = (id: number) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
   return (
-    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {inbox.map((s) => (
-        <li key={s.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(s.id)}
-            className={`group flex w-full flex-col items-center gap-2 border p-3 text-center transition hover:border-[#c9a45c] hover:bg-[#2a1a10] ${
-              s.opened ? "border-[#3d2a18] bg-black/20" : "border-[#7a5a30] bg-[#24160d]"
-            }`}
-          >
-            <ScrollArt sealed={!s.opened} />
-            <span className={`font-serif text-sm ${s.opened ? "text-[#c9b48a]" : "text-[#f0dcae]"}`}>
-              {s.opened ? (s.signed ? `Da ${s.sender_name}` : "Biglietto anonimo") : "Cartiglio sigillato"}
-            </span>
-            <span className="flex items-center gap-1 text-[0.6875rem] text-[#a08a64]">
-              <MethodIcon method={s.method} />
-              Consegnato da {BY[s.method]}
-            </span>
-            <span className="text-[0.625rem] text-[#8a7656]">{when(s.delivered_at)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex h-full flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative min-w-48 flex-1">
+          <input
+            value={query}
+            onChange={(e) => (setQuery(e.target.value), setPage(0))}
+            placeholder="Cerca per nome, luogo o testo..."
+            className="missiva-input w-full py-1.5 pr-9 pl-3 text-sm"
+          />
+          <span aria-hidden className="absolute top-1/2 right-2.5 -translate-y-1/2 text-[#c08a4e]">
+            <SearchIcon />
+          </span>
+        </label>
+        <select value={person} onChange={(e) => (setPerson(e.target.value), setPage(0))} className="missiva-input px-2 py-1.5 text-sm" aria-label={personLabel}>
+          <option value="">{personLabel}</option>
+          {special.map((x) => (
+            <option key={x.value} value={x.value}>
+              {x.label}
+            </option>
+          ))}
+          {people.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <select value={house} onChange={(e) => (setHouse(e.target.value), setPage(0))} className="missiva-input px-2 py-1.5 text-sm" aria-label="Casata">
+          <option value="">Tutte le casate</option>
+          {houses.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => (setShowArchive((v) => !v), setPage(0), setPicked([]))}
+          className={`missiva-tab px-3 py-1.5 font-serif text-xs tracking-[0.1em] uppercase ${showArchive ? "missiva-tab-attiva" : ""}`}
+        >
+          {showArchive ? "← Indietro" : `Archiviati (${archivedCount})`}
+        </button>
+      </div>
+
+      {list.length === 0 ? (
+        <p className="py-10 text-center text-[#c9b48a] italic">
+          {rows.length === 0 ? empty : showArchive ? "Nessun cartiglio archiviato." : "Nessun cartiglio trovato."}
+        </p>
+      ) : (
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {shown.map((x) => (
+            <li key={x.id} className={`missiva-riga-elenco ${x.strong ? "missiva-sigillata" : ""}`}>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => (onOpen ? onOpen(x.id) : setOpenId(openId === x.id ? null : x.id))}
+                  aria-expanded={onOpen ? undefined : openId === x.id}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <span className="missiva-busta flex h-11 w-11 shrink-0 items-center justify-center rounded-full">{x.icon}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate font-serif text-[0.9375rem] ${x.strong ? "font-semibold text-[#f6e6c8]" : "text-[#e6cdb0]"}`}>{x.title}</span>
+                    {x.lines.map((l, i) => (
+                      <span key={i} className="block truncate text-xs text-[#a08a64]">
+                        {l}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="shrink-0 self-start pt-0.5 text-right text-xs text-[#a08a64]">{x.date}</span>
+                </button>
+                <input
+                  type="checkbox"
+                  checked={sel.includes(x.id)}
+                  onChange={() => toggle(x.id)}
+                  aria-label="Seleziona il cartiglio"
+                  className="h-4 w-4 shrink-0 accent-[#c08a4e]"
+                />
+              </div>
+              {!onOpen && openId === x.id && x.body && (
+                <div className="border-t border-[#c08a4e]/30 px-4 py-3 text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{x.body}</div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#c08a4e]/30 pt-3">
+        <button
+          type="button"
+          disabled={!sel.length}
+          onClick={() => (onDelete(sel), setPicked([]))}
+          className="missiva-tab flex items-center gap-2 px-3 py-1.5 font-serif text-xs tracking-[0.1em] text-[#e8a090] uppercase disabled:opacity-40"
+        >
+          <TrashIcon /> {deleteLabel}
+        </button>
+        {pages > 1 && (
+          <nav aria-label="Pagine" className="flex items-center gap-1 font-serif text-sm text-[#e6cdb0]">
+            <button type="button" disabled={current === 0} onClick={() => setPage(current - 1)} className="px-2 disabled:opacity-30" aria-label="Pagina precedente">
+              ◂
+            </button>
+            {Array.from({ length: pages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setPage(i)}
+                aria-current={i === current}
+                className={`h-7 min-w-7 px-1.5 ${i === current ? "missiva-tab-attiva border" : "hover:text-[#f6e6c8]"}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button type="button" disabled={current >= pages - 1} onClick={() => setPage(current + 1)} className="px-2 disabled:opacity-30" aria-label="Pagina successiva">
+              ▸
+            </button>
+          </nav>
+        )}
+        <button
+          type="button"
+          disabled={!sel.length}
+          onClick={() => (onArchive(sel, !showArchive), setPicked([]))}
+          className="missiva-tab flex items-center gap-2 px-3 py-1.5 font-serif text-xs tracking-[0.1em] uppercase disabled:opacity-40"
+        >
+          <ArchiveBoxIcon /> {showArchive ? "Rimetti nell'elenco" : "Archivia selezionati"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const firstLine = (t: string | null) => {
+  const l = (t ?? "").split("\n")[0];
+  return l.length > 70 ? l.slice(0, 70) + "…" : l || "(senza testo)";
+};
+
+// Ricevuti: i sigillati non dicono chi scrive ne' da dove
+function InboxList({
+  inbox,
+  onOpen,
+  onDiscard,
+  onArchive,
+}: {
+  inbox: Inbox[] | null;
+  onOpen: (id: number) => void;
+  onDiscard: (ids: number[]) => void;
+  onArchive: (ids: number[], archived: boolean) => void;
+}) {
+  const rows: Row[] | null =
+    inbox?.map((x) => ({
+      id: x.id,
+      title: x.opened ? firstLine(x.body) : "Cartiglio sigillato",
+      strong: !x.opened,
+      lines: [
+        <>
+          Da: {x.opened ? (x.signed ? x.sender_name : "biglietto anonimo") : "?"}
+          {x.sender_house ? ` · ${x.sender_house}` : ""}
+        </>,
+        x.opened ? <>Luogo: {x.from_name ?? "—"}</> : <>Consegnato da {BY[x.method]}</>,
+      ],
+      date: when(x.delivered_at),
+      archived: !!x.archived,
+      search: [x.sender_name, x.from_name, x.body].filter(Boolean).join(" "),
+      person: x.sender_name,
+      houses: x.sender_house ? [x.sender_house] : [],
+      icon: <EnvelopeIcon open={x.opened} />,
+    })) ?? null;
+  return (
+    <MissiveList
+      rows={rows}
+      personLabel="Tutti i mittenti"
+      special={[
+        { value: "@sigillati", label: "Ancora sigillati", test: (r) => r.strong },
+        { value: "@anonimi", label: "Biglietti anonimi", test: (r) => !r.strong && !r.person },
+      ]}
+      onOpen={onOpen}
+      onDelete={onDiscard}
+      onArchive={onArchive}
+      empty="Nessun cartiglio ti è stato consegnato."
+    />
+  );
+}
+
+// Inviati: chi scrive sa solo se il cartiglio e' ancora in viaggio
+function SentList({
+  sent,
+  onDiscard,
+  onArchive,
+}: {
+  sent: Sent[] | null;
+  onDiscard: (ids: number[]) => void;
+  onArchive: (ids: number[], archived: boolean) => void;
+}) {
+  const [now] = useState(() => Date.now());
+  const rows: Row[] | null =
+    sent?.map((x) => {
+      const travelling = Date.parse(x.deliver_at) > now;
+      return {
+        id: x.id,
+        title: firstLine(x.body),
+        strong: false,
+        lines: [
+          <>
+            A: {x.recipient_name}
+            {x.recipient_house ? ` · ${x.recipient_house}` : ""}
+            {x.signed ? "" : " · senza firma"}
+          </>,
+          <>
+            Luogo: {x.to_name ?? "—"} ·{" "}
+            {travelling ? (
+              <span className="text-amber-200">
+                in viaggio, arriva verso le {new Date(x.deliver_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            ) : (
+              <>consegnato da {BY[x.method]}</>
+            )}
+          </>,
+        ],
+        date: when(x.created_at),
+        archived: !!x.archived,
+        search: [x.recipient_name, x.to_name, x.body].filter(Boolean).join(" "),
+        person: x.recipient_name,
+        houses: x.recipient_house ? [x.recipient_house] : [],
+        icon: <ScrollIcon />,
+        body: x.body,
+      };
+    }) ?? null;
+  return (
+    <MissiveList
+      rows={rows}
+      personLabel="Tutti i destinatari"
+      onDelete={onDiscard}
+      deleteLabel="Getta selezionati"
+      onArchive={onArchive}
+      empty="Non hai ancora inviato cartigli."
+    />
+  );
+}
+
+// Archivio messaggi castello (chi ha il permesso): i corvi giunti ai castelli,
+// letti dai castellani
+function CastleArchive() {
+  const supabase = useMemo(() => createClient(), []);
+  const [list, setList] = useState<Raven[] | null>(null);
+  useEffect(() => {
+    supabase.rpc("castle_archive").then(({ data }) => setList((data ?? []) as Raven[]));
+  }, [supabase]);
+  async function update(ids: number[], archived: boolean, del = false) {
+    if (!ids.length) return;
+    if (del && !window.confirm(`Togliere ${ids.length === 1 ? "il corvo selezionato" : `i ${ids.length} corvi selezionati`} dall'archivio del castello? Il cartiglio resta a chi l'ha scritto e a chi l'ha ricevuto.`)) return;
+    const { error } = await supabase.rpc("castle_archive_update", { p_ids: ids, p_archived: archived, p_delete: del });
+    if (error) return window.alert("Per questa funzione va eseguita la migrazione 0162 in Supabase.");
+    setList((prev) => (del ? prev?.filter((x) => !ids.includes(x.id)) : prev?.map((x) => (ids.includes(x.id) ? { ...x, archived } : x))) ?? prev);
+  }
+  const rows: Row[] | null =
+    list?.map((r) => ({
+      id: r.id,
+      title: firstLine(r.body),
+      strong: false,
+      lines: [
+        <>
+          Da: {r.sender_name}
+          {r.sender_house ? ` · ${r.sender_house}` : ""}
+          {r.signed ? "" : " (non firmato)"} → {r.recipient_name}
+          {r.recipient_house ? ` · ${r.recipient_house}` : ""}
+        </>,
+        <>
+          Luogo: da {r.from_name ?? "?"} a {r.to_name ?? "?"}
+        </>,
+      ],
+      date: when(r.deliver_at),
+      archived: !!r.archived,
+      search: [r.sender_name, r.recipient_name, r.from_name, r.to_name, r.body].filter(Boolean).join(" "),
+      person: r.sender_name,
+      houses: [r.sender_house, r.recipient_house].filter((h): h is string => !!h),
+      icon: <MethodIcon method="corvo" size={20} />,
+      body: r.body,
+    })) ?? null;
+  return (
+    <MissiveList
+      rows={rows}
+      personLabel="Tutti i mittenti"
+      onDelete={(ids) => update(ids, false, true)}
+      onArchive={(ids, archived) => update(ids, archived)}
+      empty="Nessun corvo nell'archivio."
+    />
+  );
+}
+
+function ScrollIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden>
+      <path d="M7 4h11a2 2 0 0 1 0 4h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1 0-4h1Z" />
+      <path d="M7 16V6a2 2 0 0 0-2-2M10 8h4M10 11h4M10 14h3" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+function EnvelopeIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden>
+      {open ? (
+        <>
+          <path d="M3 10.5 12 4l9 6.5V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
+          <path d="m3 10.5 9 6 9-6" />
+        </>
+      ) : (
+        <>
+          <rect x="3" y="5.5" width="18" height="13" rx="1" />
+          <path d="m3.5 6.5 8.5 7 8.5-7" />
+          <circle cx="12" cy="13.5" r="1.8" fill="#8e1d16" stroke="#8e1d16" />
+        </>
+      )}
+    </svg>
+  );
+}
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+      <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+function ArchiveBoxIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden>
+      <path d="M3.5 5h17v4h-17zM5 9v10h14V9M10 13h4" />
+    </svg>
   );
 }
 
@@ -248,100 +678,6 @@ function OpenedScroll({ s, onBack, onReply, onDiscard }: { s: Opened; onBack: ()
         </button>
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------
-// Archivio messaggi castello (solo admin): i cartigli giunti con i corvi,
-// letti dai castellani all'arrivo
-function CastleArchive() {
-  const supabase = useMemo(() => createClient(), []);
-  const [list, setList] = useState<Raven[] | null>(null);
-  const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<number | null>(null);
-  useEffect(() => {
-    supabase.rpc("castle_archive").then(({ data }) => setList((data ?? []) as Raven[]));
-  }, [supabase]);
-  const q = query.trim().toLowerCase();
-  const shown = (list ?? []).filter(
-    (r) => !q || [r.sender_name, r.recipient_name, r.from_name, r.to_name, r.body].some((t) => t?.toLowerCase().includes(q)),
-  );
-  return (
-    <div className="mx-auto max-w-3xl space-y-3">
-      <p className="text-center text-sm text-[#c9b48a] italic">
-        Ogni corvo che arriva a un castello viene letto dai castellani: qui trovi tutti i cartigli giunti in volo. Li vedono solo gli admin.
-      </p>
-      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cerca per nome, luogo o testo" className="input py-1.5" />
-      {list === null && <p className="text-center text-[#c9b48a]">Caricamento...</p>}
-      {list !== null && shown.length === 0 && <p className="py-6 text-center text-[#c9b48a] italic">Nessun corvo nell&apos;archivio.</p>}
-      <ul className="space-y-2">
-        {shown.map((r) => (
-          <li key={r.id} className="border border-[#5a3d22] bg-[#24160d]">
-            <button type="button" onClick={() => setOpenId(openId === r.id ? null : r.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
-              <span className="text-[#c9a45c]">
-                <MethodIcon method="corvo" size={20} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-serif text-[#f0dcae]">
-                  {r.sender_name}
-                  {!r.signed && <span className="text-xs text-[#a08a64] italic"> (non firmato)</span>} → {r.recipient_name}
-                </span>
-                <span className="block text-[0.6875rem] text-[#a08a64]">
-                  Da {r.from_name ?? "?"} a {r.to_name ?? "?"} · giunto il {when(r.deliver_at)}
-                </span>
-              </span>
-            </button>
-            {openId === r.id && (
-              <p className="border-t border-[#5a3d22] px-4 py-3 text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{r.body}</p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
-// Inviati: il mittente sa solo se il cartiglio e' ancora in viaggio
-function SentList({ sent, onDiscard }: { sent: Sent[] | null; onDiscard: (id: number) => void }) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [now] = useState(() => Date.now());
-  if (sent === null) return <p className="text-center text-[#c9b48a]">Caricamento...</p>;
-  if (sent.length === 0) return <p className="py-10 text-center text-[#c9b48a] italic">Non hai ancora inviato cartigli.</p>;
-  return (
-    <ul className="mx-auto max-w-3xl space-y-2">
-      {sent.map((s) => {
-        const travelling = Date.parse(s.deliver_at) > now;
-        return (
-          <li key={s.id} className="border border-[#5a3d22] bg-[#24160d]">
-            <button type="button" onClick={() => setOpenId(openId === s.id ? null : s.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
-              <span className="text-[#c9a45c]">
-                <MethodIcon method={s.method} size={20} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-serif text-[#f0dcae]">A {s.recipient_name}</span>
-                <span className="block text-[0.6875rem] text-[#a08a64]">
-                  Affidato a {BY[s.method]} il {when(s.created_at)} · {s.signed ? "firmato" : "senza firma"}
-                </span>
-              </span>
-              <span className={`shrink-0 text-xs ${travelling ? "text-amber-200" : "text-[#a08a64]"}`}>
-                {travelling ? `In viaggio · arriva verso le ${new Date(s.deliver_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : "Consegnato"}
-              </span>
-            </button>
-            {openId === s.id && (
-              <div className="space-y-2 border-t border-[#5a3d22] px-4 py-3">
-                <p className="text-sm whitespace-pre-wrap text-[#e8d8b4] italic">{s.body}</p>
-                <div className="text-right">
-                  <button type="button" onClick={() => onDiscard(s.id)} className="text-xs text-red-400 hover:text-red-300">
-                    Getta la copia
-                  </button>
-                </div>
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 
@@ -572,40 +908,6 @@ function WriteScroll({
 }
 
 // ---------------------------------------------------------------------
-// Cartiglio arrotolato con sigillo di ceralacca (intatto o spezzato)
-function ScrollArt({ sealed }: { sealed: boolean }) {
-  return (
-    <svg width="96" height="64" viewBox="0 0 96 64" aria-hidden className="drop-shadow-[0_3px_4px_rgb(0_0_0/0.7)]">
-      <defs>
-        <linearGradient id="carta" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f2e3bd" />
-          <stop offset=".5" stopColor="#dcc28f" />
-          <stop offset="1" stopColor="#b8975f" />
-        </linearGradient>
-      </defs>
-      {/* rotolo */}
-      <rect x="10" y="18" width="76" height="28" rx="3" fill="url(#carta)" />
-      <ellipse cx="10" cy="32" rx="6" ry="14" fill="#c9ab74" />
-      <ellipse cx="10" cy="32" rx="3" ry="9" fill="#8a6a3e" />
-      <ellipse cx="86" cy="32" rx="6" ry="14" fill="#e6d2a4" />
-      {/* nastro */}
-      <rect x="44" y="18" width="8" height="28" fill="#6e1a10" />
-      {sealed ? (
-        <>
-          <circle cx="48" cy="32" r="10" fill="#8b1a10" />
-          <circle cx="48" cy="32" r="7" fill="none" stroke="#5c0f08" strokeWidth="1.5" />
-          <path d="M44 32h8M48 28v8" stroke="#c9483a" strokeWidth="1.5" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          <path d="M39 26a10 10 0 0 1 8-4l-2 9z" fill="#8b1a10" />
-          <path d="M57 38a10 10 0 0 1-8 4l2-9z" fill="#8b1a10" />
-        </>
-      )}
-    </svg>
-  );
-}
-
 // Paggio (mano), corvo (ali), staffetta (cavallo al galoppo, stilizzato)
 function MethodIcon({ method, size = 14 }: { method: Method; size?: number }) {
   const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };

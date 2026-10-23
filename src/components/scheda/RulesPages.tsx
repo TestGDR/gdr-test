@@ -1,5 +1,6 @@
 "use client";
 
+import AdminText, { useIsAdmin } from "./AdminText";
 import { TraitsNote } from "./CustomFields";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -418,6 +419,8 @@ export function TraitsPage({
 }) {
   const { data, reload } = useRulesData(character.id);
   const [editing, setEditing] = useState(false);
+  const isAdmin = useIsAdmin();
+  const supabase = useMemo(() => createClient(), []);
 
   if (editing)
     return (
@@ -480,10 +483,24 @@ export function TraitsPage({
                             </span>
                           </p>
                           <p className="text-sm text-muted">{t.effect}</p>
-                          {o.note && (
-                            <p className="mt-0.5 text-sm text-foreground italic">
-                              {o.note}
-                            </p>
+                          {(o.note || (t.narrative && isAdmin)) && (
+                            <AdminText
+                              key={o.note ?? ""}
+                              value={o.note ?? ""}
+                              canEdit={isAdmin}
+                              emptyLabel="Nessuna riga scritta"
+                              className="mt-0.5 text-sm text-foreground italic"
+                              onSave={async (note) => {
+                                const { error } = await supabase
+                                  .from("character_traits")
+                                  .update({ note: note || null })
+                                  .eq("character_id", character.id)
+                                  .eq("trait_id", t.id);
+                                if (error) return "Non salvato.";
+                                reload();
+                                return null;
+                              }}
+                            />
                           )}
                         </li>
                       );
