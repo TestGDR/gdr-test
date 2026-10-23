@@ -29,8 +29,10 @@ import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
 import Affections from "./Affections";
 import Equipment from "./Equipment";
+import { houseBanner } from "@/lib/house-banners";
+import SheetIcon from "./SheetIcons";
 import { maritalLabel, VISIBLE_MARKS_MAX } from "@/lib/marital";
-import { PaperRow, PaperSheet } from "./PaperSheet";
+import { PaperRow, PaperTableContext } from "./PaperSheet";
 import PositionRow from "./PositionRow";
 import BirthPicker from "./BirthPicker";
 import { CustomFieldRows } from "./CustomFields";
@@ -321,20 +323,27 @@ function CharacterSheet({
     <div className="flex h-[calc(100dvh-4.5rem)] flex-col bg-[#0d0b0b] lg:h-[min(37.5rem,calc(100dvh-4.5rem))] lg:flex-row">
       <nav
         aria-label="Pagine della scheda"
-        className="flex shrink-0 overflow-x-auto border-b border-border bg-black/50 lg:w-52 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:border-r lg:border-b-0"
+        className="flex shrink-0 overflow-x-auto border-b border-border bg-black/50 lg:w-60 lg:flex-col lg:overflow-x-visible lg:overflow-y-hidden lg:border-r lg:border-b-0 lg:border-[#7a5530]/50"
       >
-        <div className="hidden justify-center border-b border-border py-4 lg:flex">
-          {character.avatar_url ? (
+        <div className="hidden items-start justify-center gap-3 border-b border-[#7a5530]/50 px-3 py-3 lg:flex">
+          <span className="cornice-ritratto shrink-0">
+            {character.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={character.avatar_url} alt={character.name} className="block h-[96px] w-[86px] object-cover" />
+            ) : (
+              <span className="flex h-[96px] w-[86px] items-center justify-center bg-black/40 font-serif text-4xl text-accent">
+                {character.name[0]}
+              </span>
+            )}
+          </span>
+          {houseBanner(character.house?.name) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={character.avatar_url}
-              alt={character.name}
-              className="h-[100px] w-[100px] border-2 border-[#3a2c2a] object-cover"
+              src={houseBanner(character.house?.name)!}
+              alt={`Casata ${character.house?.name}`}
+              title={`Casata ${character.house?.name}`}
+              className="mt-[-4px] h-[100px] w-auto drop-shadow-[0_4px_6px_#000]"
             />
-          ) : (
-            <div className="flex h-[100px] w-[100px] items-center justify-center border-2 border-[#3a2c2a] bg-black/40 font-serif text-4xl text-accent">
-              {character.name[0]}
-            </div>
           )}
         </div>
         {tabs.map((t) => (
@@ -343,12 +352,12 @@ function CharacterSheet({
             type="button"
             onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? "page" : undefined}
-            className={`shrink-0 border-b-2 px-4 py-3 text-left text-xs font-semibold tracking-[0.16em] whitespace-nowrap uppercase transition-colors lg:border-b-0 lg:border-l-2 ${
-              tab === t.id
-                ? "border-accent bg-blood/20 text-accent"
-                : "border-transparent text-muted hover:bg-white/5 hover:text-foreground"
+            className={`scheda-voce flex shrink-0 items-center gap-3 px-4 py-[0.3rem] text-left lg:min-h-0 lg:flex-1 lg:shrink font-serif text-[0.75rem] tracking-[0.12em] whitespace-nowrap uppercase ${
+              tab === t.id ? "scheda-voce-attiva" : ""
             }`}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/images/ui/scheda/icona-${t.id}.png`} alt="" aria-hidden className="hidden h-7 w-7 shrink-0 lg:block" />
             {t.label}
             {locked(t.id) && (
               <span aria-hidden className="ml-1.5 opacity-60">
@@ -366,10 +375,8 @@ function CharacterSheet({
                 active={tab === "opzioni"}
                 onClick={() => setTab("opzioni")}
               >
-                <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
-                <circle cx="16" cy="6" r="2" />
-                <circle cx="10" cy="12" r="2" />
-                <circle cx="18" cy="18" r="2" />
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+                <circle cx="12" cy="12" r="3" />
               </BottomIcon>
             )}
             {canManage && (
@@ -378,8 +385,8 @@ function CharacterSheet({
                 active={tab === "gestisci"}
                 onClick={() => setTab("gestisci")}
               >
-                <path d="M14.5 5.5a4 4 0 0 0 5 5L12 18a2.1 2.1 0 0 1-3-3l7.5-7.5" />
-                <path d="M4 20l3-3" />
+                <path d="M18.5 3.5a2.1 2.1 0 0 1 3 3L9 19l-4 1 1-4Z" />
+                <path d="M15.5 6.5l3 3M5 20l2.5-.5" />
               </BottomIcon>
             )}
           </div>
@@ -422,7 +429,7 @@ function CharacterSheet({
             characterId={character.id}
             isOwn={canEdit}
             onOpenSheet={setOtherSheet}
-            pen={(onEdit, label) => <Pen onClick={onEdit} label={label} />}
+            sigil={character.house?.sigil_url ?? null}
           />
         )}
         {active && locked(tab) && <LockedPage />}
@@ -852,94 +859,87 @@ function DataPage({
     );
 
   const fullName = fullNameOf(character);
+  const subtitle = [character.house_role?.name, character.house?.name ? `di casa ${character.house.name}` : null]
+    .filter(Boolean)
+    .join(" ");
+  const section = (icon: string, title: string) => (
+    <h4 className="mt-1 mb-1 flex items-center gap-2 border-b border-[#3b2a1a]/40 pb-1 font-serif text-base tracking-wide text-[#2a1d12] [font-variant:small-caps]">
+      <span className="text-[#5a1a12]">
+        <SheetIcon name={icon} size={19} />
+      </span>
+      {title}
+    </h4>
+  );
 
   return (
-    <div className="space-y-6 p-5">
-      <PaperSheet
-        title={fullName}
-        centered
-        ribbon={
-          character.house?.sigil_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={character.house.sigil_url}
-              alt=""
-              className="h-7 w-7 object-contain drop-shadow"
-            />
-          ) : (
-            <span className="font-serif text-lg text-[#f0dcb4]">
-              {character.name[0]}
-            </span>
-          )
-        }
-        titleAction={
-          canEdit && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              title="Modifica i dati"
-              aria-label="Modifica i dati"
-              className="shrink-0 p-1 text-[#7a1d16]/70 transition hover:text-[#7a1d16]"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden
+    <div className="flex h-full flex-col gap-2 px-4 py-3">
+      <div className="scheda-foglio relative shrink-0 overflow-hidden">
+        {character.house?.sigil_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={character.house.sigil_url} alt="" aria-hidden className="pointer-events-none absolute top-6 -right-10 h-72 w-72 object-contain opacity-[0.07] grayscale" />
+        )}
+        <header className="relative text-center">
+          <h3 className="mt-3 flex items-center justify-center gap-2 font-serif text-[2rem] leading-none tracking-wide text-[#7a1d16] [font-variant:small-caps]">
+            <span className="min-w-0 truncate">{fullName}</span>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                title="Modifica i dati"
+                aria-label="Modifica i dati"
+                className="shrink-0 p-1 text-[#7a1d16]/70 transition hover:text-[#7a1d16]"
               >
-                <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
-              </svg>
-            </button>
-          )
-        }
-      >
-        <div className="grid gap-x-6 sm:grid-cols-2">
-          <PaperRow label="Sesso" value={labelOf(SEXES, character.sex)} />
-          <PaperRow
-            label="Età"
-            value={
-              character.age
-                ? `${character.age} anni${character.birth_day && character.birth_month ? ` · nato il ${formatBirth(character.birth_day, character.birth_month, character.birth_year)}` : ""}`
-                : "—"
-            }
-          />
-          <PaperRow label="Casata" value={character.house?.name ?? "—"} />
-          <PaperRow
-            label="Ruolo in casata"
-            value={character.house_role?.name ?? "—"}
-          />
-          <PositionRow characterId={character.id} />
-          <PaperRow
-            label="Stato civile"
-            value={<MaritalValue character={character} />}
-          />
-          <PaperRow label="Altezza" value={character.height || "—"} />
-          <PaperRow label="Colore occhi" value={character.eye_color || "—"} />
-          <PaperRow
-            label="Colore capelli"
-            value={character.hair_color || "—"}
-          />
-          <DragonField character={character} isOwn={isOwn} />
-          {character.sex === "donna" && (
-            <PregnancyRow character={character} isOwn={isOwn} />
-          )}
-        </div>
-        <PaperRow
-          label="Segni visibili"
-          value={
-            <span className="whitespace-normal">
-              {character.visible_marks || "—"}
-            </span>
-          }
-        />
-        <CustomFieldRows character={character} />
-      </PaperSheet>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+                </svg>
+              </button>
+            )}
+          </h3>
+          {subtitle && <p className="mt-0.5 font-serif text-[0.6875rem] tracking-[0.16em] text-[#3b2a1a] uppercase">{subtitle}</p>}
+          <div aria-hidden className="mx-auto mt-1 flex max-w-xs items-center gap-2 text-[#7a5530]">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#7a5530]" />
+            <span className="text-xs">◆</span>
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#7a5530]" />
+          </div>
+        </header>
+
+        <PaperTableContext.Provider value={{ sex: character.sex ?? null }}>
+          <div className="relative mt-2 grid gap-x-6 sm:grid-cols-2 sm:divide-x sm:divide-[#3b2a1a]/25">
+            <div>
+              {section("identita", "Identità")}
+              <PaperRow label="Sesso" value={labelOf(SEXES, character.sex)} />
+              <PaperRow
+                label="Età"
+                wrap
+                value={
+                  <span className="text-[0.8rem]">
+                    {character.age
+                      ? `${character.age} anni${character.birth_day && character.birth_month ? ` · nato il ${formatBirth(character.birth_day, character.birth_month, character.birth_year)}` : ""}`
+                      : "—"}
+                  </span>
+                }
+              />
+              <PaperRow label="Altezza" value={character.height || "—"} />
+              <PaperRow label="Colore capelli" value={character.hair_color || "—"} />
+              <PaperRow label="Colore occhi" value={character.eye_color || "—"} />
+              <PaperRow label="Segni visibili" wrap value={<span className="whitespace-normal">{character.visible_marks || "—"}</span>} />
+              {character.sex === "donna" && <PregnancyRow character={character} isOwn={isOwn} />}
+              <CustomFieldRows character={character} />
+            </div>
+            <div className="sm:pl-6">
+              {section("nobilta", "Nobiltà")}
+              <PaperRow label="Casata" value={<span className="font-semibold text-[#8b1d14]">{character.house?.name ?? "—"}</span>} />
+              <PaperRow label="Ruolo in casata" value={character.house_role?.name ?? "—"} />
+              <PositionRow characterId={character.id} />
+              <div className="mt-3">{section("legami", "Legami")}</div>
+              <PaperRow label="Stato civile" wrap value={<MaritalValue character={character} />} />
+              <DragonField character={character} isOwn={isOwn} />
+            </div>
+          </div>
+        </PaperTableContext.Provider>
+      </div>
       {actions && !isOwn && (
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex shrink-0 flex-wrap justify-center gap-3">
           <button
             type="button"
             onClick={() => actions.message("off", contact)}
@@ -1254,7 +1254,7 @@ function FateNotes({
   // La pennina in alto a destra la vede solo chi puo' scriverle (permesso
   // "schede.note_fato": admin e moderatori)
   return (
-    <section className="iron-panel relative p-4">
+    <section className="nota-fato pannello-bronzo relative flex min-h-[7.5rem] flex-1 flex-col px-5 pt-3 pb-3">
       {canWrite && !editing && (
         <Pen
           onClick={() => setEditing(true)}
@@ -1262,13 +1262,15 @@ function FateNotes({
           className="absolute top-3 right-3"
         />
       )}
-      <div className="min-w-0">
-        <h4 className="px-10 text-center font-serif text-2xl leading-tight text-[#efe6d6]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <h4 className="shrink-0 px-10 text-center font-serif text-xl leading-tight tracking-wide text-[#e6cdb0] [font-variant:small-caps]">
+          <span aria-hidden className="mr-2 text-base text-[#c08a4e]">❦</span>
           Note del Fato
+          <span aria-hidden className="ml-2 inline-block -scale-x-100 text-base text-[#c08a4e]">❦</span>
         </h4>
-        <div className="my-3 h-px bg-gradient-to-r from-transparent via-[#6b625a] to-transparent" />
+        <div className="my-2 h-px shrink-0 bg-gradient-to-r from-transparent via-[#6b625a] to-transparent" />
         {editing ? (
-          <div className="space-y-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -1287,7 +1289,7 @@ function FateNotes({
             />
           </div>
         ) : (
-          <p className="text-sm leading-relaxed whitespace-pre-line text-[#e4dccf]">
+          <p className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-[#e4dccf]">
             {character.fate_notes || (
               <span className="text-[#8d847a] italic">Nessuna nota.</span>
             )}
@@ -1731,10 +1733,10 @@ function BottomIcon({
       title={label}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      className={`flex h-10 w-10 items-center justify-center border transition ${
+      className={`flex h-11 w-12 items-center justify-center border bg-black/40 shadow-[inset_0_0_0_1px_rgb(0_0_0/0.6)] transition ${
         active
-          ? "border-accent bg-blood/20 text-accent"
-          : "border-border text-muted hover:border-accent/60 hover:text-accent"
+          ? "border-[#e0c08a] bg-[#5a120d]/60 text-[#f3e2cc]"
+          : "border-[#8a6a3c] text-[#d4b394] hover:border-[#c9a45c] hover:text-[#f3e2cc]"
       }`}
     >
       <svg

@@ -863,3 +863,86 @@ textarea.input {
   background: radial-gradient(circle, rgb(60 38 18), rgb(20 12 6));
   box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.5);
 }
+
+/* Scheda del personaggio: voci a sinistra con la striscia rossa al passaggio,
+   pagina Dati su pergamena con la rilegatura rossa e la cornice dorata */
+.scheda-voce {
+  position: relative;
+  color: #d8cbb8;
+  border-bottom: 1px solid rgb(122 85 48 / 0.35);
+  transition: color 0.15s, background 0.15s;
+}
+.scheda-voce:hover,
+.scheda-voce-attiva {
+  color: #f6e6c8;
+  background: linear-gradient(90deg, rgb(120 22 16 / 0.95), rgb(78 14 10 / 0.9) 60%, rgb(50 9 7 / 0.85));
+  box-shadow: inset 3px 0 0 #c9a45c, inset 0 1px 0 rgb(201 164 92 / 0.35), inset 0 -1px 0 rgb(201 164 92 / 0.35);
+}
+.scheda-foglio {
+  color: #2a1d12;
+  /* pergamena con le fasce rosse e gli angoli dorati: dentro le fasce resta il testo */
+  padding: 4.2% 7.5% 4% 7.5%;
+  background: url("/images/ui/scheda/pergamena-dati.webp") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.6));
+}
+.nota-fato {
+  background: linear-gradient(180deg, #1c1714, #120e0c);
+}
+
+/* Affetti: pagina scura con la cornice, schede con la fascia rossa e i tasti dorati */
+.affetti-pagina {
+  background: linear-gradient(180deg, rgb(20 15 12 / 0.95), rgb(10 8 7 / 0.95));
+}
+.affetto-scheda {
+  border: 1px solid rgb(192 138 78 / 0.7);
+  background: linear-gradient(180deg, rgb(26 19 14 / 0.92), rgb(14 10 8 / 0.92));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.5);
+}
+.affetto-fascia {
+  background: linear-gradient(90deg, #5a0f0b, #9a2418 55%, #5a0f0b);
+  border-right: 1px solid #c08a4e;
+  box-shadow: inset -2px 0 4px rgb(0 0 0 / 0.5);
+}
+.affetto-tasto {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #8a6a3c;
+  background: rgb(0 0 0 / 0.45);
+  color: #e6cdb0;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6);
+  transition: border-color 0.15s, color 0.15s;
+}
+.affetto-tasto:hover:not(:disabled) {
+  border-color: #e0c08a;
+  color: #f6e6c8;
+}
+.affetto-tasto:disabled {
+  opacity: 0.35;
+}
+
+/* Equipaggiamento: barra rossa dell'inventario, schede con l'icona, borsa con la cornice */
+.inventario-barra {
+  border: 1px solid #b08a52;
+  background: linear-gradient(90deg, #6e1410, #4a0d0a 55%, #2a0807);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.55), 0 3px 8px rgb(0 0 0 / 0.5);
+}
+.inventario-scheda {
+  border: 1px solid rgb(122 85 48 / 0.6);
+  background: rgb(10 8 7 / 0.85);
+  color: #e6cdb0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.inventario-scheda:hover {
+  border-color: #c9a45c;
+}
+.inventario-scheda-attiva {
+  border-color: #c9a45c;
+  background: linear-gradient(180deg, rgb(110 20 16 / 0.85), rgb(60 12 9 / 0.85));
+  color: #f6e6c8;
+}
+.inventario-borsa {
+  background: linear-gradient(180deg, #16110e, #0d0a08);
+}

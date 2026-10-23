@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import RichEditor from "@/components/guide/RichEditor";
 import { createClient } from "@/lib/supabase/client";
 import { cleanPlayerHtml } from "./player-html";
@@ -36,12 +30,12 @@ export default function Affections({
   characterId,
   isOwn,
   onOpenSheet,
-  pen,
+  sigil = null,
 }: {
   characterId: string;
   isOwn: boolean;
   onOpenSheet: (id: string) => void;
-  pen: (onEdit: () => void, label: string) => ReactNode;
+  sigil?: string | null; // stemma della casata, in filigrana sullo sfondo
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [list, setList] = useState<Affection[] | null>(null);
@@ -121,10 +115,17 @@ export default function Affections({
   }
 
   return (
-    <div className="p-6">
-      <h3 className="mb-4 border-b border-border pb-2 font-serif text-2xl text-accent">
-        Affetti
-      </h3>
+    <div className="affetti-pagina pannello-bronzo relative m-3 min-h-[calc(100%-1.5rem)] overflow-hidden px-4 pt-3 pb-4">
+      {sigil && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={sigil} alt="" aria-hidden className="pointer-events-none absolute -top-6 -right-16 h-80 w-80 object-contain opacity-[0.18] [mask-image:radial-gradient(circle,black_30%,transparent_68%)]" />
+      )}
+      <h3 className="relative font-serif text-[1.7rem] leading-tight tracking-wide text-[#e6cdb0] [font-variant:small-caps]">Affetti</h3>
+      <div aria-hidden className="relative mb-3 flex items-center gap-2 text-[#c08a4e]">
+        <span className="h-px flex-1 bg-gradient-to-r from-[#c08a4e]/20 to-[#c08a4e]" />
+        <CrownIcon />
+        <span className="h-px flex-1 bg-gradient-to-l from-[#c08a4e]/20 to-[#c08a4e]" />
+      </div>
       {isOwn && list && (
         <AddPerson
           characterId={characterId}
@@ -140,37 +141,45 @@ export default function Affections({
           Nessun affetto.{isOwn && " Cerca qui sopra un PG per aggiungerlo."}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="relative space-y-3">
           {list.map((a, i) => (
-            <li
-              key={a.id}
-              className="flex gap-4 border border-border/60 bg-black/30 p-3"
-            >
+            <li key={a.id} className="affetto-scheda relative flex gap-4 py-2.5 pr-3 pl-10">
+              {/* fascia rossa con la stella */}
+              <span aria-hidden className="affetto-fascia absolute inset-y-0 left-0 flex w-7 items-center justify-center text-[#e0c08a]">
+                ✦
+              </span>
               <button
                 type="button"
                 onClick={() => onOpenSheet(a.target.id)}
                 title={`Apri la scheda di ${fullName(a.target)}`}
-                className="shrink-0 self-start"
+                className="cornice-ritratto shrink-0 self-start"
               >
                 <Avatar person={a.target} />
               </button>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pt-1">
                 <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenSheet(a.target.id)}
-                    className="text-left font-serif text-lg text-accent hover:underline"
-                  >
-                    {fullName(a.target)}
-                  </button>
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => onOpenSheet(a.target.id)}
+                      className="text-left font-serif text-xl tracking-wide text-[#e6cdb0] [font-variant:small-caps] hover:text-[#f6e6c8]"
+                    >
+                      {fullName(a.target)}
+                    </button>
+                    <div aria-hidden className="mt-1 flex w-60 max-w-full items-center gap-1.5 text-[#c08a4e]">
+                      <span className="h-px flex-1 bg-gradient-to-r from-[#c08a4e]/30 to-[#c08a4e]" />
+                      <span className="text-[0.6rem]">❖</span>
+                      <span className="h-px flex-1 bg-gradient-to-l from-[#c08a4e]/30 to-[#c08a4e]" />
+                    </div>
+                  </div>
                   {isOwn && editingId !== a.id && (
-                    <span className="flex shrink-0 items-center gap-1">
+                    <span className="flex shrink-0 items-center gap-1.5">
                       <button
                         type="button"
                         disabled={i === 0}
                         onClick={() => move(i, -1)}
                         aria-label="Sposta su"
-                        className="px-1.5 text-muted hover:text-accent disabled:opacity-30"
+                        className="affetto-tasto"
                       >
                         ↑
                       </button>
@@ -179,14 +188,22 @@ export default function Affections({
                         disabled={i === list.length - 1}
                         onClick={() => move(i, 1)}
                         aria-label="Sposta giù"
-                        className="px-1.5 text-muted hover:text-accent disabled:opacity-30"
+                        className="affetto-tasto"
                       >
                         ↓
                       </button>
-                      {pen(
-                        () => setEditingId(a.id),
-                        `Modifica l'affetto per ${fullName(a.target)}`,
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(a.id)}
+                        aria-label={`Modifica l'affetto per ${fullName(a.target)}`}
+                        title="Modifica"
+                        className="affetto-tasto"
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden>
+                          <path d="M18.5 3.5a2.1 2.1 0 0 1 3 3L9 19l-4 1 1-4Z" />
+                          <path d="M15.5 6.5l3 3" />
+                        </svg>
+                      </button>
                     </span>
                   )}
                 </div>
@@ -211,13 +228,23 @@ export default function Affections({
   );
 }
 
+function CrownIcon() {
+  return (
+    <svg viewBox="0 0 28 22" width="26" height="20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden>
+      <path d="M4 17 2.5 6.5l6 5L14 3l5.5 8.5 6-5L24 17Z" fill="rgb(192 138 78 / 0.15)" />
+      <path d="M4 20h20M4 17h20" />
+      <circle cx="14" cy="3" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 function AffectionText({ body }: { body: string }) {
   const clean = useMemo(() => cleanPlayerHtml(body), [body]);
   if (!clean.trim()) return null;
   // contain: paint tiene dentro la pagina anche gli stili scritti dal giocatore
   return (
     <div
-      className="guide-content mt-1 overflow-hidden text-sm [contain:paint]"
+      className="guide-content mt-2 overflow-hidden text-sm text-[#e4dccf] [contain:paint]"
       dangerouslySetInnerHTML={{ __html: clean }}
     />
   );
@@ -296,7 +323,7 @@ function Avatar({
   person: Person;
   small?: boolean;
 }) {
-  const size = small ? "h-10 w-10" : "h-[100px] w-[100px]";
+  const size = small ? "h-10 w-10" : "h-[132px] w-[116px]";
   return person.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -373,14 +400,29 @@ function AddPerson({
       : found.list.filter((p) => !exclude.includes(p.id));
 
   return (
-    <div className="relative mb-4">
+    <div className="relative mb-4 flex gap-3">
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Aggiungi un PG: scrivi nome o cognome..."
         aria-label="Cerca un PG da aggiungere"
-        className="input py-1.5"
+        className="missiva-input min-w-0 flex-1 px-3 py-2 text-sm"
       />
+      <button
+        type="button"
+        disabled={shown.length === 0}
+        onClick={() => {
+          const p = shown[0];
+          if (!p) return;
+          setQ("");
+          onPick(p);
+        }}
+        title={shown[0] ? `Aggiungi ${fullName(shown[0])}` : "Scrivi un nome per cercare"}
+        aria-label="Aggiungi il primo PG trovato"
+        className="affetto-tasto h-10! w-12! text-2xl"
+      >
+        +
+      </button>
       {searched && shown.length === 0 && (
         <p className="absolute inset-x-0 top-full z-10 border border-border bg-panel px-3 py-2 text-sm text-muted shadow-xl shadow-black">
           Nessun PG trovato.

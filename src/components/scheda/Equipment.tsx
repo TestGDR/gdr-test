@@ -187,7 +187,7 @@ export default function Equipment({
     return (
       <div key={s.id} className="flex flex-col items-center">
         <span
-          className={`mb-1 text-center text-[0.6rem] leading-tight tracking-[0.16em] text-muted uppercase ${s.side === "sotto" ? "" : "max-w-[5.5rem]"}`}
+          className={`mb-1 text-center font-serif text-[0.6875rem] leading-tight tracking-[0.14em] text-[#e6cdb0] uppercase ${s.side === "sotto" ? "" : "max-w-[5.5rem]"}`}
           title={s.name}
         >
           {s.name}
@@ -206,7 +206,7 @@ export default function Equipment({
               {o ? (
                 <ItemImage item={o.item} fill />
               ) : (
-                <span className="text-xs text-muted/60 italic">vuota</span>
+                <SlotIcon name={s.name} />
               )}
             </button>
           ))}
@@ -227,8 +227,8 @@ export default function Equipment({
         ? bag.find((o) => groupKey(o) === pick.key)
         : undefined;
 
-  const details = (
-    <div className="min-h-28 border-t border-border/70 pt-3">
+  const details = (picked || error || !isOwn) && (
+    <div className="min-h-24 border-t border-[#c08a4e]/30 pt-3">
       {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
       {!picked ? (
         <p className="text-sm text-muted italic">
@@ -300,11 +300,20 @@ export default function Equipment({
   return (
     <div className="flex min-h-full flex-col md:flex-row">
       {/* Figura con le nicchie */}
-      <div className="shrink-0 border-b border-border/70 p-4 md:w-[22rem] md:border-r md:border-b-0">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2">
-          <div className="space-y-2">{left.map(niche)}</div>
-          <BodyFigure />
-          <div className="space-y-2">{right.map(niche)}</div>
+      <div className="shrink-0 border-b border-[#7a5530]/40 px-4 pt-3 pb-4 md:w-[23rem] md:border-r md:border-b-0">
+        <h3 className="font-serif text-[1.6rem] leading-tight tracking-wide text-[#e6cdb0] [font-variant:small-caps]">Equipaggiamento</h3>
+        <div aria-hidden className="mb-3 flex items-center gap-2 text-[#c08a4e]">
+          <span className="h-px flex-1 bg-gradient-to-r from-[#c08a4e]/20 to-[#c08a4e]" />
+          <span className="text-xs">❖</span>
+          <span className="h-px flex-1 bg-gradient-to-l from-[#c08a4e]/20 to-[#c08a4e]" />
+        </div>
+        {/* colonne laterali uguali: la figura resta al centro esatto, le nicchie si distribuiscono su tutta la sua altezza */}
+        <div className="grid h-[29rem] grid-cols-[5.25rem_minmax(0,1fr)_5.25rem] gap-1">
+          <div className="flex flex-col items-center justify-evenly">{left.map(niche)}</div>
+          <div className="flex items-center justify-center">
+            <BodyFigure />
+          </div>
+          <div className="flex flex-col items-center justify-evenly">{right.map(niche)}</div>
         </div>
         {below.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-3">
@@ -321,19 +330,19 @@ export default function Equipment({
               type="button"
               onClick={() => setBagOpen((o) => !o)}
               aria-expanded={bagOpen}
-              className={`self-start border px-3 py-1 text-xs font-semibold tracking-[0.16em] uppercase ${
-                bagOpen
-                  ? "border-accent bg-blood/20 text-accent"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
+              className="inventario-barra flex w-full items-center gap-3 px-3 py-2 text-left"
             >
-              Inventario {bag.length}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/ui/equip/tab-baule-piccolo.png" alt="" aria-hidden className="h-6 w-6" />
+              <span className="flex-1 font-serif text-lg tracking-[0.14em] text-[#f3e2cc] uppercase">Inventario</span>
+              <span className="font-serif text-lg text-[#f3e2cc]">{bag.length}</span>
             </button>
             {bagOpen && (
               <Inventory
                 bag={bag}
                 categories={categories}
                 pick={pick}
+                isOwn={isOwn}
                 onPick={(key) => setPick({ kind: "borsa", key })}
               />
             )}
@@ -354,11 +363,13 @@ function Inventory({
   bag,
   categories,
   pick,
+  isOwn,
   onPick,
 }: {
   bag: Owned[];
   categories: Category[];
   pick: Selection;
+  isOwn: boolean;
   onPick: (key: string) => void;
 }) {
   const groups = useMemo(() => {
@@ -379,44 +390,64 @@ function Inventory({
     }
     return [...m.values()];
   }, [bag]);
+  // "Tutto" e le categorie (quelle senza oggetti restano, spente); "Varie" per chi non ha categoria
+  const noCategory = groups.some((g) => !g.item.category_id);
   const tabs = [
+    { id: "*", name: "Tutto" },
     ...categories.map((c) => ({ id: c.id, name: c.name })),
-    { id: "", name: "Varie" }, // oggetti senza categoria
-  ]
-    .map((t) => ({
-      ...t,
-      n: groups
-        .filter((g) => (g.item.category_id ?? "") === t.id)
-        .reduce((a, g) => a + g.n, 0),
-    }))
-    .filter((t) => t.n > 0);
-  const [tab, setTab] = useState<string | null>(null);
+    ...(noCategory && !categories.some((c) => c.name.toLowerCase() === "varie") ? [{ id: "", name: "Varie" }] : []),
+  ].map((t) => ({
+    ...t,
+    n: groups
+      .filter((g) => t.id === "*" || (g.item.category_id ?? "") === t.id || (t.name.toLowerCase() === "varie" && !g.item.category_id))
+      .reduce((a, g) => a + g.n, 0),
+  }));
+  const [tab, setTab] = useState("*");
   const current = tabs.find((t) => t.id === tab) ?? tabs[0];
-
-  if (groups.length === 0)
-    return <p className="text-sm text-muted">La borsa è vuota.</p>;
+  const shown = groups.filter(
+    (g) =>
+      current.id === "*" ||
+      (g.item.category_id ?? "") === current.id ||
+      (current.name.toLowerCase() === "varie" && !g.item.category_id),
+  );
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {tabs.map((t) => (
           <button
             key={t.id || "varie"}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`border px-2.5 py-1 text-[0.7rem] font-semibold tracking-[0.14em] uppercase ${
-              current?.id === t.id
-                ? "border-accent/70 text-accent"
-                : "border-border text-[#e8d8b4] hover:border-accent/50"
-            }`}
+            title={`${t.name}: ${t.n}`}
+            className={`inventario-scheda flex flex-col items-center gap-1 px-1 py-1.5 font-serif text-[0.625rem] tracking-[0.08em] uppercase ${
+              current.id === t.id ? "inventario-scheda-attiva" : ""
+            } ${t.n === 0 && t.id !== "*" ? "opacity-55" : ""}`}
           >
-            {t.name} <span className="ml-1 text-muted">{t.n}</span>
+            <CategoryIcon name={t.name} />
+            <span className="max-w-full truncate">{t.name}</span>
+            {t.n > 0 && t.id !== "*" && <span className="sr-only"> ({t.n})</span>}
           </button>
         ))}
       </div>
+      <div className="pannello-bronzo inventario-borsa min-h-[14rem] p-3">
+        {shown.length === 0 ? (
+          <div className="flex flex-col items-center py-6 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/ui/equip/baule.png" alt="" aria-hidden className="h-[52px] w-[70px] opacity-80" />
+            <p className="mt-3 font-serif text-base tracking-[0.12em] text-[#d4b394] uppercase">
+              {groups.length === 0 ? "La borsa è vuota." : "Niente in questa categoria."}
+            </p>
+            <div aria-hidden className="my-2 flex w-56 items-center gap-1.5 text-[#c08a4e]">
+              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#c08a4e]" />
+              <span className="text-[0.6rem]">❖</span>
+              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#c08a4e]" />
+            </div>
+            {isOwn && <p className="text-sm text-[#a08a64] italic">Clicca un oggetto, o una nicchia della figura, per vederlo e usarlo.</p>}
+          </div>
+        ) : (
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
-        {groups
-          .filter((g) => (g.item.category_id ?? "") === current?.id)
+        {shown
           .map((g) => (
             <li key={g.key}>
               <button
@@ -446,8 +477,40 @@ function Inventory({
             </li>
           ))}
       </ul>
+        )}
+      </div>
     </div>
   );
+}
+
+// Icona di una nicchia vuota (ritagliate dall'immagine dell'equipaggiamento)
+function SlotIcon({ name }: { name: string }) {
+  const key = name.toLowerCase().replace(/\s+/g, "-");
+  const known = ["testa", "collo", "busto", "gambe", "braccio", "mano-dx", "mano-sx", "piedi"];
+  if (!known.includes(key)) return <span className="text-xs text-[#a08a64]/70 italic">vuota</span>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/images/ui/equip/nicchia-${key}.png`} alt="" aria-hidden className="h-[54px] w-[50px] opacity-75" />;
+}
+
+// Icona di una categoria dell'inventario
+function CategoryIcon({ name }: { name: string }) {
+  const n = name.toLowerCase();
+  const file =
+    n === "tutto" ? "tab-tutto" :
+    n === "armi" ? "tab-armi" :
+    n === "armature" ? "nicchia-busto" :
+    n === "vestiti" ? "tab-armature" :
+    n === "gioielli" || n === "accessori" ? "tab-accessori" :
+    n === "consumabili" ? null :
+    "tab-varie";
+  if (!file)
+    return (
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#d4a15c" strokeWidth="1.5" strokeLinejoin="round" aria-hidden>
+        <path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3M7.5 14h9" />
+      </svg>
+    );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/images/ui/equip/${file}.png`} alt="" aria-hidden className="h-[22px] w-[22px] object-contain" />;
 }
 
 export function ItemImage({
@@ -482,9 +545,9 @@ function BodyFigure() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/images/cavaliere.png"
+      src="/images/ui/equip/cavaliere.webp"
       alt=""
-      className="mx-auto max-h-[24rem] w-full object-contain opacity-90 drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)]"
+      className="mx-auto max-h-[28rem] w-full object-contain [mask-image:radial-gradient(ellipse_50%_52%_at_center,black_55%,transparent_100%)]"
     />
   );
 }

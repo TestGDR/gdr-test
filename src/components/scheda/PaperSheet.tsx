@@ -1,6 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import SheetIcon, { rowIcon } from "./SheetIcons";
+
+// Pagina Dati: le righe diventano una tabella con l'icona (il sesso serve per ♂/♀)
+export const PaperTableContext = createContext<{ sex: string | null } | null>(null);
 
 // Foglio di pergamena (con altri fogli sotto, sfalsati): intestazione con
 // l'ornamento, segnalibro rosso facoltativo e, in fondo, una fascia per un'azione
@@ -57,6 +61,18 @@ export function PaperRow({
   right?: ReactNode;
   wrap?: boolean; // valore non troncato (es. con un riquadro che si apre)
 }) {
+  const table = useContext(PaperTableContext);
+  if (table)
+    return (
+      <div className="flex items-center gap-2.5 border-b border-[#3b2a1a]/20 py-[0.4rem] last:border-b-0">
+        <span className="w-6 text-[#4a3220]">
+          <SheetIcon name={rowIcon(label, table.sex)} size={18} />
+        </span>
+        <span className="w-[6rem] shrink-0 text-[0.8125rem] text-[#3b2a1a]">{label}</span>
+        <div className={`min-w-0 flex-1 ${wrap ? "" : "truncate "}text-[0.8125rem] text-[#2a1d12]`}>{value}</div>
+        {right && <span className="shrink-0 text-sm text-[#4a3826]">{right}</span>}
+      </div>
+    );
   return (
     <div className="flex items-center gap-3 border-b border-[#3b2a1a]/20 py-2 last:border-b-0">
       <DiamondStar />

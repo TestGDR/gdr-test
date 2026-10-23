@@ -83,6 +83,7 @@ import SalaryCollector from "./SalaryCollector";
 import WeatherView from "./WeatherView";
 import DragonPanel from "@/components/draghi/DragonPanel";
 import Modal from "@/components/ui/Modal";
+import { HOUSE_BANNERS } from "@/lib/house-banners";
 import { HpBar, ListCaption, MapTab, Pannello, TabDivider, TabLabel, listBtn, tabBtn, useCharacterStatus } from "./DesktopLayout";
 
 // ---------------------------------------------------------------------
@@ -1939,8 +1940,6 @@ const KeyIcon = () => (
 );
 
 // nomi delle voci nelle colonne del computer
-// Casate con lo stendardo disegnato (public/images/casate/stendardo-<nome>.png)
-const HOUSE_BANNERS = new Set(["blackfyre", "brightfyre", "celtigar", "darklyn", "staunton", "thaerion", "velaryon", "vhassar"]);
 
 const SIDE_NAMES: Record<Panel, string> = {
   viaggio: "Viaggio",

@@ -40,7 +40,7 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   panel:
     "w-[min(46rem,calc(100vw-2rem))] max-h-[min(37.5rem,calc(100dvh-1rem))]",
   // scheda del personaggio: linguette (13rem) + pagina 750 x 600, il contenuto gestisce lo scorrimento
-  pg: "w-[min(59.875rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem)]",
+  pg: "w-[min(61.875rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem)]",
   // voci e pettegolezzi: sempre alta 600px (meno su schermi bassi), il contenuto scorre dentro
   panel600:
     "w-[min(46rem,calc(100vw-2rem))] h-[min(37.5rem,calc(100dvh-1rem))]",
