@@ -1264,9 +1264,7 @@ function FateNotes({
       )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <h4 className="shrink-0 px-10 text-center font-serif text-xl leading-tight tracking-wide text-[#e6cdb0] [font-variant:small-caps]">
-          <span aria-hidden className="mr-2 text-base text-[#c08a4e]">❦</span>
           Note del Fato
-          <span aria-hidden className="ml-2 inline-block -scale-x-100 text-base text-[#c08a4e]">❦</span>
         </h4>
         <div className="my-2 h-px shrink-0 bg-gradient-to-r from-transparent via-[#6b625a] to-transparent" />
         {editing ? (
