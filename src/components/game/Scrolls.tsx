@@ -108,7 +108,7 @@ export default function Scrolls({
 
   return (
     <div className="scrolls-desk flex h-full flex-col">
-      <nav className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#5a3d22] px-4 py-3">
+      <nav className="missiva-nav flex shrink-0 flex-wrap items-center gap-2 px-4 py-3">
         <TabButton active={tab === "ricevuti"} onClick={() => (setTab("ricevuti"), setOpened(null))}>
           Cartigli ricevuti{sealed > 0 && <span className="ml-1.5 rounded-full bg-blood px-1.5 text-[0.625rem] text-white">{sealed}</span>}
         </TabButton>
@@ -116,7 +116,8 @@ export default function Scrolls({
           Inviati
         </TabButton>
         <TabButton active={tab === "scrivi"} onClick={() => (setTab("scrivi"), setOpened(null))}>
-          ✒ Scrivi un cartiglio
+          <QuillIcon />
+          Scrivi un cartiglio
         </TabButton>
         {isAdmin && (
           <TabButton active={tab === "castello"} onClick={() => (setTab("castello"), setOpened(null))}>
@@ -126,6 +127,9 @@ export default function Scrolls({
         <span className="ml-auto text-xs text-[#c9b48a] italic">{place ? `Ti trovi a ${place}` : ""}</span>
       </nav>
 
+      <div className="flex min-h-0 flex-1">
+      {/* il corvo sullo scrittoio (solo schermi larghi) */}
+      <div aria-hidden className="missiva-corvo hidden w-[250px] shrink-0 lg:block" />
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
         {opened ? (
           <OpenedScroll
@@ -165,6 +169,7 @@ export default function Scrolls({
           />
         )}
       </div>
+      </div>
     </div>
   );
 }
@@ -174,8 +179,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center border px-3 py-1.5 font-serif text-xs tracking-[0.1em] uppercase transition ${
-        active ? "border-[#c9a45c] bg-[#3b2414] text-[#f0dcae]" : "border-[#5a3d22] text-[#c9b48a] hover:border-[#c9a45c] hover:text-[#f0dcae]"
+      className={`missiva-tab flex items-center gap-2 px-4 py-1.5 font-serif text-xs tracking-[0.1em] uppercase transition ${
+        active ? "missiva-tab-attiva" : ""
       }`}
     >
       {children}
@@ -425,13 +430,13 @@ function WriteScroll({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4">
       {isStaff && (
         <div className="space-y-1">
-          <label htmlFor="cartiglio-da" className="block font-serif text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
+          <label htmlFor="cartiglio-da" className="missiva-etichetta block">
             Parti da (solo staff)
           </label>
-          <select id="cartiglio-da" value={origin} onChange={(e) => setOrigin(e.target.value)} className="input py-1.5">
+          <select id="cartiglio-da" value={origin} onChange={(e) => setOrigin(e.target.value)} className="missiva-input w-full px-3 py-2 text-sm">
             <option value="">La mia posizione{here ? ` (${here})` : ""}</option>
             {places.map((p) => (
               <option key={p.id} value={p.id}>
@@ -442,10 +447,10 @@ function WriteScroll({
         </div>
       )}
       <div className="space-y-1">
-        <label htmlFor="cartiglio-a" className="block font-serif text-xs tracking-[0.12em] text-[#c9b48a] uppercase">
+        <label htmlFor="cartiglio-a" className="missiva-etichetta block">
           Destinatario
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-2">
           <input
             id="cartiglio-a"
             value={name}
@@ -457,10 +462,10 @@ function WriteScroll({
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), choose())}
             onBlur={() => name.trim() && !to && choose()}
             placeholder="Nome del personaggio"
-            className="input py-1.5"
+            className="missiva-input w-full px-3 py-2 text-sm"
           />
           {!to && (
-            <button type="button" onClick={choose} className="btn-ghost shrink-0 px-3 py-1.5 text-sm">
+            <button type="button" onClick={choose} className="missiva-tab px-5 py-1.5 font-serif text-xs tracking-[0.1em] uppercase">
               Scegli
             </button>
           )}
@@ -524,17 +529,26 @@ function WriteScroll({
         </div>
       )}
 
-      <div className="unrolled-scroll px-8 py-10">
+      {/* riga dorata con la corona */}
+      <div aria-hidden className="flex items-center gap-3 py-1 text-[#c08a4e]">
+        <span className="missiva-riga h-px flex-1" />
+        <CrownIcon />
+        <span className="missiva-riga missiva-riga-dx h-px flex-1" />
+      </div>
+
+      <div className="missiva-pergamena">
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           maxLength={4000}
-          rows={9}
+          rows={7}
           placeholder="Scrivi il tuo messaggio..."
           aria-label="Testo del cartiglio"
-          className="w-full resize-none border-0 bg-transparent text-[0.9375rem] leading-relaxed text-[#2e2014] italic placeholder:text-[#8a7656] focus:outline-none"
+          className="w-full resize-none border-0 bg-transparent pr-[16%] text-[0.9375rem] leading-relaxed text-[#2e2014] italic placeholder:text-[#7a6248] focus:outline-none"
         />
-        <p className="mt-2 text-right font-serif text-[#5a1408]">{signed ? <>— {me.name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}</p>
+        <p className="mt-1 text-right font-serif tracking-wide text-[#5a3a22] [font-variant:small-caps]">
+          {signed ? <>— {me.name}</> : <span className="text-sm text-[#7a6248] italic">Nessuna firma</span>}
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm text-[#e8d8b4]">
@@ -543,7 +557,13 @@ function WriteScroll({
       </label>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="text-center">
-        <button type="button" disabled={busy || !to || !body.trim() || !options?.length || !method} onClick={send} className="btn px-8">
+        <button
+          type="button"
+          disabled={busy || !to || !body.trim() || !options?.length || !method}
+          onClick={send}
+          className="missiva-sigilla inline-flex items-center gap-3 py-2 pr-10 pl-3 font-serif text-sm tracking-[0.12em] text-[#f6e6c8] uppercase"
+        >
+          <SealIcon />
           Sigilla e invia
         </button>
       </div>
@@ -608,6 +628,47 @@ function MethodIcon({ method, size = 14 }: { method: Method; size?: number }) {
       <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11" />
       <path d="M11 10.5V4a1.5 1.5 0 0 1 3 0v7" />
       <path d="M14 10.5V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3 14.5a1.5 1.5 0 0 1 2.5-1.7L8 15" />
+    </svg>
+  );
+}
+
+// Piuma per "Scrivi un cartiglio"
+function QuillIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 3c-6 1-11 5-13 12l-1 3 3-1c7-2 11-7 12-13" />
+      <path d="M6 18 3 21M9 15l4-4M11 9l4 1" />
+    </svg>
+  );
+}
+
+// Corona al centro della riga dorata
+function CrownIcon() {
+  return (
+    <svg viewBox="0 0 28 22" width="26" height="20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden>
+      <path d="M4 17 2.5 6.5l6 5L14 3l5.5 8.5 6-5L24 17Z" fill="rgb(192 138 78 / 0.15)" />
+      <path d="M4 20h20M4 17h20" />
+      <circle cx="14" cy="3" r="1.2" fill="currentColor" />
+      <circle cx="2.5" cy="6.5" r="1" fill="currentColor" />
+      <circle cx="25.5" cy="6.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Sigillo di ceralacca sul pulsante "Sigilla e invia"
+function SealIcon() {
+  return (
+    <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden>
+      <defs>
+        <radialGradient id="ceralacca" cx="40%" cy="35%" r="70%">
+          <stop offset="0" stopColor="#c0392b" />
+          <stop offset="0.7" stopColor="#7a1712" />
+          <stop offset="1" stopColor="#4a0c08" />
+        </radialGradient>
+      </defs>
+      <path d="M16 2c3 0 4 2 6.5 2.6S28 6 28.6 9.5 30 13 30 16s-1.4 4-1.4 6.5-2.2 3.6-5.1 4.7S19 30 16 30s-4.1-1.7-7-2.8-4.6-2.2-5.2-4.7S2 19 2 16s1.4-3.5 1.8-6.5S6.5 5.2 9.5 4.6 13 2 16 2Z" fill="url(#ceralacca)" />
+      <circle cx="16" cy="16" r="9" fill="none" stroke="#e8a090" strokeOpacity=".35" strokeWidth="1" />
+      <path d="M11 19.5h10M11.5 19.5 10.5 13l3 2.5L16 11l2.5 4.5 3-2.5-1 6.5" fill="none" stroke="#f3c9b8" strokeOpacity=".75" strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }

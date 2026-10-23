@@ -767,3 +767,78 @@ textarea.input {
   border: 1px solid rgb(192 138 78 / 0.55);
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.6);
 }
+
+/* ---------------------------------------------------------------------
+   Missive: schede dorate, corvo sullo scrittoio, pergamena con i bastoni
+   --------------------------------------------------------------------- */
+.missiva-nav {
+  border-bottom: 1px solid rgb(192 138 78 / 0.45);
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.35), transparent);
+}
+.missiva-tab {
+  border: 1px solid #8a6a3c;
+  background: linear-gradient(180deg, rgb(40 26 14 / 0.9), rgb(18 11 6 / 0.9));
+  color: #e6cdb0;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6);
+}
+.missiva-tab:hover {
+  border-color: #c9a45c;
+  color: #f6e6c8;
+}
+.missiva-tab-attiva,
+.missiva-tab-attiva:hover {
+  border-color: #e9cf9b;
+  background: linear-gradient(180deg, #f0d9a8, #c9a066 55%, #a87b45);
+  color: #2a1608;
+  text-shadow: 0 1px 0 rgb(255 240 210 / 0.5);
+}
+.missiva-corvo {
+  background: url("/images/ui/missive/corvo.webp") center / cover no-repeat;
+  border-right: 1px solid rgb(192 138 78 / 0.45);
+  box-shadow: inset -12px 0 18px -8px rgb(0 0 0 / 0.8);
+}
+.missiva-etichetta {
+  font-family: var(--font-serif), serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4b394;
+}
+.missiva-input {
+  border: 1px solid #8a6a3c;
+  background: rgb(10 7 5 / 0.85);
+  color: #e8d8b4;
+  box-shadow: inset 0 1px 4px rgb(0 0 0 / 0.8);
+}
+.missiva-input:focus {
+  outline: none;
+  border-color: #e0c08a;
+}
+.missiva-riga {
+  background: linear-gradient(90deg, transparent, #c08a4e);
+}
+.missiva-riga-dx {
+  background: linear-gradient(90deg, #c08a4e, transparent);
+}
+/* pergamena con bastoni e pomoli dorati: l'immagine si allunga ai lati */
+.missiva-pergamena {
+  border-style: solid;
+  border-width: 26px 40px;
+  border-image: url("/images/ui/missive/pergamena.webp") 26 40 fill / 26px 40px stretch;
+  padding: 10px 18px 10px 16px;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7));
+}
+.missiva-sigilla {
+  border: 1px solid #c9a45c;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8e1d16, #5c0f0b 60%, #3f0907);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.55), 0 4px 10px rgb(0 0 0 / 0.7);
+  transition: filter 0.15s;
+}
+.missiva-sigilla:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.missiva-sigilla:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
