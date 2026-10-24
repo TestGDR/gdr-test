@@ -407,7 +407,7 @@ function StructureTile({
 }) {
   const building = !!readyAt && !isReady({ ready_at: readyAt });
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded border border-accent/40 bg-black/50 shadow shadow-black/60">
+    <div className="group relative flex w-[100px] flex-col overflow-hidden rounded border border-accent/40 bg-black/50 shadow shadow-black/60">
       <span className={building ? "opacity-40 grayscale" : ""}>
         <StructureImage type={type} />
       </span>
@@ -508,7 +508,7 @@ function StructureSlots({
   }
   return (
     <div className="mt-2 space-y-2">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      <div className="flex flex-wrap gap-2">
         {fief.structures.map((s) => (
           <StructureTile
             key={s.id}
@@ -528,13 +528,13 @@ function StructureSlots({
               disabled={busy}
               onClick={() => setPicking((v) => !v)}
               aria-expanded={picking}
-              className={`flex aspect-square flex-col items-center justify-center gap-1 rounded border border-dashed text-xs transition ${picking ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:border-accent hover:text-accent"}`}
+              className={`flex h-[100px] w-[100px] flex-col items-center justify-center gap-1 rounded border border-dashed text-xs transition ${picking ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:border-accent hover:text-accent"}`}
             >
               <span className="text-2xl leading-none">+</span>
               Costruisci
             </button>
           ) : (
-            <span key={i} className="flex aspect-square items-center justify-center rounded border border-dashed border-border/50 text-[0.625rem] tracking-wider text-muted/60 uppercase">
+            <span key={i} className="flex h-[100px] w-[100px] items-center justify-center rounded border border-dashed border-border/50 text-[0.625rem] tracking-wider text-muted/60 uppercase">
               Libera
             </span>
           ),

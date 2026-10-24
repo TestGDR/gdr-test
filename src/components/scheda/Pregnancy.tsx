@@ -230,15 +230,15 @@ export default function PregnancyRow({
               title={
                 triedToday
                   ? "Hai già tentato oggi: potrai riprovare domani."
-                  : undefined
+                  : "Tenta la gravidanza"
               }
-              className="border border-[#c9a45c] bg-gradient-to-b from-[#8e1d16] to-[#5c0f0b] px-2.5 py-1 font-serif text-[0.6875rem] font-semibold tracking-[0.08em] whitespace-nowrap text-[#f6e6c8] uppercase shadow-[0_2px_4px_rgb(0_0_0/0.45)] transition hover:brightness-115 disabled:opacity-50"
+              className="border border-[#c9a45c] bg-gradient-to-b from-[#8e1d16] to-[#5c0f0b] px-2 py-0.5 font-serif text-[0.625rem] font-semibold tracking-[0.08em] whitespace-nowrap text-[#f6e6c8] uppercase shadow-[0_2px_4px_rgb(0_0_0/0.45)] transition hover:brightness-115 disabled:opacity-50"
             >
               {busy
                 ? "..."
                 : triedToday
                   ? "Riprova domani"
-                  : "Tenta la gravidanza"}
+                  : "Tenta"}
             </button>
           ) : full ? (
             "No"
