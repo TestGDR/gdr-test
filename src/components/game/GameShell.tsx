@@ -228,6 +228,24 @@ export default function GameShell({
     placeLabel: area.title,
   });
 
+  // PG in attesa di approvazione: quando arriva il messaggio di SISTEMA (approvato)
+  // la pagina rilegge il personaggio, cosi' gli altri lo vedono subito attivo e con lo stemma
+  const pendingId = character && character.status !== "attivo" ? character.id : null;
+  useEffect(() => {
+    if (!pendingId) return;
+    const ch = supabase
+      .channel(`approvazione:${pendingId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "system_messages", filter: `character_id=eq.${pendingId}` },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [supabase, pendingId, router]);
+
   const unread = useUnread(character?.id ?? null);
   // Gravidanze: controllo giornaliero dei sintomi (e parto) al primo accesso del giorno
   const tickId = character?.status === "attivo" ? character.id : null;

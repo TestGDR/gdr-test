@@ -191,10 +191,9 @@ function UtilityPanel({ mode }: { mode: Mode }) {
                 >
                   <Portrait pg={p} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-serif text-accent">
-                      {p.name}
-                      {p.house && <span className="text-foreground"> {p.house.name}</span>}
-                    </span>
+                    {/* nome e casata per intero: vanno a capo invece di essere tagliati */}
+                    <span className="block font-serif leading-tight break-words text-accent">{p.name}</span>
+                    {p.house && <span className="block font-serif text-sm leading-tight break-words text-foreground">{p.house.name}</span>}
                     {p.status !== "attivo" && !isNpcTab && <span className="text-xs text-amber-200">PG non ancora attivo</span>}
                     {isNpcTab && <span className="text-xs text-muted">Personaggio non giocante</span>}
                   </span>
