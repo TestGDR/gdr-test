@@ -160,6 +160,9 @@ export default function PregnancyRow({
   const shown = active && (full || month >= 3) ? active : null;
   const monthSymptoms = symptoms.filter((s) => s.month === month);
 
+  // se si puo' tentare, nella riga c'e' solo il pulsante (niente "No")
+  const canTry = isOwn && !active && !result?.success;
+
   return (
     <div>
       <PaperRow
@@ -219,16 +222,7 @@ export default function PregnancyRow({
                 </FloatingTip>
               )}
             </span>
-          ) : full ? (
-            "No"
-          ) : (
-            "—"
-          )
-        }
-        right={
-          isOwn &&
-          !active &&
-          !result?.success && (
+          ) : canTry ? (
             <button
               type="button"
               disabled={busy || triedToday}
@@ -246,6 +240,10 @@ export default function PregnancyRow({
                   ? "Riprova domani"
                   : "Tenta la gravidanza"}
             </button>
+          ) : full ? (
+            "No"
+          ) : (
+            "—"
           )
         }
       />
