@@ -80,13 +80,16 @@ export default function DragonRegistry() {
             >
               <DragonPortrait dragon={d} size="h-12 w-12" />
               <span className="min-w-0">
-                <span className="block truncate font-serif text-accent">{dragonName(d)}</span>
-                <span className="block truncate text-xs text-muted">
+                {/* tutto per intero: le righe vanno a capo invece di essere tagliate */}
+                <span className="block font-serif leading-tight break-words text-accent">{dragonName(d)}</span>
+                <span className="block text-xs text-muted">
                   {stageLabel(d.stage, data.stages)} · {colorLabel(d)}
                 </span>
-                <span className="block truncate text-xs text-muted">
-                  {d.house_id && data.houses[d.house_id] ? `Casata ${data.houses[d.house_id]}` : "Senza casata"} · Cavaliere:{" "}
-                  {rider(d) ?? "nessuno"}
+                <span className="block text-xs break-words text-muted">
+                  {d.house_id && data.houses[d.house_id] ? `Casata ${data.houses[d.house_id]}` : "Senza casata"}
+                </span>
+                <span className="block text-xs break-words text-muted">
+                  Cavaliere: <span className="text-foreground">{rider(d) ?? "nessuno"}</span>
                 </span>
               </span>
             </button>
