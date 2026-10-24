@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import HouseArmy from "./HouseArmy";
 import HouseTrade from "./HouseTrade";
 import NpcMarket from "./NpcMarket";
-import HouseEconomy, { type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
+import HouseEconomy, { isReady, type EcoFief, type EcoFiefType, type EcoResource, type EcoStructureType } from "./HouseEconomy";
 import { loadHouseTaxes, type HouseTaxes } from "@/lib/taxes-load";
 import type { MoodRow } from "@/lib/mood";
 import type { UpkeepRow } from "./HouseEconomy";
@@ -68,7 +68,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
     const [fiefs, fiefTypes, structureTypes, resources, treasury] = await Promise.all([
       supabase
         .from("fiefs")
-        .select("*, location:locations(name), structures:fief_structures(id, structure_type_id, is_background)")
+        .select("*, location:locations(name), structures:fief_structures(*)")
         .eq("house_id", house.id)
         .order("name"),
       supabase.from("fief_types").select("id, name, incomes:fief_type_incomes(resource_id, amount)"),
@@ -139,7 +139,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
   // attacco e difesa delle strutture dei feudi: entrano nella potenza della casata
   const fiefPoints = { attack: 0, defense: 0 };
   for (const fief of data.fiefs)
-    for (const s of fief.structures) {
+    for (const s of fief.structures.filter(isReady)) {
       const type = data.structureTypes.find((t) => t.id === s.structure_type_id);
       fiefPoints.attack += type?.attack ?? 0;
       fiefPoints.defense += type?.defense ?? 0;
@@ -160,6 +160,7 @@ export default function FiefsPanel({ characterId }: { characterId: string }) {
       onChanged={() => load().then(setData)}
       taxes={data.taxes}
       mood={data.mood}
+      houseId={data.house.id}
       upkeep={data.upkeep}
       bare
     />

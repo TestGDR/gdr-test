@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { housePower, type FiefPoints, type HouseTroop, type Matchup, type TroopType } from "@/lib/armies";
 import { createClient } from "@/lib/supabase/client";
+import type { Discounts } from "@/lib/upkeep-calc";
 
 type Data = {
   types: TroopType[];
@@ -12,6 +13,7 @@ type Data = {
   called: boolean | null; // null: migrazione 0143 non ancora eseguita
   // riserva, guerra e draghi affamati (migrazione 0156; null se manca)
   state: { reserve: number; atWar: boolean; hungry: boolean } | null;
+  discounts: Discounts | null; // sconti delle strutture militari (migrazione 0164)
   isStaff: boolean;
   categories: { id: string; name: string; single_units?: boolean }[]; // gruppi di truppe (terrestri, navali...)
   training: { troop_type_id: string; resource_id: string; amount: number }[] | null; // null: migrazione 0148 mancante
@@ -44,7 +46,7 @@ export default function HouseArmy({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const [t, m, h, k, house, up, cg, tr, tre, st, staff] = await Promise.all([
+    const [t, m, h, k, house, up, cg, tr, tre, st, staff, dsc] = await Promise.all([
       supabase.from("troop_types").select("*").order("sort_order").order("name"),
       supabase.from("troop_matchups").select("*"),
       supabase.from("house_troops").select("*").eq("house_id", houseId),
@@ -56,6 +58,7 @@ export default function HouseArmy({
       supabase.from("house_resources").select("resource_id, amount").eq("house_id", houseId),
       supabase.from("houses").select("reserve_soldiers, at_war, dragons_hungry").eq("id", houseId).maybeSingle(),
       supabase.rpc("house_staff"),
+      supabase.rpc("house_discounts", { p_house: houseId }),
     ]);
     // tabelle non ancora create: il riquadro non compare
     if (t.error) return;
@@ -71,6 +74,7 @@ export default function HouseArmy({
       treasury: Object.fromEntries((tre.data ?? []).map((x) => [x.resource_id as string, Number(x.amount)])),
       state: st.error || !st.data ? null : { reserve: Number(st.data.reserve_soldiers), atWar: !!st.data.at_war, hungry: !!st.data.dragons_hungry },
       isStaff: staff.data === true,
+      discounts: dsc.error || !dsc.data ? null : (dsc.data as Discounts),
     });
   }, [supabase, houseId]);
   useEffect(() => {
@@ -189,6 +193,13 @@ export default function HouseArmy({
           }}
         />
       )}
+      {data.discounts && (
+        <p className="border border-border/60 bg-black/30 px-3 py-2 text-xs text-muted">
+          <span className="font-semibold text-[#e6cdb0]">Sconti attivi:</span> soldati {num(data.discounts.soldiers)}%
+          {Object.entries(data.discounts.resources).map(([id, v]) => ` · ${resName(id)} ${num(v)}%`)}
+          {" · "}draghi {num(data.discounts.dragons)}% · foraggio {num(data.discounts.forage)}% · addestramento {num(data.discounts.training)}%
+        </p>
+      )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
       {power.lines.length === 0 ? (
         <p className="text-sm text-muted">La casata non ha truppe.</p>
@@ -258,6 +269,7 @@ export default function HouseArmy({
           types={data.types}
           categories={data.categories}
           training={data.training}
+          trainingCut={data.discounts?.training ?? 0}
           treasury={data.treasury}
           resources={resources}
           busy={busy}
@@ -369,6 +381,7 @@ function TrainBox({
   types,
   categories,
   training,
+  trainingCut,
   treasury,
   resources,
   busy,
@@ -377,6 +390,7 @@ function TrainBox({
   types: TroopType[];
   categories: { id: string; name: string; single_units?: boolean }[];
   training: { troop_type_id: string; resource_id: string; amount: number }[];
+  trainingCut: number; // % di Manodopera risparmiata (Arsenale, Accampamento)
   treasury: Record<string, number>;
   resources: { id: string; name: string }[];
   busy: boolean;
@@ -390,7 +404,7 @@ function TrainBox({
     const c: Record<string, number> = {};
     // navi, macchine da guerra (gruppi a unita' singole): costo per unita'; le altre truppe ogni 10
     const perUnit = categories.some((x) => x.id === type?.category_id && x.single_units);
-    if (labor) c[labor.id] = count * (type?.labor_per_unit ?? 1);
+    if (labor) c[labor.id] = Math.ceil(count * (type?.labor_per_unit ?? 1) * (1 - trainingCut / 100));
     for (const t of training.filter((x) => x.troop_type_id === typeId))
       c[t.resource_id] = (c[t.resource_id] ?? 0) + (perUnit ? t.amount * count : Math.ceil((t.amount * count) / 10));
     return c;

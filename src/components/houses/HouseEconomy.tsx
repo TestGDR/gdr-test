@@ -21,6 +21,8 @@ export type EcoStructureType = {
   description: string;
   image_url?: string | null; // facoltativa: si vede nelle caselle del feudo
   category?: string; // Produzione, Militari... (solo per raggrupparle)
+  tier?: "piccola" | "media" | "grande"; // fascia (migrazione 0163)
+  build_months?: number; // mesi di lavori
   attack: number;
   defense: number;
   costs: Amount[];
@@ -38,15 +40,43 @@ export type EcoFief = {
   fief_type2_id?: string | null; // secondo tipo (conta in parte)
   description: string;
   location: { name: string } | null;
-  structures: { id: string; structure_type_id: string; is_background: boolean }[];
+  structures: { id: string; structure_type_id: string; is_background: boolean; ready_at?: string | null }[];
 };
+
+export type StructureEffect = { structure_type_id: string; kind: string; resource_id: string | null; value: number };
+type FiefMoodRow = { fief_id: string; fief_name: string; base: number; bonus: number; total: number; label: string | null; color: string | null };
+
+// Effetti speciali in parole: "−15% mantenimento soldati, +2 umore"
+export function effectsText(list: Pick<StructureEffect, "kind" | "resource_id" | "value">[], res: (id: string) => string) {
+  const n = (v: number) => Number(v).toLocaleString("it-IT");
+  return list
+    .map((e) =>
+      e.kind === "bonus_umore"
+        ? `+${n(e.value)} umore`
+        : e.kind === "sconto_soldati_tutte"
+          ? `−${n(e.value)}% mantenimento soldati`
+          : e.kind === "sconto_soldati_risorsa"
+            ? `−${n(e.value)}% ${e.resource_id ? res(e.resource_id) : "?"} dei soldati`
+            : e.kind === "sconto_draghi"
+              ? `−${n(e.value)}% Bestiame dei draghi`
+              : e.kind === "sconto_foraggio_guerra"
+                ? `−${n(e.value)}% foraggio di guerra`
+                : `−${n(e.value)}% Manodopera per addestrare`,
+    )
+    .join(", ");
+}
+
+// Struttura finita? (quelle in costruzione non rendono e non costano ancora)
+export const isReady = (s: { ready_at?: string | null }) => !s.ready_at || Date.parse(s.ready_at) <= Date.now();
+const readyDate = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+const TIER: Record<string, string> = { piccola: "Piccola", media: "Media", grande: "Grande" };
 
 const CAPACITY = { piccolo: 5, medio: 7, grande: 10 } as const;
 
 export default function HouseEconomy({
   houseName,
   playable,
-  fiefs,
+  fiefs: allFiefs,
   fiefTypes,
   structureTypes,
   resources,
@@ -59,6 +89,7 @@ export default function HouseEconomy({
   part = "tutto",
   mood = null,
   upkeep = [],
+  houseId,
 }: {
   houseName: string;
   playable: boolean;
@@ -75,12 +106,15 @@ export default function HouseEconomy({
   // arriva) oppure strutture (costruire e demolire); nella pagina della casata tutto insieme
   part?: "tutto" | "entrate" | "strutture";
   mood?: MoodRow[] | null; // umore del popolo (null: non disponibile)
+  houseId?: string; // per l'umore dei feudi (migrazione 0164)
   upkeep?: UpkeepRow[];
   // tasse: impostazioni, nome della casata regnante, se questa casata e' la regnante e quanto riceve
   taxes?: { settings: TaxSettings; rulerName: string | null; isRuler: boolean; received: Record<string, number> } | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  // per i conti del mese contano solo le strutture finite; le caselle mostrano anche i cantieri
+  const fiefs = allFiefs.map((f) => ({ ...f, structures: f.structures.filter(isReady) }));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   // grandezza e secondo tipo (Gestione -> Economia), mantenimento dei tipi di feudo,
@@ -88,6 +122,24 @@ export default function HouseEconomy({
   const [eco, setEco] = useState<EconomySettings>(DEFAULT_ECONOMY);
   const [typeUpkeep, setTypeUpkeep] = useState<(Amount & { fief_type_id: string })[]>([]);
   const [allowed, setAllowed] = useState<{ structure_type_id: string; fief_type_id: string }[]>([]);
+  // effetti speciali delle strutture e umore di ogni feudo (migrazione 0164; vuoti se manca)
+  const [effects, setEffects] = useState<StructureEffect[]>([]);
+  const [fiefMood, setFiefMood] = useState<FiefMoodRow[] | null>(null);
+  const [moodOn, setMoodOn] = useState(false);
+  useEffect(() => {
+    supabase
+      .from("structure_effects")
+      .select("structure_type_id, kind, resource_id, value")
+      .then(({ data }) => setEffects((data ?? []) as StructureEffect[]));
+    supabase
+      .from("mood_settings")
+      .select("enabled")
+      .maybeSingle()
+      .then(({ data }) => setMoodOn(!!(data as { enabled?: boolean } | null)?.enabled));
+    if (houseId)
+      supabase.rpc("fief_mood", { p_house: houseId }).then(({ data, error }) => setFiefMood(error ? null : ((data ?? []) as FiefMoodRow[])));
+  }, [supabase, houseId]);
+  const effectText = (typeId: string) => effectsText(effects.filter((e) => e.structure_type_id === typeId), res);
   useEffect(() => {
     Promise.all([
       supabase.from("economy_settings").select("medium_factor, large_factor, secondary_factor").maybeSingle(),
@@ -124,14 +176,22 @@ export default function HouseEconomy({
   async function build(fief: EcoFief, typeId: string) {
     const type = structureTypes.find((t) => t.id === typeId);
     if (!type || !builderId) return;
-    if (!window.confirm(`Costruire ${type.name} a ${fief.name}? Costa: ${text(type.costs)}.`)) return;
+    const months = type.build_months ?? 0;
+    if (
+      !window.confirm(
+        `Costruire ${type.name} a ${fief.name}? Costa: ${text(type.costs)}.` +
+          (effectText(type.id) ? ` Effetti: ${effectText(type.id)}.` : "") +
+          (months > 0 ? ` I lavori durano ${months} ${months === 1 ? "mese" : "mesi"}: renderà solo quando sarà finita.` : ""),
+      )
+    )
+      return;
     setBusy(true);
     const { error } = await supabase.rpc("build_structure", { p_fief: fief.id, p_structure_type: typeId, p_character: builderId });
     setBusy(false);
     setMsg(
       error
         ? { ok: false, text: error.message.includes("insufficienti") ? `Il tesoro non basta (${error.message.split(":")[1]?.trim() ?? ""}).` : error.message.includes("duplicate key") || error.message.includes("già nel feudo") ? `${type.name} c'è già in ${fief.name}.` : error.message.replace("piu''", "più") }
-        : { ok: true, text: `${type.name} costruita a ${fief.name}.` },
+        : { ok: true, text: type.build_months ? `Lavori iniziati: ${type.name} a ${fief.name} sarà pronta tra ${type.build_months} ${type.build_months === 1 ? "mese" : "mesi"}.` : `${type.name} costruita a ${fief.name}.` },
     );
     if (!error) {
       if (onChanged) onChanged();
@@ -183,6 +243,25 @@ export default function HouseEconomy({
       </p>
 
       {isMember && part === "entrate" && mood !== null && <MoodBar rows={mood} res={res} />}
+      {isMember && part === "entrate" && fiefMood && fiefMood.length > 0 && (
+        <div className="space-y-1 border border-border/60 bg-black/30 px-3 py-2 text-sm">
+          {fiefMood.map((m) => (
+            <p key={m.fief_id} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-serif text-accent">{m.fief_name}</span>
+              <span className="text-muted">
+                umore {m.base} dalle scorte + {m.bonus} dalle strutture ={" "}
+                <strong style={{ color: m.color ?? undefined }}>
+                  {m.total} · {m.label ?? "—"}
+                </strong>
+              </span>
+            </p>
+          ))}
+          <p className="text-xs text-muted">
+            Livelli: In rivolta sotto 20, Malcontento 20-39, Scontento 40-49, Stabile 50-69, Prospero 70-89, Florido da 90.
+            {!moodOn && " Per ora l'umore si calcola ma non ha effetti (lo accende lo staff)."}
+          </p>
+        </div>
+      )}
 
       {taxes?.isRuler && (
         <p className="border border-[#d4a72c]/50 bg-[#d4a72c]/10 px-3 py-2 text-sm text-[#f0c75e]">
@@ -255,7 +334,7 @@ export default function HouseEconomy({
       {showFiefs && fiefs.length === 0 && <p className="text-sm text-muted">La casata non ha ancora feudi.</p>}
       {showFiefs && (
       <ul className="space-y-3">
-        {fiefs.map((f) => {
+        {allFiefs.map((f) => {
           const type = fiefTypes.find((t) => t.id === f.fief_type_id);
           const type2 = f.fief_type2_id ? fiefTypes.find((t) => t.id === f.fief_type2_id) : undefined;
           const rows = fiefTypeRows(f, types, eco);
@@ -274,8 +353,8 @@ export default function HouseEconomy({
                 <span className="ml-auto text-right text-sm">
                   Strutture {f.structures.length}/{cap}
                   <span className="block text-xs text-muted">
-                    Attacco {f.structures.reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.attack ?? 0), 0)} · Difesa{" "}
-                    {f.structures.reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.defense ?? 0), 0)}
+                    Attacco {f.structures.filter(isReady).reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.attack ?? 0), 0)} · Difesa{" "}
+                    {f.structures.filter(isReady).reduce((n, s) => n + (structureTypes.find((t) => t.id === s.structure_type_id)?.defense ?? 0), 0)}
                   </span>
                 </span>
               </div>
@@ -293,6 +372,7 @@ export default function HouseEconomy({
                 builderId={builderId}
                 busy={busy}
                 text={text}
+                effectText={effectText}
                 onBuild={(typeId) => build(f, typeId)}
                 onDemolish={(s) => demolish(f, s)}
               />
@@ -310,12 +390,35 @@ export default function HouseEconomy({
 }
 
 // Una struttura vista come tessera: immagine (o l'iniziale su un fondo scuro), nome e forza
-function StructureTile({ type, bg, onDemolish, busy }: { type: EcoStructureType | undefined; bg?: boolean; onDemolish?: () => void; busy?: boolean }) {
+function StructureTile({
+  type,
+  bg,
+  onDemolish,
+  busy,
+  readyAt,
+  effects,
+}: {
+  type: EcoStructureType | undefined;
+  effects?: string; // effetti speciali, nel suggerimento
+  bg?: boolean;
+  onDemolish?: () => void;
+  busy?: boolean;
+  readyAt?: string | null; // in costruzione fino a questa data
+}) {
+  const building = !!readyAt && !isReady({ ready_at: readyAt });
   return (
     <div className="group relative flex flex-col overflow-hidden rounded border border-accent/40 bg-black/50 shadow shadow-black/60">
-      <StructureImage type={type} />
+      <span className={building ? "opacity-40 grayscale" : ""}>
+        <StructureImage type={type} />
+      </span>
+      {building && (
+        <span className="absolute inset-x-0 top-1/3 bg-black/75 px-1 py-1 text-center text-[0.625rem] leading-tight text-amber-200">
+          In costruzione
+          <span className="block text-[#e6cdb0]">pronta il {readyDate(readyAt!)}</span>
+        </span>
+      )}
       <div className="px-1.5 py-1 text-center">
-        <p className="truncate font-serif text-xs text-accent" title={type?.description || type?.name}>
+        <p className="truncate font-serif text-xs text-accent" title={[type?.description || type?.name, effects && `Effetti: ${effects}`].filter(Boolean).join(" · ")}>
           {type?.name ?? "?"}
         </p>
         {(type?.attack || type?.defense) ? (
@@ -366,6 +469,7 @@ function StructureSlots({
   builderId,
   busy,
   text,
+  effectText,
   onBuild,
   onDemolish,
 }: {
@@ -378,6 +482,7 @@ function StructureSlots({
   builderId: string | null;
   busy: boolean;
   text: (list: Amount[]) => string;
+  effectText?: (typeId: string) => string;
   onBuild: (typeId: string) => void;
   onDemolish: (s: EcoFief["structures"][number]) => void;
 }) {
@@ -391,6 +496,7 @@ function StructureSlots({
     const list = onlyIn(t);
     return list.length > 0 && !list.includes(fief.fief_type_id ?? "") && !list.includes(fief.fief_type2_id ?? "");
   };
+  const tooBig = (t: EcoStructureType) => t.tier === "grande" && fief.size === "piccolo";
   const typeNames = (ids: string[]) => ids.map((id) => fiefTypes.find((x) => x.id === id)?.name ?? "?").join(", ");
   // raggruppate per categoria, nell'ordine in cui compaiono
   const groups: { name: string; list: EcoStructureType[] }[] = [];
@@ -407,7 +513,9 @@ function StructureSlots({
           <StructureTile
             key={s.id}
             type={structureTypes.find((t) => t.id === s.structure_type_id)}
+            effects={effectText?.(s.structure_type_id)}
             bg={s.is_background}
+            readyAt={s.ready_at}
             busy={busy}
             onDemolish={builderId ? () => onDemolish(s) : undefined}
           />
@@ -443,18 +551,19 @@ function StructureSlots({
             )}
             {g.list.map((t) => {
               const already = built.has(t.id);
-              const notHere = !already && forbidden(t);
-              const poor = !already && !notHere && lacks(t);
+              const small = !already && tooBig(t);
+              const notHere = !already && !small && forbidden(t);
+              const poor = !already && !notHere && !small && lacks(t);
               return (
                 <li key={t.id}>
                   <button
                     type="button"
-                    disabled={busy || already || poor || notHere}
+                    disabled={busy || already || poor || notHere || small}
                     onClick={() => {
                       setPicking(false);
                       onBuild(t.id);
                     }}
-                    title={already ? "C'è già in questo feudo: non se ne può costruire una seconda" : notHere ? `Si costruisce solo nei feudi di tipo ${typeNames(onlyIn(t))}` : poor ? "Il tesoro della casata non basta" : `Costruisci ${t.name}`}
+                    title={already ? "C'è già in questo feudo: non se ne può costruire una seconda" : small ? "Le strutture grandi si costruiscono solo nei feudi medi o grandi" : notHere ? `Si costruisce solo nei feudi di tipo ${typeNames(onlyIn(t))}` : poor ? "Il tesoro della casata non basta" : `Costruisci ${t.name}`}
                     className="flex w-full gap-2 rounded border border-border bg-black/50 p-1.5 text-left transition enabled:hover:border-accent disabled:opacity-45"
                   >
                     <span className="w-16 shrink-0">
@@ -462,11 +571,19 @@ function StructureSlots({
                     </span>
                     <span className="min-w-0 flex-1 text-xs">
                       <span className="block font-serif text-sm text-accent">{t.name}</span>
+                      {t.tier && (
+                        <span className="block text-[#d4b394]">
+                          {TIER[t.tier]}
+                          {t.build_months ? ` · ${t.build_months} ${t.build_months === 1 ? "mese" : "mesi"} di lavori` : ""}
+                        </span>
+                      )}
                       <span className="block text-muted">Costa: {text(t.costs)}</span>
                       {t.incomes.length > 0 && <span className="block text-green-400/90">Rende: {text(t.incomes)}/mese</span>}
                       {t.upkeep.length > 0 && <span className="block text-red-400/90">Mantenimento: {text(t.upkeep)}/mese</span>}
                       {(t.attack || t.defense) ? <span className="block text-muted">ATT {t.attack} · DIF {t.defense}</span> : null}
+                      {effectText?.(t.id) && <span className="block text-[#e6cdb0]">Effetti: {effectText(t.id)}</span>}
                       {already && <span className="block text-amber-200">Già nel feudo</span>}
+                      {small && <span className="block text-amber-200">Solo nei feudi medi o grandi</span>}
                       {poor && <span className="block text-red-400">Tesoro insufficiente</span>}
                       {notHere && <span className="block text-amber-200">Solo nei feudi di tipo {typeNames(onlyIn(t))}</span>}
                     </span>

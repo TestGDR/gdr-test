@@ -24,6 +24,8 @@ type StructureType = {
   description: string;
   image_url?: string | null;
   category?: string; // solo per raggrupparle
+  tier?: "piccola" | "media" | "grande"; // fascia (migrazione 0163)
+  build_months?: number; // mesi di lavori
   allowed: string[]; // tipi di feudo in cui si costruisce (vuoto = ovunque)
   sort_order: number;
   attack: number;
@@ -424,6 +426,7 @@ function TypeEditor({
   withUpkeep = withCosts,
   categories,
   fiefTypes,
+  withTier = false,
   onSave,
   onCancel,
 }: {
@@ -440,14 +443,17 @@ function TypeEditor({
     image_url?: string | null;
     category?: string;
     allowed?: string[];
+    tier?: string;
+    build_months?: number;
   } | null;
   resources: Resource[];
   withCosts: boolean; // strutture: costo, mantenimento, attacco e difesa
   withUpkeep?: boolean; // tipi di feudo: anche il mantenimento
   categories?: string[]; // strutture: categorie gia' usate (migrazione 0155)
   fiefTypes?: { id: string; name: string }[]; // strutture: dove si possono costruire
+  withTier?: boolean; // strutture: fascia e mesi di lavori (migrazione 0163)
   onSave: (
-    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number; image_url?: string | null; category?: string },
+    row: { name: string; description: string; sort_order: number; attack?: number; defense?: number; image_url?: string | null; category?: string; tier?: string; build_months?: number },
     lists: { incomes: Amount[]; costs: Amount[]; upkeep: Amount[]; allowed: string[] },
   ) => Promise<string | null>;
   onCancel: () => void;
@@ -461,6 +467,8 @@ function TypeEditor({
   const [attack, setAttack] = useState(String(initial?.attack ?? 0));
   const [defense, setDefense] = useState(String(initial?.defense ?? 0));
   const [image, setImage] = useState(initial?.image_url ?? "");
+  const [tier, setTier] = useState(initial?.tier ?? "piccola");
+  const [months, setMonths] = useState(String(initial?.build_months ?? 1));
   const [category, setCategory] = useState(initial?.category ?? "");
   const [allowed, setAllowed] = useState<string[]>(initial?.allowed ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -487,6 +495,20 @@ function TypeEditor({
           <Field label="Difesa">
             <input type="number" min={0} value={defense} onChange={(e) => setDefense(e.target.value)} className="input w-28! py-1.5" />
           </Field>
+          {withTier && (
+            <>
+              <Field label="Fascia">
+                <select value={tier} onChange={(e) => setTier(e.target.value)} className="input w-32! py-1.5">
+                  <option value="piccola">Piccola</option>
+                  <option value="media">Media</option>
+                  <option value="grande">Grande (solo feudi medi e grandi)</option>
+                </select>
+              </Field>
+              <Field label="Mesi di lavori">
+                <input type="number" min={0} max={24} value={months} onChange={(e) => setMonths(e.target.value)} className="input w-24! py-1.5" />
+              </Field>
+            </>
+          )}
           <Field label="Immagine (facoltativa: indirizzo https, meglio quadrata)">
             <span className="flex items-center gap-2">
               <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://..." className="input min-w-64 py-1.5" />
@@ -568,6 +590,7 @@ function TypeEditor({
               ? {
                   attack: Math.max(0, Math.round(Number(attack) || 0)),
                   defense: Math.max(0, Math.round(Number(defense) || 0)),
+                  ...(withTier ? { tier, build_months: Math.min(24, Math.max(0, Math.round(Number(months) || 0))) } : {}),
                   // l'immagine si manda solo se c'e' (o c'era): cosi' si salva anche prima della migrazione 0142
                   ...(img || initial?.image_url ? { image_url: img || null } : {}),
                 }
@@ -618,6 +641,7 @@ function StructuresTab({ supabase, resources, structures, fiefTypes, eco, reload
           withCosts
           categories={eco ? categories : undefined}
           fiefTypes={eco ? fiefTypes : undefined}
+          withTier={structures.some((s) => s.tier !== undefined)}
           onCancel={() => setEditing(null)}
           onSave={async (row, lists) => {
             const { data, error } =
@@ -676,6 +700,12 @@ function StructuresTab({ supabase, resources, structures, fiefTypes, eco, reload
                 <span className="text-xs text-muted">Attacco </span>
                 {t.attack} <span className="text-xs text-muted">· Difesa </span>
                 {t.defense}
+                {t.tier && (
+                  <span className="text-xs text-muted">
+                    {" "}
+                    · fascia {t.tier} · {t.build_months ?? 0} {t.build_months === 1 ? "mese" : "mesi"} di lavori
+                  </span>
+                )}
               </span>
               {t.allowed.length > 0 && (
                 <span className="block text-xs text-amber-200">
