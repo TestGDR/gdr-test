@@ -21,6 +21,8 @@ export default function ForumThreadView({
   threadId,
   userId,
   canModerate,
+  canHighlight = false,
+  focusPostId,
   sections,
   onBack,
   onChanged,
@@ -28,6 +30,8 @@ export default function ForumThreadView({
   threadId: string;
   userId: string;
   canModerate: boolean;
+  canHighlight?: boolean; // segnala un intervento a tutti
+  focusPostId?: string; // intervento da mostrare (arrivando da un post segnalato)
   sections: ForumSection[];
   onBack: (sectionId?: string) => void;
   onChanged: () => void; // letti / non letti e liste da aggiornare
@@ -76,6 +80,24 @@ export default function ForumThreadView({
       }),
     [supabase, threadId],
   );
+
+  // arrivando da un post segnalato: la pagina scende fino all'intervento
+  useEffect(() => {
+    if (!focusPostId || !posts.some((p) => p.id === focusPostId)) return;
+    const t = setTimeout(
+      () => document.getElementById(`post-${focusPostId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      100,
+    );
+    return () => clearTimeout(t);
+  }, [focusPostId, posts]);
+
+  async function highlight(p: ForumPost, on: boolean) {
+    if (on && !window.confirm("Segnalare questo intervento a tutta l'utenza?")) return;
+    setError(null);
+    const { error } = await supabase.rpc("forum_highlight_post", { p_post: p.id, p_on: on });
+    if (error) return setError("Segnalazione non riuscita.");
+    load();
+  }
 
   useEffect(() => {
     load().then(() =>
@@ -280,7 +302,8 @@ export default function ForumThreadView({
         {posts.map((p, i) => (
           <li
             key={p.id}
-            className="flex gap-3 border border-border/60 bg-black/30 p-3"
+            id={`post-${p.id}`}
+            className={`flex scroll-mt-3 gap-3 border bg-black/30 p-3 ${p.highlighted_at ? "border-[#c08a4e]" : "border-border/60"}`}
           >
             <div className="hidden w-24 shrink-0 text-center sm:block">
               {p.author?.avatar_url ? (
@@ -317,8 +340,22 @@ export default function ForumThreadView({
                     </span>
                   )}
                 </span>
+                {p.highlighted_at && (
+                  <span className="text-[#f0c75e]" title={p.highlighted_by ? `Segnalato da ${p.highlighted_by}` : undefined}>
+                    📌 Segnalato
+                  </span>
+                )}
                 {editing !== p.id && (
                   <span className="flex gap-3">
+                    {canHighlight && (
+                      <button
+                        type="button"
+                        onClick={() => highlight(p, !p.highlighted_at)}
+                        className="hover:text-accent"
+                      >
+                        {p.highlighted_at ? "Togli segnalazione" : "Segnala a tutti"}
+                      </button>
+                    )}
                     {(p.author_id === userId || canModerate) && (
                       <button
                         type="button"

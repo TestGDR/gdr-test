@@ -33,11 +33,17 @@ export default function Forum({
   userId,
   canModerate,
   canManage,
+  canHighlight = false,
+  openThreadId,
+  focusPostId,
   onUnreadChanged,
 }: {
   userId: string;
   canModerate: boolean;
   canManage: boolean;
+  canHighlight?: boolean; // segnala i post a tutti
+  openThreadId?: string; // si apre gia' su questa discussione (post segnalato)
+  focusPostId?: string;
   onUnreadChanged: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -45,7 +51,9 @@ export default function Forum({
   const [sections, setSections] = useState<ForumSection[]>([]);
   const [unread, setUnread] = useState<Unread[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<View>({ kind: "ultime" });
+  const [view, setView] = useState<View>(
+    openThreadId ? { kind: "discussione", id: openThreadId } : { kind: "ultime" },
+  );
   const [menu, setMenu] = useState(false); // colonna delle sezioni sul telefono
   const [version, setVersion] = useState(0); // ricarica le liste
 
@@ -251,6 +259,8 @@ export default function Forum({
             threadId={view.id}
             userId={userId}
             canModerate={canModerate}
+            canHighlight={canHighlight}
+            focusPostId={view.id === openThreadId ? focusPostId : undefined}
             sections={sections}
             onBack={(sectionId) =>
               go(

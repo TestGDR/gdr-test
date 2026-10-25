@@ -285,6 +285,12 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
           "Modificare ed eliminare gli interventi di tutti, chiudere, fissare e rendere importanti le discussioni",
       },
       {
+        key: "forum.segnalare",
+        label: "Segnalare i post",
+        description:
+          "Segnalare un intervento del forum a tutta l'utenza: a tutti appare una finestra con il pulsante Leggi",
+      },
+      {
         key: "forum.sezioni",
         label: "Gestire le sezioni",
         description:

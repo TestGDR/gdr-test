@@ -50,6 +50,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canChooseOrigin={permissions.has("missive.parti_da")}
       canModerateForum={permissions.has("forum.moderare")}
       canManageForum={permissions.has("forum.sezioni")}
+      canHighlightForum={permissions.has("forum.segnalare")}
       canReviewGossip={permissions.has("pettegolezzi.gestire")}
       hasDragon={hasDragon}
       canInvisible={permissions.has("staff.invisibile")}

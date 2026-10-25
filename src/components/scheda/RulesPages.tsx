@@ -30,6 +30,7 @@ import {
   deriveStats,
   pxCostForNext,
   type Stats,
+  rankOf,
 } from "@/lib/rules/engine";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
@@ -337,16 +338,23 @@ export function SkillsPage({
                     const level = data.levels[k.id] ?? 0;
                     const mod = skillTraitMod(k, data.owned, data.traits);
                     const cost = pxCostForNext(level);
+                    const rank = rankOf(stats[k.stat] ?? 0, level);
                     return (
                       <li
                         key={k.id}
-                        className="flex items-center gap-2 text-sm"
-                        title={k.description || undefined}
+                        className={`flex items-center gap-2 border-l-2 px-1.5 py-0.5 text-sm ${RANK_STYLE[rank.index]}`}
+                        title={[`${rank.label} (rank ${rank.value}): ${rank.note}`, k.description].filter(Boolean).join(" · ")}
                       >
-                        <span
-                          className={`min-w-0 flex-1 truncate ${level ? "text-foreground" : "text-muted"}`}
-                        >
-                          {k.name}
+                        {/* nome dell'abilita' e, sotto, il grado di competenza (anche a livello 0) */}
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={`block truncate ${level ? "text-foreground" : "text-muted"}`}
+                          >
+                            {k.name}
+                          </span>
+                          <span className="block text-[0.625rem] leading-tight tracking-[0.12em] text-[#d8c39a]/80 uppercase">
+                            {rank.label} · rank {rank.value}
+                          </span>
                         </span>
                         <span
                           className="w-16 text-right text-xs text-muted"
@@ -396,12 +404,50 @@ export function SkillsPage({
           })}
         </div>
       )}
+      <RankLegend />
       <p className="mt-4 text-xs text-muted">
         Il numero a sinistra del livello è il bonus del tiro (statistica +
         abilità + tratti sempre attivi). I tratti che valgono solo in certe
         situazioni si aggiungono al momento.
       </p>
     </div>
+  );
+}
+
+// Colori dei gradi di competenza, dal piu' basso al piu' alto
+const RANK_STYLE = [
+  "border-red-500/70 bg-red-950/40",
+  "border-orange-500/70 bg-orange-950/35",
+  "border-yellow-500/70 bg-yellow-950/30",
+  "border-emerald-500/70 bg-emerald-950/35",
+  "border-[#d4af37] bg-[#d4af37]/15",
+];
+
+// Legenda: la competenza dipende da statistica + abilita' (il rank), non dal solo livello
+function RankLegend() {
+  return (
+    <section className="mt-5 border-t border-accent/20 pt-3">
+      <h4 className="mb-1 font-serif text-base text-accent">Gradi di competenza</h4>
+      <p className="mb-2 text-xs text-muted">
+        La competenza non dipende solo dal livello dell&apos;abilità, ma dal{" "}
+        <strong className="text-foreground">rank</strong>: statistica + abilità. Il colore di ogni
+        abilità indica il tuo grado.
+      </p>
+      <ul className="grid gap-1 text-xs sm:grid-cols-2">
+        {RULES.ranks.map((r, i) => {
+          const next = RULES.ranks[i + 1]?.min;
+          return (
+            <li key={r.label} className={`border-l-2 px-2 py-1 ${RANK_STYLE[i]}`}>
+              <strong className="text-foreground">{r.label}</strong>{" "}
+              <span className="text-muted">
+                (rank {i === 0 ? `fino a ${next - 1}` : next ? `${r.min}–${next - 1}` : `da ${r.min}`})
+              </span>
+              : {r.note}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

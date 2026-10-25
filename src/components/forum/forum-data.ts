@@ -42,6 +42,8 @@ export type ForumPost = {
   created_at: string;
   edited_at: string | null;
   edited_by_name: string | null;
+  highlighted_at?: string | null; // segnalato a tutti dallo staff
+  highlighted_by?: string | null;
   author?: { avatar_url: string | null } | null;
 };
 export type Unread = { thread_id: string; section_id: string; since: string };

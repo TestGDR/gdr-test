@@ -69,6 +69,7 @@ import GossipPanel, { useGossipPending } from "./GossipPanel";
 import { useIdleLogout } from "./idle-logout";
 import Forum from "@/components/forum/Forum";
 import { ForumUnreadContext, useForumUnread } from "@/components/forum/forum-data";
+import { HighlightsModal, useForumHighlights } from "@/components/forum/ForumHighlights";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
 import MessagesModal, { Avatar, type Contact, type MessageKind } from "./MessagesModal";
@@ -125,6 +126,7 @@ type Props = {
   canChooseOrigin: boolean; // sceglie da dove parte un cartiglio
   canModerateForum: boolean; // modera il forum
   canManageForum: boolean; // categorie e sezioni del forum
+  canHighlightForum: boolean; // segnala i post a tutti
   canReviewGossip: boolean; // approva i pettegolezzi
   hasDragon: boolean; // cavalca un drago: vede "Il mio drago"
   canInvisible: boolean; // ha il permesso dell'invisibilita'
@@ -169,6 +171,7 @@ export default function GameShell({
   canChooseOrigin,
   canModerateForum,
   canManageForum,
+  canHighlightForum,
   canReviewGossip,
   hasDragon,
   canInvisible,
@@ -274,6 +277,8 @@ export default function GameShell({
   }, [supabase, userId]);
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
   const forumUnread = useForumUnread(userId);
+  const highlights = useForumHighlights(userId); // post segnalati dallo staff non ancora visti
+  const [forumTarget, setForumTarget] = useState<{ thread: string; post: string } | null>(null);
   const gossipPending = useGossipPending(canReviewGossip, panelOpen("voci")); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
   // Avviso a schermo quando arriva una risposta a un ticket: resta finche' non lo si chiude
   const [ticketSeenCount, setTicketSeenCount] = useState(tickets.count);
@@ -600,6 +605,9 @@ export default function GameShell({
             userId={userId}
             canModerate={canModerateForum}
             canManage={canManageForum}
+            canHighlight={canHighlightForum}
+            openThreadId={forumTarget?.thread}
+            focusPostId={forumTarget?.post}
             onUnreadChanged={forumUnread.refresh}
           />
         )}
@@ -662,6 +670,15 @@ export default function GameShell({
           </button>
         </div>
       )}
+      <HighlightsModal
+        items={highlights.items}
+        onRead={(h) => {
+          highlights.markSeen([h.post_id]);
+          setForumTarget({ thread: h.thread_id, post: h.post_id });
+          openPanel("forum");
+        }}
+        onClose={() => highlights.markSeen(highlights.items.map((h) => h.post_id))}
+      />
       </GossipPendingContext.Provider>
       </ForumUnreadContext.Provider>
       </TicketContext.Provider>

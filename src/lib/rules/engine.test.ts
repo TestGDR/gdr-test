@@ -90,17 +90,17 @@ test("Tratti: tre vantaggi +1, +2, +2 sullo stesso tiro -> totale +3", () => {
   assert.equal(capTraitModifiers([-2, -2]), -3);
 });
 
-test("Tratti: tre svantaggi -> errore (massimo 2)", () => {
+test("Tratti: cinque svantaggi -> errore (massimo 4)", () => {
   const flaw = (name: string) => ({ kind: "svantaggio" as const, cost: 1, name });
-  assert.ok(validateTraits([flaw("a"), flaw("b"), flaw("c")]).some((e) => e.includes("massimo 2")));
+  assert.ok(validateTraits(["a", "b", "c", "d", "e"].map(flaw)).some((e) => e.includes("massimo 4 svantaggi")));
 });
 
-test("Tratti: svantaggi di valore 2 e 3 -> errore (valore totale massimo 4)", () => {
+test("Tratti: svantaggi di valore 3 e 3 -> errore (valore totale massimo 5)", () => {
   const errors = validateTraits([
-    { kind: "svantaggio", cost: 2, name: "a" },
+    { kind: "svantaggio", cost: 3, name: "a" },
     { kind: "svantaggio", cost: 3, name: "b" },
   ]);
-  assert.ok(errors.some((e) => e.includes("massimo 4")));
+  assert.ok(errors.some((e) => e.includes("massimo 5 punti")));
 });
 
 test("Tratti: un solo Talento di statistica", () => {

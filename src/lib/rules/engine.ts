@@ -225,3 +225,12 @@ export function spendPX(px: number, level: number): { ok: true; cost: number; px
   if (px < cost) return { ok: false, error: `Servono ${cost} PX, ne hai ${px}.` };
   return { ok: true, cost, px: px - cost, level: level + 1 };
 }
+
+// ---------------------------------------------------------------------
+// Grado di competenza: rank = statistica + abilita'
+// ---------------------------------------------------------------------
+export function rankOf(statValue: number, skillLevel: number) {
+  const value = statValue + skillLevel;
+  const index = RULES.ranks.reduce((i, r, k) => (value >= r.min ? k : i), 0);
+  return { value, index, ...RULES.ranks[index] };
+}

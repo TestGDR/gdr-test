@@ -61,6 +61,16 @@ export const RULES = {
   // Dado che esplode (sezione 1)
   die: { sides: 10, explodeOn: 10, fumbleOn: 1 },
 
+  // Gradi di competenza: rank = statistica + abilita' (senza tratti e modificatori).
+  // Le note dicono quanto si riesce nelle prove (rank + d10 che esplode)
+  ranks: [
+    { min: 0, label: "Inesperto", note: "le prove normali (DV 15) riescono solo con un 10" },
+    { min: 6, label: "Apprendista", note: "serve impegno per superare le prove normali (DV 15)" },
+    { min: 10, label: "Capace", note: "di solito si superano le prove normali (DV 15)" },
+    { min: 13, label: "Maestro", note: "solo la sfortuna fa fallire le prove normali (DV 15)" },
+    { min: 18, label: "Degno di canzoni", note: "solo la sfortuna fa fallire le prove difficili (DV 20)" },
+  ],
+
   // Difficolta' (DV)
   difficulties: [
     {
