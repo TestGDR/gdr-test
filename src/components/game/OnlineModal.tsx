@@ -96,7 +96,7 @@ export default function OnlineModal(props: Props) {
             <span className={props.invisible ? "text-accent" : "text-foreground"}>Invisibile</span>
             <span className="text-xs text-muted">
               {props.invisible
-                ? "i giocatori non ti vedono tra i presenti; nelle chat leggi e scrivi senza entrare in giocata"
+                ? "nessuno ti vede tra i presenti, come se fossi scollegato; nelle chat leggi e scrivi senza entrare in giocata"
                 : "ti vedono tutti"}
             </span>
           </label>
@@ -174,7 +174,7 @@ function PlayerRow({
     >
       <AvailabilityDot value={player.availability} onChange={isMe ? onChangeAvailability : undefined} />
       {player.invisible && (
-        <span title="Invisibile ai giocatori" className="shrink-0 rounded border border-accent/50 px-1 text-[0.625rem] tracking-wider text-accent uppercase">
+        <span title="Sei invisibile: ti vedi solo tu" className="shrink-0 rounded border border-accent/50 px-1 text-[0.625rem] tracking-wider text-accent uppercase">
           invisibile
         </span>
       )}

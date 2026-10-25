@@ -95,6 +95,8 @@ type Area = { title: string; image?: string | null; description?: string | null;
 const AreaContext = createContext<(area: Area) => void>(() => {});
 // Notizie ON / OFF nuove, non ancora viste: l'icona cambia colore
 const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
+// ricerche di gioco ancora aperte (anche gia' lette): la voce resta evidenziata
+const PlayRequestsActiveContext = createContext(0);
 // Eventi creati dopo l'ultima apertura del calendario: l'icona si accende
 const EventsUnseenContext = createContext(false);
 // Ticket: quanti da leggere e come aprire la finestra dei ticket
@@ -320,6 +322,7 @@ export default function GameShell({
     <QuestContext.Provider value={quest}>
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
+      <PlayRequestsActiveContext.Provider value={playRequests.active}>
       <EventsUnseenContext.Provider value={events.unseen}>
       <TicketContext.Provider value={ticketCtx}>
       <ForumUnreadContext.Provider value={forumUnread.count}>
@@ -682,6 +685,7 @@ export default function GameShell({
       </ForumUnreadContext.Provider>
       </TicketContext.Provider>
       </EventsUnseenContext.Provider>
+      </PlayRequestsActiveContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
     </QuestContext.Provider>
@@ -1425,6 +1429,8 @@ const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
     ? "Calendario: eventi nuovi"
     : p === "ricerca" && newRequests > 0
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
+    : p === "ricerca" && newNews
+    ? "Ricerca gioco: ci sono ricerche aperte"
     : newNews
       ? `${PANEL_TITLE[p]}: notizie nuove`
       : PANEL_TITLE[p];
@@ -1451,7 +1457,9 @@ function PanelButton({
   const forumNew = useContext(ForumUnreadContext);
   const gossipNew = useContext(GossipPendingContext);
   const eventsNew = useContext(EventsUnseenContext);
+  const requestsOpen = useContext(PlayRequestsActiveContext);
   const newNews =
+    (panel === "ricerca" && requestsOpen > 0) || // dorata finche' ci sono ricerche aperte
     (panel === "calendario" && eventsNew) ||
     (panel === "notizie-on" && unseen.on) ||
     (panel === "notizie-off" && unseen.off) ||

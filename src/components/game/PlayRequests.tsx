@@ -36,6 +36,17 @@ function romeToDate(day: string, hm: string) {
 export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
   const supabase = useMemo(() => createClient(), []);
   const [count, setCount] = useState(0);
+  const [active, setActive] = useState(0); // ricerche ancora aperte (anche gia' lette)
+
+  // ricerche degli altri non ancora scadute
+  const fetchActive = useCallback(async () => {
+    const { count } = await supabase
+      .from("play_requests")
+      .select("id", { count: "exact", head: true })
+      .neq("author_id", userId)
+      .gt("ends_at", new Date().toISOString());
+    return count ?? 0;
+  }, [supabase, userId]);
 
   const fetchCount = useCallback(async () => {
     const { data: seen } = await supabase.from("play_requests_seen").select("seen_at").eq("user_id", userId).maybeSingle();
@@ -51,22 +62,27 @@ export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
 
   const refresh = useCallback(() => {
     fetchCount().then(setCount);
-  }, [fetchCount]);
+    fetchActive().then(setActive);
+  }, [fetchCount, fetchActive]);
 
+  // nuove, tolte o cambiate: si riconta; ogni 2 minuti per quelle che scadono da sole
   useEffect(() => {
     const ch = supabase
       .channel(`ricerca-gioco:${userId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "play_requests" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "play_requests" }, () => refresh())
       .subscribe();
+    const t = setInterval(() => fetchActive().then(setActive), 120_000);
     return () => {
+      clearInterval(t);
       supabase.removeChannel(ch);
     };
-  }, [supabase, userId, fetchCount, refresh]);
+  }, [supabase, userId, fetchCount, fetchActive, refresh]);
 
   // chiuso il pannello si riconta (il segno di "visto" e' gia' salvato)
   useEffect(() => {
     if (!viewing) fetchCount().then(setCount);
-  }, [viewing, fetchCount]);
+    fetchActive().then(setActive);
+  }, [viewing, fetchCount, fetchActive]);
 
   // Pannello aperto: tutte le richieste sono viste. Il segno e' l'ora dell'ultima
   // richiesta (orologio del server), cosi' un orologio del computer sbagliato non conta
@@ -82,7 +98,7 @@ export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
   }, [supabase, userId]);
 
   // mentre il pannello e' aperto non lampeggia
-  return { count: viewing ? 0 : count, markSeen };
+  return { count: viewing ? 0 : count, active, markSeen };
 }
 
 // Prima cosa: tutte le ricerche gioco inserite. "Nuova ricerca gioco" apre il modulo
