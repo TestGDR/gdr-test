@@ -207,7 +207,7 @@ function HexFrame({ dragon }: { dragon: Dragon }) {
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle,#efe3c6,#cdb486)] text-center">
             <DragonGlyph colors={[dragon.color1, dragon.color2]} />
-            <span className="px-8 text-xs italic">Carica un&apos;immagine dalla linguetta Crescita</span>
+            <span className="px-8 text-xs italic">Metti il link di un&apos;immagine dalla linguetta Crescita</span>
           </div>
         )}
       </div>
@@ -370,6 +370,7 @@ function Growth({
   const [alloc, setAlloc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [bond, setBond] = useState("");
+  const [imageUrl, setImageUrl] = useState(dragon.image_url ?? "");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const stage = stages.find((s) => s.stage === dragon.stage);
   const next = nextStage(dragon.stage, stages);
@@ -393,17 +394,20 @@ function Growth({
     return !error;
   }
 
-  async function uploadImage(file: File | null, remove = false) {
+  async function saveImage(remove = false) {
     const form = new FormData();
     form.set("id", dragon.id);
     if (remove) form.set("remove", "1");
-    else if (file) form.set("image", file);
+    else form.set("url", imageUrl);
     setBusy(true);
     setMsg(null);
     const res = await saveDragonImage(form);
     setBusy(false);
     setMsg(res.error ? { ok: false, text: res.error } : { ok: true, text: "Immagine aggiornata." });
-    if (!res.error) onChanged();
+    if (!res.error) {
+      if (remove) setImageUrl("");
+      onChanged();
+    }
   }
 
   const box = "space-y-2 border border-[#6b4a2e]/40 bg-[#f4e9cd]/50 px-4 py-3";
@@ -435,24 +439,30 @@ function Growth({
             Salva nome
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label className={`${button} cursor-pointer`}>
-            {dragon.image_url ? "Cambia immagine" : "Carica immagine"}
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="sr-only"
-              disabled={busy}
-              onChange={(e) => uploadImage(e.target.files?.[0] ?? null)}
-            />
-          </label>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <input
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            maxLength={1000}
+            placeholder="https://… link dell'immagine"
+            aria-label="Link dell'immagine del drago"
+            className="min-w-0 flex-1 border-0 border-b border-[#6b4a2e] bg-transparent px-1 py-1 text-sm text-[#3b2a1a] placeholder:text-[#7a6248] focus:border-[#8b2a14] focus:outline-none"
+          />
+          <button
+            type="button"
+            disabled={busy || !imageUrl.trim() || imageUrl.trim() === (dragon.image_url ?? "")}
+            onClick={() => saveImage()}
+            className={button}
+          >
+            Salva immagine
+          </button>
           {dragon.image_url && (
-            <button type="button" disabled={busy} onClick={() => uploadImage(null, true)} className="text-[#8b2a14] underline">
+            <button type="button" disabled={busy} onClick={() => saveImage(true)} className="text-[#8b2a14] underline">
               Rimuovi
             </button>
           )}
-          <span className="text-xs italic">PNG, JPG, WebP o GIF · max 1 MB</span>
         </div>
+        <p className="text-xs italic">Incolla il link di un&apos;immagine già online (deve iniziare con https://)</p>
       </section>
 
       <section className={box}>

@@ -333,7 +333,7 @@ function DragonEditor({
           <p className="text-sm text-muted">
             {egg ? "Uovo" : `${stageLabel(d.stage, stages)} · mantenimento ${monthlyUpkeep(d, stages)} risorse al mese`}
           </p>
-          <ImageUpload dragonId={d.id} hasImage={!!dragon.image_url} />
+          <ImageUpload dragonId={d.id} hasImage={!!dragon.image_url} current={dragon.image_url} />
         </div>
       </div>
 
@@ -618,8 +618,9 @@ function NumberGrid({
   );
 }
 
-function ImageUpload({ dragonId, hasImage }: { dragonId: string; hasImage: boolean }) {
+function ImageUpload({ dragonId, hasImage, current }: { dragonId: string; hasImage: boolean; current?: string | null }) {
   const router = useRouter();
+  const [link, setLink] = useState(current ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function send(form: FormData) {
@@ -633,22 +634,26 @@ function ImageUpload({ dragonId, hasImage }: { dragonId: string; hasImage: boole
   }
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs">
-      <label className="cursor-pointer text-accent hover:underline">
-        {busy ? "Caricamento..." : hasImage ? "Cambia immagine" : "Carica un'immagine"}
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="sr-only"
-          disabled={busy}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const form = new FormData();
-            form.set("image", file);
-            send(form);
-          }}
-        />
-      </label>
+      <input
+        value={link}
+        onChange={(e) => setLink(e.target.value)}
+        maxLength={1000}
+        placeholder="https://… link dell'immagine"
+        aria-label="Link dell'immagine del drago"
+        className="input min-w-0 flex-1 py-1 text-xs"
+      />
+      <button
+        type="button"
+        disabled={busy || !link.trim()}
+        onClick={() => {
+          const form = new FormData();
+          form.set("url", link);
+          send(form);
+        }}
+        className="text-accent hover:underline disabled:opacity-40"
+      >
+        {busy ? "Salvataggio..." : "Salva immagine"}
+      </button>
       {hasImage && (
         <button
           type="button"

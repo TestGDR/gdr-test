@@ -339,6 +339,7 @@ function RenameField({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void
 }
 
 function ImageField({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void }) {
+  const [link, setLink] = useState(dragon.image_url ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -354,22 +355,26 @@ function ImageField({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void 
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <label className="cursor-pointer text-accent hover:underline">
-        {busy ? "Caricamento..." : dragon.image_url ? "Cambia immagine" : "Carica un'immagine"}
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="sr-only"
-          disabled={busy}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const form = new FormData();
-            form.set("image", file);
-            send(form);
-          }}
-        />
-      </label>
+      <input
+        value={link}
+        onChange={(e) => setLink(e.target.value)}
+        maxLength={1000}
+        placeholder="https://… link dell'immagine"
+        aria-label="Link dell'immagine del drago"
+        className="input min-w-0 flex-1 py-1 text-xs"
+      />
+      <button
+        type="button"
+        disabled={busy || !link.trim()}
+        onClick={() => {
+          const form = new FormData();
+          form.set("url", link);
+          send(form);
+        }}
+        className="text-accent hover:underline disabled:opacity-40"
+      >
+        {busy ? "Salvataggio..." : "Salva immagine"}
+      </button>
       {dragon.image_url && (
         <button
           type="button"
@@ -384,7 +389,6 @@ function ImageField({ dragon, onSaved }: { dragon: Dragon; onSaved?: () => void 
           Rimuovi
         </button>
       )}
-      <span className="text-muted">PNG, JPG, WebP o GIF · max 1 MB</span>
       {error && <span className="text-red-400">{error}</span>}
     </div>
   );
