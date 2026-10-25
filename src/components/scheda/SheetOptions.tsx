@@ -247,7 +247,7 @@ export default function SheetOptions() {
       <section className="space-y-3">
         <h4 className="font-serif text-lg text-[#d8c39a]">Colori della chat</h4>
         <ColorPicker
-          label="Parlato (il testo tra virgolette)"
+          label="Parlato (il testo tra < > o « »)"
           colors={SPEECH_COLORS}
           value={prefs.speech_color}
           onChange={(v) => set({ speech_color: v })}

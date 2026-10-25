@@ -1358,10 +1358,10 @@ function Highlighted({ text, names }: { text: string; names?: string[] }) {
   );
 }
 
-// Evidenzia il parlato scritto tra < >, «caporali» o "virgolette"
+// Evidenzia il parlato scritto tra < > o «caporali» (le virgolette " " restano testo normale)
 function FormattedText({ text, names }: { text: string; names?: string[] }) {
-  // Con il gruppo di cattura, le parti tra virgolette finiscono agli indici dispari
-  const parts = text.split(/(<[^>]*>|«[^»]*»|"[^"]*"|“[^”]*”)/g);
+  // Con il gruppo di cattura, le parti del parlato finiscono agli indici dispari
+  const parts = text.split(/(<[^>]*>|«[^»]*»)/g);
   return (
     <>
       {parts.map((part, i) =>
