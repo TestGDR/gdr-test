@@ -165,6 +165,11 @@ export default function ChatRoom({
     () => new Set([...characters.map((c) => c.id), ...npcs.map((n) => n.id)]),
     [characters, npcs],
   );
+  // nomi dei miei PG: nelle azioni degli altri li vedo evidenziati
+  const myNames = useMemo(
+    () => characters.map((c) => c.name.trim()).filter((n) => n.length >= 2),
+    [characters],
+  );
   useEffect(() => {
     const channel = supabase
       .channel(`room:${roomId}`)
@@ -705,6 +710,7 @@ export default function ChatRoom({
                     message={m}
                     who={cast[m.character_id]}
                     forMe={!!m.recipient_id && mine.has(m.recipient_id)}
+                    myNames={mine.has(m.character_id) ? undefined : myNames}
                     tools={
                       (editable || removable) && (
                         <span className="flex shrink-0 items-center gap-2 text-xs">
@@ -1115,9 +1121,11 @@ function MessageRow({
   who,
   tools,
   forMe = false,
+  myNames,
 }: {
   message: Message;
   who?: Who;
+  myNames?: string[]; // nomi dei miei PG da evidenziare (non nelle mie azioni)
   forMe?: boolean; // il messaggio e' rivolto a un mio personaggio (raggiro scoperto)
   tools?: ReactNode; // modifica (autore) e cancella (chi modera)
 }) {
@@ -1173,7 +1181,7 @@ function MessageRow({
             </span>
           </div>
           <p className="chat-text whitespace-pre-line">
-            <FormattedText text={message.content} />
+            <FormattedText text={message.content} names={myNames} />
           </p>
         </div>
       </div>
@@ -1307,7 +1315,7 @@ function MessageRow({
       <p className="chat-text text-justify">
         {/* colore dell'azione scelto nelle Opzioni della scheda */}
         <span style={{ color: "var(--chat-action, inherit)" }}>
-          <FormattedText text={message.content} />
+          <FormattedText text={message.content} names={myNames} />
         </span>
       </p>
       </div>
@@ -1325,8 +1333,33 @@ function DieIcon() {
   );
 }
 
+// Il nome del mio PG scritto da un altro: evidenziato (parola intera, maiuscole o no)
+function Highlighted({ text, names }: { text: string; names?: string[] }) {
+  if (!names?.length) return <>{text}</>;
+  const esc = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(${esc.join("|")})(?![\\p{L}\\p{N}])`, "giu");
+  const parts = text.split(re);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 === 1 ? (
+          <mark
+            key={i}
+            title="Il tuo personaggio"
+            className="rounded-sm bg-[#8b2a14]/70 px-0.5 font-semibold text-[#ffe2a8]"
+          >
+            {p}
+          </mark>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
+}
+
 // Evidenzia il parlato scritto tra < >, «caporali» o "virgolette"
-function FormattedText({ text }: { text: string }) {
+function FormattedText({ text, names }: { text: string; names?: string[] }) {
   // Con il gruppo di cattura, le parti tra virgolette finiscono agli indici dispari
   const parts = text.split(/(<[^>]*>|«[^»]*»|"[^"]*"|“[^”]*”)/g);
   return (
@@ -1339,10 +1372,12 @@ function FormattedText({ text }: { text: string }) {
             className="font-semibold max-lg:font-normal max-lg:italic"
             style={{ color: "var(--chat-speech, #fde68a)" }}
           >
-            {part.startsWith("<") ? `«${part.slice(1, -1)}»` : part}
+            <Highlighted text={part.startsWith("<") ? `«${part.slice(1, -1)}»` : part} names={names} />
           </span>
         ) : (
-          <span key={i}>{part}</span>
+          <span key={i}>
+            <Highlighted text={part} names={names} />
+          </span>
         ),
       )}
     </>

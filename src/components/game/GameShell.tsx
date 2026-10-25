@@ -1947,12 +1947,13 @@ function DesktopRight({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={p.sigil} alt="" title={`Casata ${p.house}`} className="h-4 w-4 shrink-0 object-contain" />
               )}
+              {/* invisibile (lo vede solo lo staff col permesso): nome grigio scuro */}
               <button
                 type="button"
                 onClick={() => p.characterId && onOpenSheet(p.characterId)}
                 disabled={!p.characterId}
-                title={p.characterId ? `Apri la scheda di ${p.name}` : undefined}
-                className="font-name truncate text-left text-[0.8125rem] text-[#b8bec0] hover:underline disabled:no-underline"
+                title={p.invisible ? `${p.name} · invisibile ai giocatori` : p.characterId ? `Apri la scheda di ${p.name}` : undefined}
+                className={`font-name truncate text-left text-[0.8125rem] hover:underline disabled:no-underline ${p.invisible ? "text-[#5f5f5f] italic" : "text-[#b8bec0]"}`}
               >
                 {p.name}
               </button>

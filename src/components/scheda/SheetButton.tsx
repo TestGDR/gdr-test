@@ -10,6 +10,7 @@ import {
 } from "react";
 import { saveSheetFields, type SheetFields } from "@/app/scheda/actions";
 import DragonSection from "@/components/draghi/DragonSection";
+import DragonPanel from "@/components/draghi/DragonPanel";
 import { dragonName, type Dragon } from "@/lib/dragons";
 import RichEditor from "@/components/guide/RichEditor";
 import Modal from "@/components/ui/Modal";
@@ -1794,17 +1795,23 @@ function DragonField({
           </button>
         }
       />
+      {/* drago: la stessa scheda dell'Anagrafe draghi (Crescita solo per il cavaliere); uovo: come prima */}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={dragon.status === "uovo" ? `Uovo di ${character.name}` : `Drago di ${character.name}`}
-        size="lg"
+        title={dragon.status === "uovo" ? `Uovo di ${character.name}` : dragonName(dragon)}
+        size={dragon.status === "uovo" ? "lg" : "sheet"}
       >
-        <DragonSection
-          characterId={character.id}
-          characterName={character.name}
-          isOwn={isOwn}
-        />
+        {open &&
+          (dragon.status === "uovo" ? (
+            <DragonSection
+              characterId={character.id}
+              characterName={character.name}
+              isOwn={isOwn}
+            />
+          ) : (
+            <DragonPanel key={dragon.id} dragonId={dragon.id} />
+          ))}
       </Modal>
     </>
   );

@@ -167,9 +167,9 @@ function PlayerRow({
 }) {
   return (
     <li
-      className={`flex items-center gap-2 rounded-md border border-border/70 bg-black/40 px-2 py-1 sm:gap-3 sm:px-3 ${
-        player.live ? "" : "opacity-50"
-      }`}
+      className={`flex items-center gap-2 rounded-md border px-2 py-1 sm:gap-3 sm:px-3 ${
+        player.invisible ? "border-[#3a3a3a] bg-[#1a1a1a]/80 grayscale" : "border-border/70 bg-black/40"
+      } ${player.live ? "" : "opacity-50"}`}
       title={player.live ? undefined : "Connessione momentaneamente persa: resta nell'elenco per qualche minuto"}
     >
       <AvailabilityDot value={player.availability} onChange={isMe ? onChangeAvailability : undefined} />
@@ -195,7 +195,7 @@ function PlayerRow({
             disabled={!player.characterId}
             title={player.characterId ? `Apri la scheda di ${fullName(player)}` : undefined}
             // su cellulare nome e cognome vanno a capo invece di essere tagliati
-            className="font-name min-w-0 text-left text-xs leading-tight font-semibold break-words text-foreground hover:underline disabled:no-underline sm:truncate sm:text-[0.8125rem]"
+            className={`font-name min-w-0 text-left text-xs leading-tight font-semibold break-words hover:underline disabled:no-underline sm:truncate sm:text-[0.8125rem] ${player.invisible ? "text-[#6b6b6b] italic" : "text-foreground"}`}
           >
             {fullName(player)}
           </button>
