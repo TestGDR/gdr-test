@@ -32,7 +32,7 @@ export async function saveDragonImage(form: FormData): Promise<{ error?: string;
   let url: string | null = null;
   if (!remove) {
     if (!link) return { error: "Incolla il link dell'immagine." };
-    if (!link.startsWith("https://") || /s/.test(link) || link.length > 1000)
+    if (!link.startsWith("https://") || /\s/.test(link) || link.length > 1000)
       return { error: "Il link deve iniziare con https://" };
     url = link;
   }
