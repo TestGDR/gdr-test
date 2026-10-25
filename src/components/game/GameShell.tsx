@@ -229,7 +229,7 @@ export default function GameShell({
     place: chatId ? "chat" : "mappa",
     placeKey: chatId ? `chat:${chatId}` : "mappa",
     placeLabel: area.title,
-  });
+  }, invisible); // invisibile: niente annuncio in tempo reale (lo vede solo chi ha il permesso)
 
   // PG in attesa di approvazione: quando arriva il messaggio di SISTEMA (approvato)
   // la pagina rilegge il personaggio, cosi' gli altri lo vedono subito attivo e con lo stemma

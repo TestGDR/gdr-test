@@ -198,8 +198,14 @@ export function usePresence(me: PresencePayload, invisible = false) {
 
   return useMemo(() => {
     const liveIds = new Set(live.map((p) => p.userId));
-    return [...live, ...recent.filter((p) => !liveIds.has(p.userId))].sort(
-      byAvailabilityThenName,
-    );
-  }, [live, recent]);
+    // "invisibile" lo sa il database (il tempo reale non lo porta); io lo so da me
+    const hiddenIds = new Set(recent.filter((p) => p.invisible).map((p) => p.userId));
+    const mark = (p: OnlinePlayer): OnlinePlayer => ({
+      ...p,
+      invisible: p.userId === me.userId ? invisible : p.invisible || hiddenIds.has(p.userId),
+    });
+    return [...live, ...recent.filter((p) => !liveIds.has(p.userId))]
+      .map(mark)
+      .sort(byAvailabilityThenName);
+  }, [live, recent, me.userId, invisible]);
 }
