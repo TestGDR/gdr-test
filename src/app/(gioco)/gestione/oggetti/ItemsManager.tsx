@@ -382,6 +382,28 @@ function ItemForm({
             ))}
           </select>
         </label>
+        {(v.slot_id || v.slot_group) && (
+          // a due mani: indossato occupa tutte le nicchie del gruppo (es. Mano dx e Mano sx)
+          <label
+            className="flex items-center gap-2 self-end pb-2 text-sm"
+            title="Indossato occupa entrambe le mani: l'altra mano resta bloccata"
+          >
+            <input
+              type="checkbox"
+              checked={v.hands === "2"}
+              onChange={(e) =>
+                set({
+                  hands: e.target.checked
+                    ? "2"
+                    : v.kind === "arma"
+                      ? "1"
+                      : null,
+                })
+              }
+            />
+            A due mani
+          </label>
+        )}
         <label className="block">
           <span className="mb-1 block text-xs tracking-wider text-muted uppercase">
             Prezzo (monete)

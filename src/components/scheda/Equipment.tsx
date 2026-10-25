@@ -178,8 +178,19 @@ export default function Equipment({
   const slotOf = (o: Owned) => o.equipped_slot_id ?? o.item.slot_id;
 
   // Nicchia: un riquadro per ogni posto della parte del corpo
+  const groupOf = (id: string | null) =>
+    slots.find((x) => x.id === id)?.slot_group ?? null;
   const niche = (s: Slot) => {
     const inSlot = worn.filter((w) => slotOf(w) === s.id);
+    // mano bloccata da un oggetto a due mani indossato nell'altra nicchia del gruppo
+    const blocker = s.slot_group
+      ? worn.find(
+          (w) =>
+            w.item.hands === "2" &&
+            slotOf(w) !== s.id &&
+            groupOf(slotOf(w)) === s.slot_group,
+        )
+      : undefined;
     const boxes = Array.from(
       { length: Math.max(1, s.capacity) },
       (_, i) => inSlot[i] ?? null,
@@ -198,13 +209,26 @@ export default function Equipment({
             <button
               key={o?.id ?? `vuota-${i}`}
               type="button"
-              disabled={!o}
-              onClick={() => o && setPick({ kind: "indossato", ownedId: o.id })}
-              title={o ? o.item.name : `${s.name}: vuota`}
+              disabled={!o && !blocker}
+              onClick={() => {
+                const x = o ?? blocker;
+                if (x) setPick({ kind: "indossato", ownedId: x.id });
+              }}
+              title={
+                o
+                  ? o.item.name
+                  : blocker
+                    ? `Occupata: ${blocker.item.name} (a due mani)`
+                    : `${s.name}: vuota`
+              }
               className={`equip-frame h-[4.5rem] w-[4.5rem] ${o && pick?.kind === "indossato" && pick.ownedId === o.id ? "equip-frame-on" : ""}`}
             >
               {o ? (
                 <ItemImage item={o.item} fill />
+              ) : blocker ? (
+                <span className="block h-full w-full opacity-35 grayscale">
+                  <ItemImage item={blocker.item} fill />
+                </span>
               ) : (
                 <SlotIcon name={s.name} />
               )}
@@ -253,6 +277,7 @@ export default function Equipment({
                 ? (slots.find((s) => s.id === slotOf(picked))?.name ??
                   place(picked.item))
                 : place(picked.item)}
+              {picked.item.hands === "2" && " · a due mani"}
               {pick?.kind === "borsa" &&
                 ` · ${bag.filter((b) => groupKey(b) === pick.key).length} in borsa`}
               {picked.equipped && " · indossato"}
@@ -264,14 +289,20 @@ export default function Equipment({
             )}
             {isOwn && isWearable(picked.item) && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {picked.equipped || picked.item.slot_id ? (
+                {picked.equipped ||
+                picked.item.slot_id ||
+                picked.item.hands === "2" ? (
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => equip(picked.id, !picked.equipped)}
                     className={`${picked.equipped ? "btn-ghost" : "btn"} px-3 py-1 text-xs tracking-[0.12em] uppercase`}
                   >
-                    {picked.equipped ? "Togli" : "Indossa"}
+                    {picked.equipped
+                      ? "Togli"
+                      : picked.item.hands === "2"
+                        ? "Indossa (a due mani)"
+                        : "Indossa"}
                   </button>
                 ) : (
                   // oggetto di un gruppo (es. Mano): si sceglie la nicchia
