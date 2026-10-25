@@ -22,6 +22,7 @@ const KIND: Record<string, string> = {
   abilita: "Abilità",
   drago: "Drago",
   modifica: "Modifica admin",
+  rimborso: "Rimborso",
 };
 const kindOf = (r: Pick<Row, "kind" | "amount">) =>
   r.kind ? (KIND[r.kind] ?? r.kind) : r.amount > 0 ? "Staff" : "Drago";
@@ -44,22 +45,21 @@ export default function PxBox({ character }: { character: Character }) {
   const [spent, setSpent] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
 
-  // spesi: abilita' e draghi (le correzioni dell'admin non contano)
+  // spesi: abilita' e draghi, meno i rimborsi (le correzioni dell'admin non contano)
   useEffect(() => {
     supabase
       .from("px_log")
       .select("amount, kind")
       .eq("character_id", character.id)
-      .lt("amount", 0)
+      .or("amount.lt.0,kind.eq.rimborso")
       .then(({ data, error }) => {
         if (error) return;
-        setSpent(
-          ((data ?? []) as { amount: number; kind: string | null }[])
-            .filter((r) => r.kind !== "modifica")
-            .reduce((a, r) => a - r.amount, 0),
-        );
+        const rows = (data ?? []) as { amount: number; kind: string | null }[];
+        const out = rows.filter((r) => r.amount < 0 && r.kind !== "modifica").reduce((a, r) => a - r.amount, 0);
+        const back = rows.filter((r) => r.kind === "rimborso").reduce((a, r) => a + r.amount, 0);
+        setSpent(Math.max(0, out - back));
       });
-  }, [supabase, character.id]);
+  }, [supabase, character.id, character.px]);
 
   const left = `${character.px ?? 0}${character.px_half ? ",5" : ""}`;
   return (

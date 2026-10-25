@@ -7,13 +7,12 @@ import DicePanel, { type DiceCategory } from "./DicePanel";
 
 export type CommandTab = DiceCategory | "raggira" | "combattimento";
 type Tab = CommandTab;
+// niente tiri sulle sole statistiche ne' lanci di oggetti
 const TABS: { id: Tab; label: string }[] = [
-  { id: "abilita", label: "Tiri sulle abilità" },
-  { id: "statistiche", label: "Tiri sulle statistiche" },
-  { id: "liberi", label: "Dadi liberi" },
+  { id: "abilita", label: "Abilità" },
+  { id: "liberi", label: "Dado libero" },
   { id: "raggira", label: "Raggira" },
   { id: "combattimento", label: "Combattimento" },
-  { id: "oggetti", label: "Lancia oggetti" },
 ];
 
 // Finestra "Comandi" della chat: tutti i tiri, divisi per tipo
@@ -34,13 +33,15 @@ export default function ChatCommands({
   initialTab?: Tab;
   canNpc?: boolean; // l'utente muove i PNG
 }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTab] = useState<Tab>(
+    TABS.some((t) => t.id === initialTab) ? initialTab : "abilita",
+  );
 
   return (
     <div className="space-y-4">
       <nav
         className="flex flex-wrap gap-1 border-b border-border pb-2"
-        aria-label="Comandi"
+        aria-label="Dadi"
       >
         {TABS.map((t) => (
           <button
@@ -82,12 +83,6 @@ export default function ChatCommands({
               characterId={characterId}
               onDone={onDone}
             />
-          )}
-          {tab === "oggetti" && (
-            <p className="text-sm text-muted">
-              Il danno dell&apos;oggetto scelto (es. 2d5+1), tra quelli che il
-              personaggio possiede.
-            </p>
           )}
           <DicePanel
             key={tab}

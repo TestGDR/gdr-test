@@ -460,7 +460,7 @@ export default function ChatRoom({
   const tools: { id: Tool; label: string; icon: ReactNode }[] = [
     {
       id: "comandi",
-      label: "Comandi",
+      label: "Dadi",
       icon: (
         <path d="M4 7l6-3 6 3v7l-6 3-6-3zM10 4v13M4 7l6 3 6-3M16 11l4 2v5l-4 2-4-2" />
       ),
@@ -477,7 +477,7 @@ export default function ChatRoom({
     },
   ];
   const titles: Record<Tool, string> = {
-    comandi: "Comandi",
+    comandi: "Dadi",
     notepad: "Notepad",
     salva: "Salva la chat",
     tipo: "Destinatario",

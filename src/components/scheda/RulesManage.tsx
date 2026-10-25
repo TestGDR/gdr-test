@@ -168,24 +168,18 @@ export default function RulesManage({
     if (!levels) return;
     setBusy(true);
     setMsg(null);
-    const rows = Object.entries(levels).map(([skill_id, level]) => ({
-      character_id: character.id,
-      skill_id,
-      level,
-    }));
-    const zero = rows.filter((r) => r.level === 0).map((r) => r.skill_id);
-    const keep = rows.filter((r) => r.level > 0);
-    const res1 = keep.length
-      ? await supabase.from("character_skills").upsert(keep)
-      : { error: null };
-    const res2 = zero.length
-      ? await supabase
-          .from("character_skills")
-          .delete()
-          .eq("character_id", character.id)
-          .in("skill_id", zero)
-      : { error: null };
-    done(res1.error ?? res2.error, "Abilità salvate.");
+    // abbassando un livello comprato con i PX, i PX tornano al giocatore
+    const { data, error } = await supabase.rpc("staff_set_skill_levels", {
+      p_character: character.id,
+      p_levels: levels,
+    });
+    const back = (data as number | null) ?? 0;
+    done(
+      error,
+      back > 0
+        ? `Abilità salvate: restituiti ${back} PX al giocatore.`
+        : "Abilità salvate.",
+    );
   }
 
   async function addOwnedTrait() {
