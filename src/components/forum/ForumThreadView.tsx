@@ -92,10 +92,11 @@ export default function ForumThreadView({
   }, [focusPostId, posts]);
 
   async function highlight(p: ForumPost, on: boolean) {
-    if (on && !window.confirm("Segnalare questo intervento a tutta l'utenza?")) return;
+    if (on && !window.confirm("Segnalare questa discussione a tutta l'utenza?")) return;
     setError(null);
     const { error } = await supabase.rpc("forum_highlight_post", { p_post: p.id, p_on: on });
     if (error) return setError("Segnalazione non riuscita.");
+    onChanged();
     load();
   }
 
@@ -181,6 +182,14 @@ export default function ForumThreadView({
         <h2 className="mt-1 flex flex-wrap items-center gap-2 font-serif text-2xl text-accent">
           {thread.pinned && <PinIcon />}
           {thread.title}
+          {posts[0]?.highlighted_at && (
+            <span
+              className="border border-[#c08a4e] px-2 py-0.5 font-sans text-xs tracking-wider text-[#f0c75e] uppercase"
+              title={posts[0].highlighted_by ? `Segnalata da ${posts[0].highlighted_by}` : undefined}
+            >
+              📌 Segnalata a tutti
+            </span>
+          )}
           {thread.locked && (
             <span className="border border-border px-2 py-0.5 font-sans text-xs tracking-wider text-muted uppercase">
               Chiusa
@@ -303,7 +312,7 @@ export default function ForumThreadView({
           <li
             key={p.id}
             id={`post-${p.id}`}
-            className={`flex scroll-mt-3 gap-3 border bg-black/30 p-3 ${p.highlighted_at ? "border-[#c08a4e]" : "border-border/60"}`}
+            className="flex scroll-mt-3 gap-3 border border-border/60 bg-black/30 p-3"
           >
             <div className="hidden w-24 shrink-0 text-center sm:block">
               {p.author?.avatar_url ? (
@@ -340,20 +349,16 @@ export default function ForumThreadView({
                     </span>
                   )}
                 </span>
-                {p.highlighted_at && (
-                  <span className="text-[#f0c75e]" title={p.highlighted_by ? `Segnalato da ${p.highlighted_by}` : undefined}>
-                    📌 Segnalato
-                  </span>
-                )}
                 {editing !== p.id && (
                   <span className="flex gap-3">
-                    {canHighlight && (
+                    {/* la segnalazione vale per tutta la discussione: si fa dall'intervento di apertura */}
+                    {canHighlight && i === 0 && (
                       <button
                         type="button"
                         onClick={() => highlight(p, !p.highlighted_at)}
                         className="hover:text-accent"
                       >
-                        {p.highlighted_at ? "Togli segnalazione" : "Segnala a tutti"}
+                        {p.highlighted_at ? "Togli segnalazione" : "Segnala la discussione"}
                       </button>
                     )}
                     {(p.author_id === userId || canModerate) && (

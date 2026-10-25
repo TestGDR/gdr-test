@@ -74,7 +74,7 @@ export function HighlightsModal({
     <Modal
       open={items.length > 0}
       onClose={onClose}
-      title={items.length > 1 ? "Post segnalati" : "Post segnalato"}
+      title={items.length > 1 ? "Discussioni segnalate" : "Discussione segnalata"}
     >
       <div className="space-y-3 p-4">
         <ul className="space-y-3">
@@ -84,8 +84,8 @@ export function HighlightsModal({
               <span className="min-w-0 flex-1">
                 <span className="block font-serif text-lg leading-tight break-words text-accent">{h.title}</span>
                 <span className="block text-xs text-muted">
-                  {h.section_name} · scritto da {h.author_name}
-                  {h.highlighted_by && ` · segnalato da ${h.highlighted_by}`} · {when(h.highlighted_at)}
+                  {h.section_name} · aperta da {h.author_name}
+                  {h.highlighted_by && ` · segnalata da ${h.highlighted_by}`} · {when(h.highlighted_at)}
                 </span>
               </span>
               <button type="button" onClick={() => onRead(h)} className="btn shrink-0 px-3 py-1.5 text-xs tracking-[0.12em] uppercase">
