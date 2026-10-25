@@ -1,6 +1,8 @@
 import { GameArea } from "@/components/game/GameShell";
 import Link from "next/link";
 import { requirePermission } from "@/lib/staff";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { judge, LEVEL_ORDER, type Level, type Verdict } from "@/lib/inactivity";
 
 type AccessRow = {
   id: number;
@@ -24,6 +26,17 @@ type ActivityRow = {
   activated_at: string | null;
   last_entry: string | null;
   last_chat_action: string | null;
+  verdict: Verdict;
+};
+
+// Colori e nomi dei livelli del regolamento
+const LEVELS: Record<Level, { label: string; cls: string }> = {
+  cancellare: { label: "Da cancellare", cls: "border-red-500/60 bg-red-900/40 text-red-200" },
+  desimbolo: { label: "Da desimbolare", cls: "border-orange-500/60 bg-orange-900/40 text-orange-200" },
+  attenzione: { label: "In scadenza", cls: "border-amber-400/60 bg-amber-900/30 text-amber-200" },
+  nuovo: { label: "Nuovi", cls: "border-sky-500/50 bg-sky-900/30 text-sky-200" },
+  assente: { label: "In assenza", cls: "border-violet-400/50 bg-violet-900/30 text-violet-200" },
+  ok: { label: "In regola", cls: "border-emerald-500/50 bg-emerald-900/30 text-emerald-200" },
 };
 
 const LIMIT = 500;
@@ -74,11 +87,37 @@ export default async function AccessiPage({ searchParams }: PageProps<"/gestione
   );
 
   if (view === "attivita") {
-    const { data, error } = await supabase.rpc("staff_character_activity");
+    // dati per il regolamento: iscrizione, PNG (esclusi) e assenze
+    const db = createAdminClient() ?? supabase;
+    const [{ data, error }, { data: chars }, { data: absences }] = await Promise.all([
+      supabase.rpc("staff_character_activity"),
+      db.from("characters").select("id, is_npc, created_at"),
+      db.from("absences").select("character_id, from_date, to_date"),
+    ]);
+    const info = new Map((chars ?? []).map((c) => [c.id as string, c as { is_npc: boolean; created_at: string }]));
+    const now = new Date();
+    const rows = ((data ?? []) as Omit<ActivityRow, "verdict">[])
+      .filter((r) => !info.get(r.character_id)?.is_npc)
+      .map((r) => ({
+        ...r,
+        verdict: judge(
+          {
+            ...r,
+            created_at: info.get(r.character_id)?.created_at ?? null,
+            absences: (absences ?? []).filter((a) => a.character_id === r.character_id),
+          },
+          now,
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          LEVEL_ORDER.indexOf(a.verdict.level) - LEVEL_ORDER.indexOf(b.verdict.level) ||
+          (a.verdict.deadline?.getTime() ?? 0) - (b.verdict.deadline?.getTime() ?? 0),
+      );
     return (
       <div className="space-y-6">
         {header}
-        <CharacterActivity rows={(data ?? []) as ActivityRow[]} failed={!!error} />
+        <CharacterActivity rows={rows} failed={!!error} />
       </div>
     );
   }
@@ -172,6 +211,19 @@ function CharacterActivity({ rows, failed }: { rows: ActivityRow[]; failed: bool
   if (failed) return <p className="text-red-400">Impossibile caricare le attività dei personaggi.</p>;
   return (
     <section className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {LEVEL_ORDER.map((l) => (
+          <span key={l} className={`rounded border px-3 py-1.5 text-sm ${LEVELS[l].cls}`}>
+            {LEVELS[l].label}: <strong>{rows.filter((r) => r.verdict.level === l).length}</strong>
+          </span>
+        ))}
+      </div>
+      <p className="text-sm text-muted">
+        <strong className="text-foreground">Situazione</strong>: secondo il regolamento sull&apos;inattività. Conta solo
+        l&apos;ultima azione in chat, non i login: in approvazione o approvato senza giocare, 7 giorni; giocante, almeno una
+        giocata a settimana (altrimenti desimbolo) e cancellazione dopo un mese; dopo un&apos;assenza, 7 giorni per
+        rientrare. I PNG non sono contati. Ticket senza risposta e comunicazioni alla Gestione vanno controllati a mano.
+      </p>
       <p className="text-sm text-muted">
         <strong className="text-foreground">Ultimo login</strong>: l&apos;ultima volta che il giocatore è entrato in land.{" "}
         <strong className="text-foreground">Ultima azione</strong>: l&apos;ultima azione scritta in una chat di gioco.{" "}
@@ -182,6 +234,7 @@ function CharacterActivity({ rows, failed }: { rows: ActivityRow[]; failed: bool
           <thead className="bg-panel text-muted">
             <tr>
               <th className="p-2">Personaggio</th>
+              <th className="p-2">Situazione</th>
               <th className="p-2">Creazione</th>
               <th className="p-2">Ultimo login</th>
               <th className="p-2">Ultima azione</th>
@@ -191,6 +244,12 @@ function CharacterActivity({ rows, failed }: { rows: ActivityRow[]; failed: bool
             {rows.map((r) => (
               <tr key={r.character_id} className="border-t border-border">
                 <td className="p-2 font-serif">{r.name}</td>
+                <td className="p-2">
+                  <span className={`inline-block whitespace-nowrap rounded border px-2 py-0.5 text-xs ${LEVELS[r.verdict.level].cls}`}>
+                    {r.verdict.label}
+                  </span>
+                  {r.verdict.detail && <span className="mt-0.5 block text-xs text-muted">{r.verdict.detail}</span>}
+                </td>
                 <td className="whitespace-nowrap p-2">
                   {r.status === "attivo" ? (
                     (dateTime(r.activated_at) ?? "—")
