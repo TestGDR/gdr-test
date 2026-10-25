@@ -52,6 +52,12 @@ const PANELS = [
       "Stemmi, ruoli e stipendi, alberi genealogici, PNG e PG di ogni casata.",
   },
   {
+    permission: "px.assegnare",
+    href: "/gestione/px",
+    title: "Assegna PX",
+    description: "Dai PX a uno o più personaggi, con il motivo: si aggiungono a quelli che hanno e arriva un messaggio di SISTEMA.",
+  },
+  {
     permission: "draghi.gestire",
     href: "/gestione/draghi",
     title: "Draghi",

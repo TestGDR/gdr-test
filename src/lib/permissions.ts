@@ -177,6 +177,12 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
         description:
           "Scrivere e modificare le Note del Fato nella pagina Dati delle schede",
       },
+      {
+        key: "px.assegnare",
+        label: "Assegnare PX",
+        description:
+          "Gestione → Assegna PX: dare PX ai personaggi (solo in aggiunta), con il motivo; al PG arriva un messaggio di SISTEMA",
+      },
     ],
   },
   {
@@ -337,6 +343,7 @@ export const MANAGEMENT_PERMISSIONS = [
   "creazione.gestire",
   "dadi.gestire",
   "draghi.gestire",
+  "px.assegnare",
   "utenti.gestire",
   "manutenzione.sito",
   "iscrizioni.gestire",

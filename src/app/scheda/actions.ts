@@ -25,6 +25,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/staff";
 
+// Monete date a ogni personaggio quando viene approvato e attivato
+const WELCOME_COINS = 500;
+
 export type CreationResult = { error?: string; invalidStep?: number };
 
 // Salva le scelte fatte finora (nella bozza, che vede solo il proprietario)
@@ -427,9 +430,10 @@ async function processCreation(
     update.house_id = houseId;
     update.house_role_id = data.house_role_id;
   }
-  if (equipBlock && cfg(equipBlock).keep_change)
-    update.coins =
-      ((character.coins as number | null) ?? 0) + Math.max(0, budget - spent); // monete avanzate
+  // sul conto: monete di benvenuto + quelle avanzate dall'equipaggiamento
+  const change = equipBlock && cfg(equipBlock).keep_change ? Math.max(0, budget - spent) : 0;
+  const startCoins = ((character.coins as number | null) ?? 0) + change + WELCOME_COINS;
+  update.coins = startCoins;
   if (claim) update.face_claim = claim;
   for (const f of PHYSICAL_FIELDS)
     if (physicalFields.includes(f.id))
@@ -447,6 +451,14 @@ async function processCreation(
           : "Approvazione non riuscita, riprova.",
     };
   await admin.from("character_drafts").delete().eq("character_id", characterId);
+  // movimento in banca: si vede nel conto del PG
+  await admin.from("bank_transactions").insert({
+    character_id: characterId,
+    amount: WELCOME_COINS,
+    kind: "staff",
+    description: "Monete di benvenuto (personaggio approvato)",
+    balance_after: startCoins,
+  });
   if (Object.keys(privateFields).length)
     await admin
       .from("character_private_fields")

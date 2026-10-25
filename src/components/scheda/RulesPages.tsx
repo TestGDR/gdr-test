@@ -35,6 +35,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import RulesManage from "./RulesManage";
+import PxBox from "./PxHistory";
 
 // Statistiche del PG (1-10); quelle mancanti valgono il minimo
 export function statsOf(
@@ -204,21 +205,8 @@ export function DerivedPanel({ character }: { character: Character }) {
         ))}
       </dl>
       <dl className="flex gap-3 sm:flex-col">
-        {(
-          [
-            ["PX", `${character.px ?? 0}${character.px_half ? ",5" : ""}`],
-          ] as const
-        ).map(([k, v]) => (
-          <div
-            key={k}
-            className="min-w-24 border border-accent/40 bg-black/30 px-3 py-2 text-center"
-          >
-            <dt className="text-[0.65rem] tracking-[0.16em] text-muted uppercase">
-              {k}
-            </dt>
-            <dd className="font-serif text-xl text-accent">{v}</dd>
-          </div>
-        ))}
+        {/* PX da spendere e spesi; storico (pulsante) solo per gli admin */}
+        <PxBox character={character} />
         <FameBox character={character} />
       </dl>
       <CombatSummary
