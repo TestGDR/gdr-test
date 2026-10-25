@@ -24,7 +24,8 @@ import DragonBars from "./DragonBars";
 // cornice esagonale, i valori nei cerchi e le linguette laterali per le sezioni
 
 type TraitInfo = { pregio: string; difetto: string; pregio_text?: string; difetto_text?: string };
-type Data = { dragon: Dragon | null; stages: DragonStage[]; traits: TraitInfo[]; px: number; pxHalf: boolean; riderName: string; skillFactor: number; bondCost: number };
+// canGrow: la linguetta Crescita c'e' solo per il cavaliere (il drago e' del suo PG)
+type Data = { dragon: Dragon | null; stages: DragonStage[]; traits: TraitInfo[]; px: number; pxHalf: boolean; riderName: string; skillFactor: number; bondCost: number; canGrow: boolean };
 
 const TABS = [
   { id: "scheda", label: "Scheda" },
@@ -39,30 +40,45 @@ type Tab = (typeof TABS)[number]["id"];
 const INK = "text-[#3b2a1a]";
 const LINE = "#6b4a2e";
 
-export default function DragonPanel({ characterId }: { characterId: string }) {
+// characterId: il drago di quel PG ("Il mio drago"); dragonId: un drago qualsiasi (Anagrafe draghi)
+export default function DragonPanel({ characterId, dragonId }: { characterId?: string; dragonId?: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<Tab>("scheda");
 
   const fetchAll = useCallback(async (): Promise<Data> => {
-    const [dragon, stages, traits, me, settings] = await Promise.all([
-      supabase.from("dragons").select("*").eq("rider_id", characterId).maybeSingle(),
+    const [dragon, stages, traits, settings, auth] = await Promise.all([
+      dragonId
+        ? supabase.from("dragons").select("*").eq("id", dragonId).maybeSingle()
+        : supabase.from("dragons").select("*").eq("rider_id", characterId ?? "").maybeSingle(),
       supabase.from("dragon_stages").select("*").order("sort_order"),
       supabase.from("dragon_trait_pairs").select("*"),
-      supabase.from("characters").select("name, px, px_half").eq("id", characterId).single(),
       supabase.from("dragon_settings").select("*").maybeSingle(),
+      supabase.auth.getUser(),
     ]);
+    const d = (dragon.data ?? null) as Dragon | null;
+    // cavaliere: PG (con i suoi PX, se e' di chi guarda) oppure PNG
+    const [me, npc] = await Promise.all([
+      d?.rider_id
+        ? supabase.from("characters").select("name, px, px_half, owner_id").eq("id", d.rider_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      d?.npc_rider_id
+        ? supabase.from("house_npcs").select("name").eq("id", d.npc_rider_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const canGrow = !!me.data && me.data.owner_id === auth.data.user?.id;
     return {
+      canGrow,
       dragon: (dragon.data ?? null) as Dragon | null,
       stages: (stages.data ?? []) as DragonStage[],
       traits: (traits.data ?? []) as TraitInfo[],
-      px: me.data?.px ?? 0,
-      pxHalf: !!me.data?.px_half,
-      riderName: me.data?.name ?? "",
+      px: canGrow ? (me.data?.px ?? 0) : 0,
+      pxHalf: canGrow && !!me.data?.px_half,
+      riderName: me.data?.name ?? (npc.data ? `${npc.data.name} (PNG)` : ""),
       skillFactor: settings.data?.skill_px_factor ?? 10,
       bondCost: settings.data?.bond_px_per_point ?? 1,
     };
-  }, [supabase, characterId]);
+  }, [supabase, characterId, dragonId]);
 
   const reload = useCallback(() => fetchAll().then(setData), [fetchAll]);
   useEffect(() => {
@@ -77,9 +93,9 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
         ) : !data.dragon ? (
           <div className="py-20 text-center">
             <p className="font-serif text-2xl text-[#8b2a14]">Nessun drago</p>
-            <p className="mt-2 italic">Non sei ancora il cavaliere di un drago.</p>
+            <p className="mt-2 italic">{dragonId ? "Questo drago non esiste più." : "Non sei ancora il cavaliere di un drago."}</p>
           </div>
-        ) : data.dragon.status === "uovo" ? (
+        ) : data.dragon.status === "uovo" && data.canGrow ? (
           <EggView dragon={data.dragon} onHatched={reload} />
         ) : (
           <>
@@ -88,7 +104,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
             {tab === "abilita" && <Skills dragon={data.dragon} />}
             {tab === "carattere" && <Character dragon={data.dragon} />}
             {tab === "tratti" && <Traits dragon={data.dragon} traits={data.traits} />}
-            {tab === "crescita" && (
+            {tab === "crescita" && data.canGrow && (
               <Growth dragon={data.dragon} stages={data.stages} px={data.px} pxHalf={data.pxHalf} skillFactor={data.skillFactor} bondCost={data.bondCost} onChanged={reload} />
             )}
           </>
@@ -98,7 +114,7 @@ export default function DragonPanel({ characterId }: { characterId: string }) {
       {/* Linguette laterali */}
       {data?.dragon && data.dragon.status !== "uovo" && (
         <nav aria-label="Sezioni della scheda" className="flex w-9 shrink-0 flex-col gap-1.5 py-6">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.id !== "crescita" || data.canGrow).map((t) => (
             <button
               key={t.id}
               type="button"

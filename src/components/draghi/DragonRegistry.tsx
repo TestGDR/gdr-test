@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { colorLabel, dragonName, stageLabel, type Dragon, type DragonStage } from "@/lib/dragons";
 import { createClient } from "@/lib/supabase/client";
-import DragonCard, { DragonPortrait } from "./DragonCard";
+import Modal from "@/components/ui/Modal";
+import { DragonPortrait } from "./DragonCard";
+import DragonPanel from "./DragonPanel";
 
 type Data = { dragons: Dragon[]; stages: DragonStage[]; riders: Record<string, string>; houses: Record<string, string> };
 
@@ -51,16 +53,6 @@ export default function DragonRegistry() {
   );
   const open = data.dragons.find((d) => d.id === openId);
 
-  if (open)
-    return (
-      <div className="space-y-3">
-        <button type="button" onClick={() => setOpenId(null)} className="text-sm text-muted hover:text-accent">
-          ← Anagrafe draghi
-        </button>
-        <DragonCard dragon={open} stages={data.stages} riderName={rider(open)} />
-      </div>
-    );
-
   return (
     <div className="space-y-4">
       <input
@@ -97,6 +89,10 @@ export default function DragonRegistry() {
         ))}
       </ul>
       {list.length === 0 && <p className="text-muted">Nessun drago trovato.</p>}
+      {/* la stessa scheda di "Il mio drago"; Crescita solo per il cavaliere */}
+      <Modal open={!!open} onClose={() => setOpenId(null)} title={open ? dragonName(open) : "Drago"} size="sheet">
+        {open && <DragonPanel key={open.id} dragonId={open.id} />}
+      </Modal>
     </div>
   );
 }
