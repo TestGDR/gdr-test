@@ -6,7 +6,7 @@ import "@geoman-io/leaflet-geoman-free";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
-import { extendLine, geometryOf, insidePoint, pointInArea, ringArea, ringsOf, splitArea, subtractAreas, traceLand } from "./geo-tools";
+import { extendLine, geometryOf, pointInArea, ringArea, ringsOf, shareInside, splitArea, subtractAreas, traceLand } from "./geo-tools";
 import {
   CASTLE_TYPES,
   KIND_LABEL,
@@ -451,13 +451,16 @@ export default function MapCanvas({
             .flatMap((x) => {
               const rs = ringsOf(x.geometry);
               const sz = rs.reduce((a, r) => a + ringArea(r), 0);
-              return sz < size && rs.some((r) => pointInArea(insidePoint(r), own)) ? rs : [];
+              return sz < size && shareInside(rs, own) > 0.5 ? rs : [];
             })
         : [];
     const base = mode === "dentro" ? subtractAreas(own, inner) : own;
     if (!base.length) return setMsg({ ok: false, text: "L'area è già tutta occupata da aree interne." });
-    const parts = splitArea(base, cut);
-    if (parts.length <= base.length)
+    // regni: le briciole lungo i bordi (meno di ~30x30 pixel) non contano e non si scelgono;
+    // divisione: si tiene tutto (anche le isolette restano all'area)
+    const big = (rs: Point[][]) => (mode === "dentro" ? rs.filter((r) => ringArea(r) > 1000) : rs);
+    const parts = big(splitArea(base, cut));
+    if (parts.length <= big(base).length)
       return setMsg({
         ok: false,
         text: "La linea deve andare da un bordo a un altro (anche il bordo di un'area interna già fatta): riprova.",

@@ -281,3 +281,15 @@ export function insidePoint(r: Point[]): Point {
   const c: Point = [r.reduce((a, p) => a + p[0], 0) / r.length, r.reduce((a, p) => a + p[1], 0) / r.length];
   return pointInArea(c, [r]) ? c : r[Math.floor(r.length / 2)];
 }
+
+// Quanta parte di un'area sta dentro un'altra (da 0 a 1): un regno "e' dentro" il continente
+// se ci sta quasi tutto, qualunque forma abbia (anche se il suo centro cade fuori)
+export function shareInside(inner: Point[][], outer: Point[][]): number {
+  const a: MultiPolygon = inner.map((r) => [r.map(toXY)] as Polygon);
+  const b: MultiPolygon = outer.map((r) => [r.map(toXY)] as Polygon);
+  const total = inner.reduce((s, r) => s + ringArea(r), 0);
+  if (!total) return 0;
+  const both = polygonClipping.intersection(a, b);
+  const common = both.reduce((s, poly) => s + ringArea(poly[0].map(toPt)), 0);
+  return common / total;
+}
