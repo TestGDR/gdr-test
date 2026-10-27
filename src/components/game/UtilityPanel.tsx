@@ -122,11 +122,21 @@ function UtilityPanel({ mode }: { mode: Mode }) {
           <ul className={`mx-auto grid gap-3 sm:grid-cols-2 ${mode === "servizi" ? "max-w-md" : "max-w-3xl lg:grid-cols-3"}`}>
             {boxesFor(mode).map((b) => (
               <li key={b.id}>
+                {b.id === "mappa" ? (
+                  // la mappa interattiva si apre in una nuova scheda (un collegamento: i browser non lo bloccano)
+                  <a
+                    href="/mappa-interattiva"
+                    target="_blank"
+                    rel="noopener"
+                    className="group flex h-24 w-full flex-col items-center justify-center gap-2 border-4 border-double border-border bg-black/40 transition hover:border-accent/60 hover:bg-blood/10"
+                  >
+                    <span className={`${b.color} transition group-hover:scale-110 [&_svg]:h-7 [&_svg]:w-7`}>{b.icon}</span>
+                    <span className="text-center font-serif text-xs tracking-[0.14em] text-muted uppercase group-hover:text-foreground">{b.label}</span>
+                  </a>
+                ) : (
                 <button
                   type="button"
                   onClick={() => {
-                    // la mappa interattiva si apre in una nuova scheda
-                    if (b.id === "mappa") return void window.open("/mappa-interattiva", "_blank", "noopener");
                     setTab(b.id);
                     setHouseId(null);
                     setQuery("");
@@ -137,6 +147,7 @@ function UtilityPanel({ mode }: { mode: Mode }) {
                   <span className={`${b.color} transition group-hover:scale-110 [&_svg]:h-7 [&_svg]:w-7`}>{b.icon}</span>
                   <span className="text-center font-serif text-xs tracking-[0.14em] text-muted uppercase group-hover:text-foreground">{b.label}</span>
                 </button>
+                )}
               </li>
             ))}
           </ul>

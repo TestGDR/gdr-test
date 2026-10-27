@@ -1877,7 +1877,12 @@ function DesktopLeft({
                 </>
               }
             >
-              {() => <GameArchive />}
+              {() => (
+                // finestra grande: lo scorrimento lo fa il contenuto
+                <div className="h-full overflow-y-auto p-5">
+                  <GameArchive />
+                </div>
+              )}
             </ModalButton>
           </li>
           {offPanels.filter((p) => p.id === "calendario").map((p) => (
