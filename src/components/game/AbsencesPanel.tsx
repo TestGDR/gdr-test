@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 import type { MainCharacter } from "@/lib/main-character";
 
 type Absence = {
@@ -63,6 +64,8 @@ export function useAbsencesUnseen(userId: string, viewing: boolean) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, refresh]);
+
+  useResync(refresh);
 
   // chiuso il pannello si riconta
   useEffect(() => {

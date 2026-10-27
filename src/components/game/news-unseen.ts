@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 import type { NewsKind } from "./NewsPanel";
 
 // Notizie ON e OFF pubblicate dopo l'ultima volta che il giocatore ha aperto il
@@ -39,6 +40,10 @@ export function useNewsUnseen(userId: string, viewing: NewsKind | null) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, fetchUnseen]);
+
+  useResync(() => {
+    if (!viewing) fetchUnseen().then(setUnseen);
+  });
 
   // all'avvio e quando si chiude un pannello delle notizie si riconta
   useEffect(() => {

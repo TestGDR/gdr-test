@@ -25,6 +25,8 @@ import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import GameDateLabel from "./GameDateLabel";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
+import { useNewVersion } from "./new-version";
 import { everyEvenInBackground, playEvent, playMessageChime } from "@/lib/notify-sound";
 import { applyPrefs, cachedPrefs, loadPrefs } from "@/lib/prefs";
 import { isDue, markDone } from "@/lib/throttle";
@@ -282,6 +284,7 @@ export default function GameShell({
     loadPrefs(supabase, userId).then(applyPrefs);
   }, [supabase, userId]);
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
+  const newVersion = useNewVersion(); // il sito e' stato aggiornato mentre la pagina era aperta
   const forumUnread = useForumUnread(userId);
   const highlights = useForumHighlights(userId); // post segnalati dallo staff non ancora visti
   const [forumTarget, setForumTarget] = useState<{ thread: string } | null>(null);
@@ -661,6 +664,17 @@ export default function GameShell({
         onMessageOff={(to) => openMessages("off", to)}
       />
       </SheetActionsContext.Provider>
+      {newVersion && (
+        <div
+          role="status"
+          className="fixed top-3 left-1/2 z-[70] flex w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 flex-wrap items-center gap-3 border border-accent/60 bg-panel px-4 py-3 text-sm shadow-2xl shadow-black"
+        >
+          <span className="min-w-0 flex-1">Il sito è stato aggiornato: ricarica la pagina per avere le novità.</span>
+          <button type="button" onClick={() => window.location.reload()} className="btn px-3 py-1.5 text-xs">
+            Aggiorna
+          </button>
+        </div>
+      )}
       {idle.minutesLeft !== null && (
         <div
           role="alert"
@@ -1167,6 +1181,9 @@ function useUnread(characterId: string | null) {
   const refresh = useCallback(() => {
     fetchCounts().then(setCounts);
   }, [fetchCounts]);
+  useResync(() => {
+    if (characterId) refresh();
+  });
 
   useEffect(() => {
     if (!characterId) return;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 import { when } from "./forum-data";
 
 export type Highlight = {
@@ -44,6 +45,8 @@ export function useForumHighlights(userId: string) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, refresh]);
+
+  useResync(refresh);
 
   // letta o chiusa: non torna piu'
   const markSeen = useCallback(

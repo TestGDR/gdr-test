@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 import type { MainCharacter } from "@/lib/main-character";
 import { Avatar, type Contact } from "./MessagesModal";
 
@@ -77,6 +78,11 @@ export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, fetchCount, fetchActive, refresh]);
+
+  useResync(() => {
+    if (!viewing) refresh();
+    else fetchActive().then(setActive);
+  });
 
   // chiuso il pannello si riconta (il segno di "visto" e' gia' salvato)
   useEffect(() => {

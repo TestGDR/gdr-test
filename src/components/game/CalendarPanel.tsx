@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 
 type GameEvent = {
   id: string;
@@ -417,5 +418,8 @@ export function useEventsUnseen(userId: string, viewing: boolean) {
   useEffect(() => {
     if (!viewing) check().then(setUnseen);
   }, [viewing, check]);
+  useResync(() => {
+    if (!viewing) check().then(setUnseen);
+  });
   return { unseen: unseen && !viewing, clear: useCallback(() => setUnseen(false), []) };
 }

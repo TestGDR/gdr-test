@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useResync } from "@/lib/use-resync";
 
 export type ForumCategory = { id: string; name: string; sort_order: number };
 export type ForumSection = {
@@ -89,6 +90,8 @@ export function useForumUnread(userId: string) {
       supabase.removeChannel(ch);
     };
   }, [supabase, userId, refresh]);
+
+  useResync(refresh);
 
   return { count, refresh };
 }
