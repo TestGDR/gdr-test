@@ -255,3 +255,29 @@ function simplify(pts: [number, number][], tol: number) {
   }
   return pts.filter((_, i) => keep[i]);
 }
+
+// L'area meno altre aree (es. il continente meno i regni gia' fatti): restano i pezzi liberi
+export function subtractAreas(rings: Point[][], minus: Point[][]): Point[][] {
+  if (!minus.length) return rings;
+  const area: MultiPolygon = rings.map((r) => [r.map(toXY)] as Polygon);
+  const holes: MultiPolygon = minus.map((r) => [r.map(toXY)] as Polygon);
+  const out = polygonClipping.difference(area, holes);
+  return out.map((poly) => poly[0].map(toPt)).filter((r) => ringArea(r) > 4);
+}
+
+// Allunga di poco i due capi della linea: finendo esattamente su un bordo, lo attraversa
+export function extendLine(line: Point[], by: number): Point[] {
+  if (line.length < 2) return line;
+  const push = (a: Point, b: Point): Point => {
+    const dy = a[0] - b[0], dx = a[1] - b[1];
+    const len = Math.hypot(dy, dx) || 1;
+    return [a[0] + (dy / len) * by, a[1] + (dx / len) * by];
+  };
+  return [push(line[0], line[1]), ...line, push(line[line.length - 1], line[line.length - 2])];
+}
+
+// Un punto che sta dentro l'anello (media dei vertici, o un vertice se la media cade fuori)
+export function insidePoint(r: Point[]): Point {
+  const c: Point = [r.reduce((a, p) => a + p[0], 0) / r.length, r.reduce((a, p) => a + p[1], 0) / r.length];
+  return pointInArea(c, [r]) ? c : r[Math.floor(r.length / 2)];
+}

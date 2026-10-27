@@ -6,7 +6,7 @@ import "@geoman-io/leaflet-geoman-free";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
-import { geometryOf, pointInArea, ringArea, ringsOf, splitArea, traceLand } from "./geo-tools";
+import { extendLine, geometryOf, insidePoint, pointInArea, ringArea, ringsOf, splitArea, subtractAreas, traceLand } from "./geo-tools";
 import {
   CASTLE_TYPES,
   KIND_LABEL,
@@ -106,8 +106,10 @@ export default function MapCanvas({
   }, [wand]);
   // divisione: area da dividere con la linea, poi i pezzi tra cui scegliere la parte nuova
   const splitRef = useRef<string | null>(null);
+  type SplitMode = "dividi" | "dentro";
+  const splitModeRef = useRef<SplitMode>("dividi");
   const [splitting, setSplitting] = useState<string | null>(null);
-  const [pieces, setPieces] = useState<{ id: string; rings: Point[][] } | null>(null);
+  const [pieces, setPieces] = useState<{ id: string; rings: Point[][]; mode: SplitMode } | null>(null);
   const piecesRef = useRef<L.LayerGroup | null>(null);
   const draftRef = useRef<L.LayerGroup | null>(null); // anteprima di cio' che si sta per salvare
   const settingsRef = useRef(initialSettings);
@@ -131,6 +133,8 @@ export default function MapCanvas({
     });
     mapRef.current = map;
     fitted.current = false; // mappa nuova: va inquadrata
+    // solo in sviluppo: la mappa raggiungibile dalle prove automatiche
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __mappa?: L.Map }).__mappa = map;
     groupRef.current = L.layerGroup().addTo(map);
     piecesRef.current = L.layerGroup().addTo(map);
     draftRef.current = L.layerGroup().addTo(map);
@@ -144,6 +148,7 @@ export default function MapCanvas({
     });
     map.on("click", (e: L.LeafletMouseEvent) => {
       if (wandRef.current) return traceRef.current(toPt(e.latlng));
+      if (map.pm.globalDrawModeEnabled()) return; // si sta disegnando
       setSelected(null);
     });
 
@@ -236,7 +241,11 @@ export default function MapCanvas({
     layersRef.current.clear();
     const order: FeatureKind[] = ["confine", "strada", "luogo"];
     for (const kind of order)
-      for (const f of features.filter((x) => x.kind === kind)) {
+      for (const f of features
+        .filter((x) => x.kind === kind)
+        .map((x) => ({ x, size: x.kind === "confine" ? ringsOf(x.geometry).reduce((a, r) => a + ringArea(r), 0) : 0 }))
+        .sort((a, b) => b.size - a.size)
+        .map((o) => o.x)) {
         // vista "castelli": solo i castelli, senza confini e strade
         if (view === "castelli" && !isCastle(f)) continue;
         const sel = f.id === selected;
@@ -282,8 +291,8 @@ export default function MapCanvas({
           (layer as L.Marker).bindPopup(html, { className: "map-popup", maxWidth: 280, minWidth: 180, offset: [0, -6] });
         }
         layer.on("click", (e) => {
-          // con la bacchetta il clic passa alla mappa (si traccia la costa anche sopra un'area)
-          if (wandRef.current) return;
+          // con la bacchetta o mentre si disegna il clic passa alla mappa (vertici anche dentro e sui bordi delle aree)
+          if (wandRef.current || mapRef.current?.pm.globalDrawModeEnabled()) return;
           L.DomEvent.stopPropagation(e);
           if (f.kind === "luogo") return; // si apre il fumetto
           setDraft(null);
@@ -406,10 +415,11 @@ export default function MapCanvas({
   };
 
   // --- Dividere un'area con una linea --------------------------------------
-  function startSplit(id: string) {
+  function startSplit(id: string, mode: SplitMode = "dividi") {
     const map = mapRef.current;
     if (!map) return;
     splitRef.current = id;
+    splitModeRef.current = mode;
     setSplitting(id);
     setMsg(null);
     map.pm.enableDraw("Line", { snappable: true });
@@ -427,11 +437,32 @@ export default function MapCanvas({
     setSplitting(null);
     const f = features.find((x) => x.id === id);
     if (!f) return;
-    const parts = splitArea(ringsOf(f.geometry), line);
-    const before = ringsOf(f.geometry).length;
-    if (parts.length <= before)
-      return setMsg({ ok: false, text: "La linea deve attraversare tutta l'area, da un bordo all'altro: riprova." });
-    setPieces({ id: f.id, rings: parts });
+    const mode = splitModeRef.current;
+    // i capi si allungano di ~12 pixel di schermo: finendo su un bordo, lo attraversano
+    const zoom = mapRef.current?.getZoom() ?? 0;
+    const cut = extendLine(line, 12 / Math.pow(2, zoom));
+    // area interna: si ritaglia nella parte non ancora occupata da altre aree interne
+    const own = ringsOf(f.geometry);
+    const size = own.reduce((a, r) => a + ringArea(r), 0);
+    const inner =
+      mode === "dentro"
+        ? features
+            .filter((x) => x.kind === "confine" && x.id !== f.id)
+            .flatMap((x) => {
+              const rs = ringsOf(x.geometry);
+              const sz = rs.reduce((a, r) => a + ringArea(r), 0);
+              return sz < size && rs.some((r) => pointInArea(insidePoint(r), own)) ? rs : [];
+            })
+        : [];
+    const base = mode === "dentro" ? subtractAreas(own, inner) : own;
+    if (!base.length) return setMsg({ ok: false, text: "L'area è già tutta occupata da aree interne." });
+    const parts = splitArea(base, cut);
+    if (parts.length <= base.length)
+      return setMsg({
+        ok: false,
+        text: "La linea deve andare da un bordo a un altro (anche il bordo di un'area interna già fatta): riprova.",
+      });
+    setPieces({ id: f.id, rings: parts, mode });
   };
   // anteprima tratteggiata dell'elemento nuovo (non ancora salvato), con il colore scelto
   useEffect(() => {
@@ -472,14 +503,18 @@ export default function MapCanvas({
     const rest = pieces.rings.filter((_, k) => k !== i);
     setBusy(true);
     const now = new Date().toISOString();
-    const up = await supabase.from("map_features").update({ geometry: geometryOf(rest), updated_at: now }).eq("id", f.id);
+    // "dentro": l'area di prima resta intera; "dividi": perde la parte presa
+    const up =
+      pieces.mode === "dentro"
+        ? { error: null }
+        : await supabase.from("map_features").update({ geometry: geometryOf(rest), updated_at: now }).eq("id", f.id);
     const ins = up.error
       ? up
       : await supabase
           .from("map_features")
           .insert({
             kind: "confine",
-            name: "Nuova area",
+            name: pieces.mode === "dentro" ? "Nuovo regno" : "Nuova area",
             description: "",
             color: f.color === "#b04a8e" ? "#3b8fc4" : "#b04a8e",
             house_id: null,
@@ -618,8 +653,10 @@ export default function MapCanvas({
           <div className="absolute bottom-4 left-1/2 z-[1000] flex w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-center gap-2 border border-accent/60 bg-black/90 px-3 py-2 text-sm shadow-xl">
             <span className="min-w-0 flex-1">
               {pieces
-                ? "Clicca la parte che diventa una nuova area (il resto rimane all'area di prima)."
-                : "Disegna la linea di divisione: parti da fuori dell'area, attraversala e finisci fuori (doppio clic o clic sull'ultimo punto per finire)."}
+                ? pieces.mode === "dentro"
+                  ? "Clicca la parte che diventa la nuova area interna (l'area grande resta intera)."
+                  : "Clicca la parte che diventa una nuova area (il resto rimane all'area di prima)."
+                : "Parti da un bordo (la linea si aggancia da sola), metti tutti i punti che vuoi e finisci su un altro bordo: clic sull'ultimo punto per finire."}
             </span>
             <button type="button" onClick={cancelSplit} className="btn-ghost px-3 py-1 text-xs">
               Annulla
@@ -672,7 +709,8 @@ export default function MapCanvas({
             </button>
             <p>
               Con la bacchetta clicchi sulla terra e il contorno diventa un&apos;area (es. tutto il continente). Poi
-              selezioni l&apos;area e usi <strong>Dividi con una linea</strong> per creare le aree interne.
+              selezioni l&apos;area e usi <strong>Crea un&apos;area interna</strong> per disegnare i regni: la linea va da un
+              bordo a un altro, anche quello di un regno già fatto.
             </p>
             <button type="button" onClick={() => setBgOpen((o) => !o)} className="underline hover:text-accent">
               {bgOpen ? "Chiudi lo sfondo" : "Cambia l'immagine di sfondo"}
@@ -846,6 +884,11 @@ export default function MapCanvas({
                 <button type="button" onClick={() => startShape(sel.id)} className="text-muted underline hover:text-accent">
                   {sel.kind === "luogo" ? "Sposta" : "Modifica forma"}
                 </button>
+                {sel.kind === "confine" && (
+                  <button type="button" onClick={() => startSplit(sel.id, "dentro")} className="text-muted underline hover:text-accent">
+                    Crea un&apos;area interna (regno)
+                  </button>
+                )}
                 {sel.kind === "confine" && (
                   <button type="button" onClick={() => startSplit(sel.id)} className="text-muted underline hover:text-accent">
                     Dividi con una linea
