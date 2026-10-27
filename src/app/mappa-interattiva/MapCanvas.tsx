@@ -415,6 +415,54 @@ export default function MapCanvas({
   };
 
   // --- Dividere un'area con una linea --------------------------------------
+  // Parte libera di un'area: tolte le aree interne gia' fatte (es. il continente meno i regni)
+  function freePart(f: MapFeature): Point[][] {
+    const own = ringsOf(f.geometry);
+    const size = own.reduce((a, r) => a + ringArea(r), 0);
+    const inner = features
+      .filter((x) => x.kind === "confine" && x.id !== f.id)
+      .flatMap((x) => {
+        const rs = ringsOf(x.geometry);
+        const sz = rs.reduce((a, r) => a + ringArea(r), 0);
+        return sz < size && shareInside(rs, own) > 0.5 ? rs : [];
+      });
+    return subtractAreas(own, inner);
+  }
+
+  // Tutta la parte rimasta diventa una nuova area interna (senza tracciare linee)
+  async function takeRest(f: MapFeature) {
+    const rest = freePart(f)
+      .filter((r) => ringArea(r) > 1000)
+      .map((r) => cleanRing(r));
+    if (!rest.length) return setMsg({ ok: false, text: "Non resta niente di libero: l'area è tutta divisa." });
+    setBusy(true);
+    const ins = await supabase
+      .from("map_features")
+      .insert({
+        kind: "confine",
+        name: "Nuovo regno",
+        description: "",
+        color: "#8a7bd1",
+        house_id: null,
+        place_type: null,
+        geometry: geometryOf(rest),
+      })
+      .select("*")
+      .single();
+    setBusy(false);
+    if (ins.error) return setMsg({ ok: false, text: "Regno non creato." });
+    await reload();
+    setSelected(null);
+    setDraft({ ...(ins.data as MapFeature) });
+    setMsg({
+      ok: true,
+      text:
+        rest.length > 1
+          ? `Creato con la parte rimasta (${rest.length} pezzi, isole comprese): dagli un nome.`
+          : "Creato con la parte rimasta: dagli un nome.",
+    });
+  }
+
   function startSplit(id: string, mode: SplitMode = "dividi") {
     const map = mapRef.current;
     if (!map) return;
@@ -443,18 +491,7 @@ export default function MapCanvas({
     const cut = extendLine(line, 12 / Math.pow(2, zoom));
     // area interna: si ritaglia nella parte non ancora occupata da altre aree interne
     const own = ringsOf(f.geometry);
-    const size = own.reduce((a, r) => a + ringArea(r), 0);
-    const inner =
-      mode === "dentro"
-        ? features
-            .filter((x) => x.kind === "confine" && x.id !== f.id)
-            .flatMap((x) => {
-              const rs = ringsOf(x.geometry);
-              const sz = rs.reduce((a, r) => a + ringArea(r), 0);
-              return sz < size && shareInside(rs, own) > 0.5 ? rs : [];
-            })
-        : [];
-    const base = mode === "dentro" ? subtractAreas(own, inner) : own;
+    const base = mode === "dentro" ? freePart(f) : own;
     if (!base.length) return setMsg({ ok: false, text: "L'area è già tutta occupata da aree interne." });
     // regni: le briciole lungo i bordi (meno di ~30x30 pixel) non contano e non si scelgono;
     // divisione: si tiene tutto (anche le isolette restano all'area)
@@ -929,6 +966,18 @@ export default function MapCanvas({
                 {sel.kind === "confine" && (
                   <button type="button" onClick={() => startSplit(sel.id, "dentro")} className="text-muted underline hover:text-accent">
                     Crea un&apos;area interna (regno)
+                  </button>
+                )}
+                {sel.kind === "confine" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (window.confirm("Creare un regno con tutta la parte di quest'area non ancora assegnata?")) takeRest(sel);
+                    }}
+                    className="text-muted underline hover:text-accent"
+                  >
+                    Crea un regno con la parte rimasta
                   </button>
                 )}
                 {sel.kind === "confine" && (
