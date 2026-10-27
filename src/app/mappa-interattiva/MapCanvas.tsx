@@ -82,6 +82,10 @@ export default function MapCanvas({
   const groupRef = useRef<L.LayerGroup | null>(null);
   const layersRef = useRef(new Map<string, L.Layer>());
   const fitted = useRef(false);
+  // da lontano (vista intera) solo le capitali; avvicinandosi di un passo compaiono tutti i luoghi
+  const fitZoom = useRef(0);
+  const ZOOM_ALL = 1; // passi di zoom oltre la vista intera
+  const [near, setNear] = useState(false);
 
   const [settings, setSettings] = useState(initialSettings);
   const [features, setFeatures] = useState(initialFeatures);
@@ -138,6 +142,7 @@ export default function MapCanvas({
     groupRef.current = L.layerGroup().addTo(map);
     piecesRef.current = L.layerGroup().addTo(map);
     draftRef.current = L.layerGroup().addTo(map);
+    map.on("zoomend", () => setNear(map.getZoom() >= fitZoom.current + ZOOM_ALL - 0.01));
     map.on("popupopen", (e: L.PopupEvent) => {
       const btn = e.popup.getElement()?.querySelector<HTMLButtonElement>("[data-edit]");
       btn?.addEventListener("click", () => {
@@ -229,6 +234,8 @@ export default function MapCanvas({
     ]);
     if (!fitted.current) {
       map.fitBounds(bounds);
+      fitZoom.current = map.getZoom();
+      setNear(false);
       fitted.current = true;
     }
   }, [settings]);
@@ -248,6 +255,8 @@ export default function MapCanvas({
         .map((o) => o.x)) {
         // vista "castelli": solo i castelli, senza confini e strade
         if (view === "castelli" && !isCastle(f)) continue;
+        // da lontano: dei luoghi solo le capitali (e quello selezionato)
+        if (!near && f.kind === "luogo" && f.place_type !== "capitale" && f.id !== selected) continue;
         const sel = f.id === selected;
         let layer: L.Layer;
         if (f.kind === "luogo") {
@@ -301,7 +310,7 @@ export default function MapCanvas({
         layer.addTo(group);
         layersRef.current.set(f.id, layer);
       }
-  }, [features, view, selected, shaping, houses, canEdit]);
+  }, [features, view, selected, shaping, houses, canEdit, near]);
 
   const reload = async () => {
     const { data } = await supabase.from("map_features").select("*").order("created_at");
@@ -665,13 +674,15 @@ export default function MapCanvas({
     const layer = layersRef.current.get(f.id);
     setDraft(null);
     if (f.kind !== "luogo") setSelected(f.id);
-    if (!map || !layer) return;
-    if (layer instanceof L.Marker) {
-      map.setView(layer.getLatLng(), Math.max(map.getZoom(), 0));
-      layer.openPopup();
+    if (!map) return;
+    if (f.kind === "luogo") {
+      map.setView(f.geometry as Point, Math.max(map.getZoom(), fitZoom.current + ZOOM_ALL));
+      // il segnaposto compare dopo l'avvicinamento: il fumetto si apre appena c'e'
+      setTimeout(() => (layersRef.current.get(f.id) as L.Marker | undefined)?.openPopup(), 350);
       return;
     }
-    else map.fitBounds((layer as L.Polyline).getBounds(), { maxZoom: 1, padding: [40, 40] });
+    if (!layer) return;
+    map.fitBounds((layer as L.Polyline).getBounds(), { maxZoom: 1, padding: [40, 40] });
   }
 
   const sel = features.find((f) => f.id === selected) ?? null;
@@ -761,7 +772,7 @@ export default function MapCanvas({
           <h1 className="font-serif text-2xl tracking-wide text-accent">Mappa di Westeros</h1>
           <p className="text-xs text-muted">
             {view === "politica" ? "Vista politica: confini, percorsi e luoghi." : "Vista dei castelli: capitali, castelli e fortezze."} Usa + e − (o la
-            rotella) per avvicinarti e allontanarti.
+            rotella) per avvicinarti e allontanarti: da lontano si vedono solo le capitali, avvicinandoti tutti i luoghi.
           </p>
         </header>
         {msg && <p className={`text-sm ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</p>}
