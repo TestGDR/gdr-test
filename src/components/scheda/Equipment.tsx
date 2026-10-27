@@ -112,6 +112,14 @@ export default function Equipment({
   const [pick, setPick] = useState<Selection>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // in giocata l'equipaggiamento non si cambia (lo blocca il database)
+  const [inGame, setInGame] = useState(false);
+  useEffect(() => {
+    if (!isOwn) return;
+    supabase
+      .rpc("character_in_game", { p_character: characterId })
+      .then(({ data }) => setInGame(data === true));
+  }, [supabase, characterId, isOwn]);
 
   const load = useCallback(
     () =>
@@ -160,7 +168,9 @@ export default function Equipment({
     setBusy(false);
     if (error)
       return setError(
-        error.message.includes("posto")
+        error.message.includes("giocata")
+          ? error.message
+          : error.message.includes("posto")
           ? "Non c'è più posto: togli prima un oggetto."
           : error.message.includes("indossa")
             ? "Questo oggetto non si indossa."
@@ -171,6 +181,12 @@ export default function Equipment({
   }
 
   if (slots === null) return <p className="p-6 text-muted">Caricamento...</p>;
+  const lockNote = isOwn && inGame && (
+    <p className="border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
+      Sei in giocata: l&apos;equipaggiamento è bloccato (non puoi indossare, togliere o comprare oggetti) finché non esci
+      dalla giocata.
+    </p>
+  );
 
   const worn = owned.filter((o) => o.equipped);
   const bag = owned.filter((o) => !o.equipped);
@@ -383,6 +399,7 @@ export default function Equipment({
             L&apos;inventario lo vede solo il proprietario.
           </p>
         )}
+        {lockNote}
         <div className="mt-auto">{details}</div>
       </div>
     </div>

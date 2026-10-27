@@ -291,6 +291,11 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
           "Modificare ed eliminare gli interventi di tutti, chiudere, fissare e rendere importanti le discussioni",
       },
       {
+        key: "timeline.gestire",
+        label: "Timeline",
+        description: "Menu gioco → Timeline: aggiungere, modificare e togliere gli eventi di gioco",
+      },
+      {
         key: "forum.segnalare",
         label: "Segnalare i post",
         description:

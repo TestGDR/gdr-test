@@ -183,7 +183,9 @@ function Shop({
     if (error)
       return setMsg({
         ok: false,
-        text: error.message.includes("monete")
+        text: error.message.includes("giocata")
+          ? error.message
+          : error.message.includes("monete")
           ? "Sul conto non ci sono abbastanza monete."
           : "Acquisto non riuscito.",
       });
@@ -345,7 +347,9 @@ function Smith({
     if (error)
       return setMsg({
         ok: false,
-        text: error.message.includes("monete")
+        text: error.message.includes("giocata")
+          ? error.message
+          : error.message.includes("monete")
           ? "Sul conto non ci sono abbastanza monete."
           : error.message.length < 120
             ? error.message
@@ -381,7 +385,9 @@ function Smith({
     if (error)
       return setMsg({
         ok: false,
-        text: error.message.includes("monete")
+        text: error.message.includes("giocata")
+          ? error.message
+          : error.message.includes("monete")
           ? "Sul conto non ci sono abbastanza monete."
           : "Il fabbro non può lavorare questo oggetto.",
       });

@@ -41,6 +41,7 @@ import {
   CalendarIcon,
   FaqIcon,
   SpyIcon,
+  TimelineIcon,
   CastleIcon,
   DragonIcon,
   GearIcon,
@@ -61,6 +62,7 @@ import {
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
 import AbsencesPanel, { useAbsencesUnseen } from "./AbsencesPanel";
+import TimelinePanel from "./TimelinePanel";
 import CalendarPanel, { useEventsUnseen } from "./CalendarPanel";
 import FaqPanel from "./FaqPanel";
 import SpiesPanel from "./SpiesPanel";
@@ -134,6 +136,7 @@ type Props = {
   canManageForum: boolean; // categorie e sezioni del forum
   canHighlightForum: boolean; // segnala i post a tutti
   canReviewGossip: boolean; // approva i pettegolezzi
+  canEditTimeline: boolean; // scrive gli eventi della Timeline
   hasDragon: boolean; // cavalca un drago: vede "Il mio drago"
   canInvisible: boolean; // ha il permesso dell'invisibilita'
   initialInvisible: boolean; // e' invisibile adesso
@@ -141,7 +144,7 @@ type Props = {
 };
 
 // Pannelli aperti dalla barra di destra (o dal menu del cellulare)
-type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci" | "calendario" | "faq" | "spie";
+type Panel = "notizie-on" | "notizie-off" | "ricerca" | "assenze" | "viaggio" | "feudi" | "mercato" | "forum" | "voci" | "calendario" | "faq" | "spie" | "timeline";
 const PANEL_TITLE: Record<Panel, string> = {
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
@@ -155,6 +158,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   calendario: "Calendario degli eventi",
   faq: "FAQ",
   spie: "Spie",
+  timeline: "Timeline degli eventi di gioco",
 };
 
 export default function GameShell({
@@ -179,6 +183,7 @@ export default function GameShell({
   canManageForum,
   canHighlightForum,
   canReviewGossip,
+  canEditTimeline,
   hasDragon,
   canInvisible,
   initialInvisible,
@@ -640,6 +645,7 @@ export default function GameShell({
           />
         )}
         {panel === "faq" && <FaqPanel key={panelSession} canEdit={canEditDocs} />}
+        {panel === "timeline" && <TimelinePanel key={panelSession} canEdit={canEditTimeline} />}
         {panel === "spie" &&
           (character && character.status === "attivo" ? (
             <SpiesPanel key={panelSession} characterId={character.id} />
@@ -940,6 +946,7 @@ function Caption({ children }: { children: ReactNode }) {
 }
 // nomi corti dei pannelli, sotto le icone
 const PANEL_SHORT: Record<Panel, string> = {
+  timeline: "Timeline",
   "notizie-on": "Notizie ON",
   "notizie-off": "Notizie OFF",
   ricerca: "Ricerca",
@@ -1354,6 +1361,7 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
   { id: "feudi", icon: <FiefIcon /> },
   { id: "mercato", icon: <MarketIcon /> },
   { id: "spie", icon: <SpyIcon /> },
+  { id: "timeline", icon: <TimelineIcon /> },
   // OFF game
   { id: "notizie-off", icon: <HornIcon /> },
   { id: "forum", icon: <ForumIcon /> },
@@ -1370,7 +1378,7 @@ const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feud
 
 // Le icone dei pannelli divise in due zone: quello che riguarda il gioco (ON)
 // e quello che riguarda i giocatori e la comunita' (OFF)
-const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato", "spie"];
+const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato", "spie", "timeline"];
 const ZONE_OFF: Panel[] = ["notizie-off", "forum", "ricerca", "assenze", "calendario", "faq"];
 const zonePanels = (zone: Panel[], inHouse: boolean) => {
   const icons = panelsFor(inHouse);
@@ -1739,7 +1747,7 @@ function DesktopLeft({
 }) {
   const status = useCharacterStatus(character?.id ?? null);
   const offPanels = zonePanels(ZONE_OFF, inHouse);
-  const gamePanels: Panel[] = ["viaggio", "feudi", "mercato", "spie", "voci", "notizie-on"];
+  const gamePanels: Panel[] = ["viaggio", "feudi", "mercato", "spie", "voci", "notizie-on", "timeline"];
   return (
     <aside className="hidden w-64 shrink-0 flex-col gap-2 overflow-hidden p-2 lg:flex">
       {/* personaggio */}
@@ -2015,6 +2023,7 @@ const KeyIcon = () => (
 // nomi delle voci nelle colonne del computer
 
 const SIDE_NAMES: Record<Panel, string> = {
+  timeline: "Timeline",
   viaggio: "Viaggio",
   feudi: "Feudi e possedimenti",
   mercato: "Mercato",

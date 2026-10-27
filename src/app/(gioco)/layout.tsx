@@ -52,6 +52,7 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       canManageForum={permissions.has("forum.sezioni")}
       canHighlightForum={permissions.has("forum.segnalare")}
       canReviewGossip={permissions.has("pettegolezzi.gestire")}
+      canEditTimeline={permissions.has("timeline.gestire")}
       hasDragon={hasDragon}
       canInvisible={permissions.has("staff.invisibile")}
       initialInvisible={invisible}
