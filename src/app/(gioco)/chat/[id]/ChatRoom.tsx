@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
+import { AppearanceModal } from "@/components/scheda/SheetButton";
 import { isFresh } from "@/lib/chat-ttl";
 import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
@@ -1299,10 +1300,13 @@ function MessageRow({
             className="h-7 w-7 shrink-0 object-contain"
           />
         )}
-        <span className="min-w-0 flex-1 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase">
+        <span className="min-w-0 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase">
           {message.character_name}
           {to}
         </span>
+        {/* "Guarda": l'aspetto del personaggio */}
+        <LookButton characterId={message.character_id} name={message.character_name} />
+        <span className="flex-1" aria-hidden />
         {tools}
         <span className="shrink-0 text-xs text-[#b8bec0]">
           {time}
@@ -1320,6 +1324,28 @@ function MessageRow({
       </p>
       </div>
     </div>
+  );
+}
+
+// Occhio accanto al nome: apre l'aspetto del personaggio (come un "guarda")
+function LookButton({ characterId, name }: { characterId: string; name: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={`Guarda ${name}: aspetto`}
+        aria-label={`Guarda l'aspetto di ${name}`}
+        className="shrink-0 text-[#b8bec0]/70 transition hover:text-accent"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      {open && <AppearanceModal characterId={characterId} name={name} onClose={() => setOpen(false)} />}
+    </>
   );
 }
 

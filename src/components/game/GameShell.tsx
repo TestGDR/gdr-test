@@ -58,7 +58,7 @@ import {
 } from "./icons";
 import NewsBook from "./NewsBook";
 import PlayRequestsPanel, { usePlayRequestsUnseen } from "./PlayRequests";
-import AbsencesPanel from "./AbsencesPanel";
+import AbsencesPanel, { useAbsencesUnseen } from "./AbsencesPanel";
 import CalendarPanel, { useEventsUnseen } from "./CalendarPanel";
 import FaqPanel from "./FaqPanel";
 import SpiesPanel from "./SpiesPanel";
@@ -97,6 +97,8 @@ const AreaContext = createContext<(area: Area) => void>(() => {});
 const NewsUnseenContext = createContext<{ on: boolean; off: boolean }>({ on: false, off: false });
 // ricerche di gioco ancora aperte (anche gia' lette): la voce resta evidenziata
 const PlayRequestsActiveContext = createContext(0);
+// assenze degli altri: nuove (lampeggia) e ancora aperte (resta colorata)
+const AbsencesContext = createContext({ count: 0, active: 0 });
 // Eventi creati dopo l'ultima apertura del calendario: l'icona si accende
 const EventsUnseenContext = createContext(false);
 // Ticket: quanti da leggere e come aprire la finestra dei ticket
@@ -266,6 +268,8 @@ export default function GameShell({
   const [panels, setPanels] = useState<Partial<Record<Panel, number>>>({});
   const panelOpen = (p: Panel) => (panels[p] ?? 0) > 0;
   const playRequests = usePlayRequestsUnseen(userId, panelOpen("ricerca"));
+  const absences = useAbsencesUnseen(userId, panelOpen("assenze"));
+  const absencesInfo = useMemo(() => ({ count: absences.count, active: absences.active }), [absences.count, absences.active]);
   const tickets = useTicketUnread(userId);
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
@@ -298,6 +302,7 @@ export default function GameShell({
     setDrawerOpen(false); // su cellulare il menu si richiude: resta la finestra
     if (p === "notizie-on") news.markSeen("on");
     if (p === "notizie-off") news.markSeen("off");
+    if (p === "assenze") absences.markSeen();
   };
 
   function openMessages(kind: MessageKind, to: Contact | null = null) {
@@ -323,6 +328,7 @@ export default function GameShell({
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
       <PlayRequestsActiveContext.Provider value={playRequests.active}>
+      <AbsencesContext.Provider value={absencesInfo}>
       <EventsUnseenContext.Provider value={events.unseen}>
       <TicketContext.Provider value={ticketCtx}>
       <ForumUnreadContext.Provider value={forumUnread.count}>
@@ -343,8 +349,8 @@ export default function GameShell({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : news.unseen.on || news.unseen.off ? "Apri pannello: notizie nuove" : "Apri pannello"}
-            className={`${menuBtn} absolute left-2 lg:hidden ${playRequests.count > 0 ? "blink-call" : news.unseen.on || news.unseen.off ? "news-new" : ""}`}
+            aria-label={playRequests.count > 0 ? "Apri pannello: nuove richieste di gioco" : absences.count > 0 ? "Apri pannello: nuove assenze" : news.unseen.on || news.unseen.off ? "Apri pannello: notizie nuove" : "Apri pannello"}
+            className={`${menuBtn} absolute left-2 lg:hidden ${playRequests.count > 0 || absences.count > 0 ? "blink-call" : news.unseen.on || news.unseen.off ? "news-new" : ""}`}
           >
             <MenuIcon />
           </button>
@@ -685,6 +691,7 @@ export default function GameShell({
       </ForumUnreadContext.Provider>
       </TicketContext.Provider>
       </EventsUnseenContext.Provider>
+      </AbsencesContext.Provider>
       </PlayRequestsActiveContext.Provider>
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
@@ -1431,6 +1438,8 @@ const panelLabel = (p: Panel, newRequests: number, newNews: boolean) =>
     ? `Ricerca gioco: ${newRequests} ${newRequests === 1 ? "richiesta nuova" : "richieste nuove"}`
     : p === "ricerca" && newNews
     ? "Ricerca gioco: ci sono ricerche aperte"
+    : p === "assenze" && newNews
+    ? "Assenze: ci sono assenze in corso o in arrivo"
     : newNews
       ? `${PANEL_TITLE[p]}: notizie nuove`
       : PANEL_TITLE[p];
@@ -1452,7 +1461,10 @@ function PanelButton({
   caption?: string; // nome sotto l'icona (menu del cellulare)
   list?: boolean; // nelle colonne del computer: nome accanto all'icona
 }) {
-  const calling = panel === "ricerca" && newRequests > 0; // lampeggia finche' non si apre
+  const absencesNow = useContext(AbsencesContext);
+  // lampeggia finche' non si apre (ricerche di gioco e assenze nuove)
+  const callCount = panel === "ricerca" ? newRequests : panel === "assenze" ? absencesNow.count : 0;
+  const calling = callCount > 0;
   const unseen = useContext(NewsUnseenContext);
   const forumNew = useContext(ForumUnreadContext);
   const gossipNew = useContext(GossipPendingContext);
@@ -1460,6 +1472,7 @@ function PanelButton({
   const requestsOpen = useContext(PlayRequestsActiveContext);
   const newNews =
     (panel === "ricerca" && requestsOpen > 0) || // dorata finche' ci sono ricerche aperte
+    (panel === "assenze" && absencesNow.active > 0) || // ...e finche' ci sono assenze
     (panel === "calendario" && eventsNew) ||
     (panel === "notizie-on" && unseen.on) ||
     (panel === "notizie-off" && unseen.off) ||
@@ -1476,7 +1489,7 @@ function PanelButton({
       {caption && (list ? <ListCaption>{caption}</ListCaption> : <Caption>{caption}</Caption>)}
       {calling && (
         <span className="absolute -top-1 -right-1 min-w-4 rounded-full bg-blood px-1 text-center text-[0.625rem] font-bold text-white shadow">
-          {newRequests}
+          {callCount}
         </span>
       )}
       {/* Forum: quante discussioni hanno risposte nuove */}

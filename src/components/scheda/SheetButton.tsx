@@ -1392,6 +1392,36 @@ function AppearanceView({ text }: { text: string }) {
   );
 }
 
+// "Guarda": l'aspetto di un PG in una finestra (dalla chat), in sola lettura
+export function AppearanceModal({
+  characterId,
+  name,
+  onClose,
+}: {
+  characterId: string | null;
+  name: string;
+  onClose: () => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    if (!characterId) return;
+    supabase
+      .from("characters")
+      .select("appearance")
+      .eq("id", characterId)
+      .maybeSingle()
+      .then(({ data }) => setText((data?.appearance as string | null) ?? ""));
+  }, [supabase, characterId]);
+  return (
+    <Modal open={characterId !== null} onClose={onClose} title={`Aspetto · ${name}`} size="lg">
+      <div className="max-h-[75vh] overflow-y-auto p-6">
+        {text === null ? <p className="text-muted">Caricamento...</p> : <AppearanceView text={text} />}
+      </div>
+    </Modal>
+  );
+}
+
 function AppearancePage({
   character,
   isOwn,
