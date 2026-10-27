@@ -543,6 +543,26 @@ export default function MapCanvas({
     chooseRef.current = chooseNewPart;
   });
 
+  // Unisci: l'area (es. un'isola salvata a parte) diventa un pezzo di un'altra area (es. un regno)
+  async function mergeInto(from: MapFeature, toId: string) {
+    const to = features.find((x) => x.id === toId);
+    if (!to) return;
+    if (!window.confirm(`Unire "${from.name || "quest'area"}" a "${to.name || "l'area scelta"}"? Diventa un suo pezzo e sparisce come area a parte.`))
+      return;
+    setBusy(true);
+    const geometry = geometryOf([...ringsOf(to.geometry), ...ringsOf(from.geometry)]);
+    const up = await supabase
+      .from("map_features")
+      .update({ geometry, updated_at: new Date().toISOString() })
+      .eq("id", to.id);
+    const del = up.error ? up : await supabase.from("map_features").delete().eq("id", from.id);
+    setBusy(false);
+    if (del.error) return setMsg({ ok: false, text: "Unione non riuscita." });
+    await reload();
+    setSelected(to.id);
+    setMsg({ ok: true, text: `Unita a ${to.name || "l'area"}.` });
+  }
+
   async function remove(f: MapFeature) {
     if (!window.confirm(`Togliere dalla mappa "${f.name || KIND_LABEL[f.kind]}"?`)) return;
     const { error } = await supabase.from("map_features").delete().eq("id", f.id);
@@ -907,6 +927,27 @@ export default function MapCanvas({
                   >
                     {addTo === sel.id ? "🪄 Fine (smetti di aggiungere)" : "🪄 Aggiungi isole"}
                   </button>
+                )}
+                {sel.kind === "confine" && features.some((x) => x.kind === "confine" && x.id !== sel.id) && (
+                  <label className="flex w-full items-center gap-2 text-muted">
+                    Unisci a
+                    <select
+                      value=""
+                      disabled={busy}
+                      onChange={(e) => e.target.value && mergeInto(sel, e.target.value)}
+                      className="input min-w-0 flex-1 py-0.5 text-xs"
+                    >
+                      <option value="">— scegli l&apos;area —</option>
+                      {features
+                        .filter((x) => x.kind === "confine" && x.id !== sel.id)
+                        .sort((a, b) => a.name.localeCompare(b.name, "it"))
+                        .map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name || "Area senza nome"}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
                 )}
                 <button type="button" onClick={() => remove(sel)} className="text-red-400 underline hover:text-red-300">
                   Togli
