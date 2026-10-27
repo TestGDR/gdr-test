@@ -24,7 +24,7 @@ const dateLabel = (e: Pick<Ev, "year" | "month" | "day">) =>
       ? `${moonName(e.month)} ${e.year} D.C.`
       : `${e.year} D.C.`;
 
-// Timeline: gli eventi di gioco in ordine di data ON. Lo staff con il permesso
+// Timeline: gli eventi di gioco in ordine di data ON, il piu' recente in alto. Lo staff con il permesso
 // "timeline.gestire" aggiunge, corregge e toglie gli eventi
 export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
   const supabase = useMemo(() => createClient(), []);
@@ -40,10 +40,11 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
       supabase
         .from("timeline_events")
         .select("id, year, month, day, title, summary")
-        .order("year")
-        .order("month", { nullsFirst: true })
-        .order("day", { nullsFirst: true })
-        .order("created_at")
+        // dal piu' recente (in alto) al piu' vecchio
+        .order("year", { ascending: false })
+        .order("month", { ascending: false, nullsFirst: false })
+        .order("day", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .then(({ data, error }) => {
           setFailed(!!error);
           setEvents((data ?? []) as Ev[]);
@@ -193,22 +194,22 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
         <div className="space-y-6">
           {years.map((y) => (
             <section key={y}>
-              <h3 className="mb-2 font-serif text-2xl tracking-wide text-accent">{y} D.C.</h3>
+              <h3 className="mb-2 font-serif text-lg tracking-wide text-accent">{y} D.C.</h3>
               {/* linea verticale con un punto per ogni evento */}
-              <ol className="relative ml-2 space-y-4 border-l-2 border-accent/40 pl-5">
+              <ol className="relative ml-2 space-y-3 border-l-2 border-accent/40 pl-5">
                 {shown
                   .filter((e) => e.year === y)
                   .map((e) => (
                     <li key={e.id} className="relative">
                       <span
                         aria-hidden
-                        className="absolute top-1.5 -left-[1.6rem] h-3 w-3 rounded-full border-2 border-accent bg-[#2a1a12]"
+                        className="absolute top-1 -left-[1.6rem] h-3 w-3 rounded-full border-2 border-accent bg-[#2a1a12]"
                       />
-                      <p className="text-xs tracking-[0.14em] text-[#d8c39a] uppercase">{dateLabel(e)}</p>
-                      <h4 className="font-serif text-lg leading-tight text-foreground">{e.title}</h4>
-                      {e.summary && <p className="mt-1 text-sm whitespace-pre-line text-muted">{e.summary}</p>}
+                      <p className="text-[0.625rem] tracking-[0.14em] text-[#d8c39a] uppercase">{dateLabel(e)}</p>
+                      <h4 className="font-serif text-sm leading-tight font-semibold text-foreground">{e.title}</h4>
+                      {e.summary && <p className="mt-0.5 text-xs leading-relaxed whitespace-pre-line text-muted">{e.summary}</p>}
                       {canEdit && (
-                        <p className="mt-1 flex gap-3 text-xs">
+                        <p className="mt-1 flex gap-3 text-[0.6875rem]">
                           <button
                             type="button"
                             onClick={() => {
