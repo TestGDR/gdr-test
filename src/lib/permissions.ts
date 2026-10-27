@@ -291,6 +291,11 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
           "Modificare ed eliminare gli interventi di tutti, chiudere, fissare e rendere importanti le discussioni",
       },
       {
+        key: "mappa.gestire",
+        label: "Mappa interattiva",
+        description: "Utility → Mappa interattiva: cambiare lo sfondo, disegnare confini e strade, aggiungere luoghi d'interesse",
+      },
+      {
         key: "timeline.gestire",
         label: "Timeline",
         description: "Menu gioco → Timeline: aggiungere, modificare e togliere gli eventi di gioco",

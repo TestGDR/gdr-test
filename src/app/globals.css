@@ -946,3 +946,31 @@ textarea.input {
 .inventario-borsa {
   background: linear-gradient(180deg, #16110e, #0d0a08);
 }
+
+/* Mappa interattiva: etichette dei luoghi e dei confini, senza riquadro */
+.leaflet-tooltip.map-label {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  color: #f3e2cc;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+}
+.leaflet-tooltip.map-label::before {
+  display: none;
+}
+.leaflet-tooltip.map-label-border {
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff3c4;
+}
+.map-place-icon {
+  background: transparent;
+  border: 0;
+}
+.leaflet-container.map-interattiva {
+  background: #1a140f;
+}

@@ -7,7 +7,7 @@ import { SheetModal } from "@/components/scheda/SheetButton";
 import ModalButton from "@/components/ui/ModalButton";
 import Bank from "./Bank";
 import ChangePassword from "./ChangePassword";
-import { DragonIcon } from "./icons";
+import { DragonIcon, MapIcon } from "./icons";
 import RoomBooking from "./RoomBooking";
 import { createClient } from "@/lib/supabase/client";
 
@@ -28,6 +28,7 @@ const BOXES = [
   { id: "casate", label: "Casate PG", icon: <ShieldIcon />, color: "text-red-500" },
   { id: "png", label: "Anagrafe PNG", icon: <AddressBookIcon />, color: "text-[#9fb4c9]" },
   { id: "casate-png", label: "Casate PNG", icon: <ShieldIcon />, color: "text-[#9fb4c9]" },
+  { id: "mappa", label: "Mappa interattiva", icon: <MapIcon />, color: "text-[#c9a45c]" },
   { id: "draghi", label: "Anagrafe draghi", icon: <span className="inline-block scale-[1.4]"><DragonIcon /></span>, color: "text-orange-400" },
   { id: "stanze", label: "Prenota stanza", icon: <KeyIcon />, color: "text-yellow-500" },
   { id: "banca", label: "Banca", icon: <CoinsIcon />, color: "text-amber-300" },
@@ -124,6 +125,8 @@ function UtilityPanel({ mode }: { mode: Mode }) {
                 <button
                   type="button"
                   onClick={() => {
+                    // la mappa interattiva si apre in una nuova scheda
+                    if (b.id === "mappa") return void window.open("/mappa-interattiva", "_blank", "noopener");
                     setTab(b.id);
                     setHouseId(null);
                     setQuery("");
