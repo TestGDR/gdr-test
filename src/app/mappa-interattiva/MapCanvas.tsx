@@ -6,7 +6,7 @@ import "@geoman-io/leaflet-geoman-free";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
-import { extendLine, geometryOf, pointInArea, ringArea, ringsOf, shareInside, splitArea, subtractAreas, traceLand } from "./geo-tools";
+import { cleanRing, extendLine, geometryOf, pointInArea, ringArea, ringsOf, shareInside, splitArea, subtractAreas, traceLand } from "./geo-tools";
 import {
   CASTLE_TYPES,
   KIND_LABEL,
@@ -459,7 +459,8 @@ export default function MapCanvas({
     // regni: le briciole lungo i bordi (meno di ~30x30 pixel) non contano e non si scelgono;
     // divisione: si tiene tutto (anche le isolette restano all'area)
     const big = (rs: Point[][]) => (mode === "dentro" ? rs.filter((r) => ringArea(r) > 1000) : rs);
-    const parts = big(splitArea(base, cut));
+    // bordi puliti: niente vertici sovrapposti ne' punte lasciate dal taglio
+    const parts = big(splitArea(base, cut)).map((r) => cleanRing(r));
     if (parts.length <= big(base).length)
       return setMsg({
         ok: false,
@@ -564,6 +565,24 @@ export default function MapCanvas({
     await reload();
     setSelected(to.id);
     setMsg({ ok: true, text: `Unita a ${to.name || "l'area"}.` });
+  }
+
+  // Ripulisci il bordo di un'area gia' salvata
+  async function cleanArea(f: MapFeature) {
+    const before = ringsOf(f.geometry);
+    const after = before.map((r) => cleanRing(r));
+    const n0 = before.reduce((a, r) => a + r.length, 0);
+    const n1 = after.reduce((a, r) => a + r.length, 0);
+    if (n1 >= n0) return setMsg({ ok: true, text: "Il bordo è già pulito." });
+    setBusy(true);
+    const { error } = await supabase
+      .from("map_features")
+      .update({ geometry: geometryOf(after), updated_at: new Date().toISOString() })
+      .eq("id", f.id);
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: "Bordo non salvato." });
+    await reload();
+    setMsg({ ok: true, text: `Bordo ripulito: ${n0 - n1} vertici inutili tolti.` });
   }
 
   async function remove(f: MapFeature) {
@@ -915,6 +934,11 @@ export default function MapCanvas({
                 {sel.kind === "confine" && (
                   <button type="button" onClick={() => startSplit(sel.id)} className="text-muted underline hover:text-accent">
                     Dividi con una linea
+                  </button>
+                )}
+                {sel.kind === "confine" && (
+                  <button type="button" disabled={busy} onClick={() => cleanArea(sel)} className="text-muted underline hover:text-accent">
+                    Ripulisci il bordo
                   </button>
                 )}
                 {sel.kind === "confine" && settings.image_url && (

@@ -293,3 +293,63 @@ export function shareInside(inner: Point[][], outer: Point[][]): number {
   const common = both.reduce((s, poly) => s + ringArea(poly[0].map(toPt)), 0);
   return common / total;
 }
+
+// Pulizia di un bordo: toglie i vertici quasi sovrapposti, le punte sottilissime
+// (andata e ritorno) e i puntini inutili lungo i tratti dritti (entro ~1 pixel)
+export function cleanRing(ring: Point[], tol = 0.9): Point[] {
+  let r = ring.slice();
+  const d = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  for (let pass = 0; pass < 6; pass++) {
+    const before = r.length;
+    // vertici a meno di un pixel dal precedente
+    r = r.filter((p, i) => i === 0 || d(p, r[i - 1]) >= 1);
+    if (r.length > 3 && d(r[0], r[r.length - 1]) < 1) r.pop();
+    // punte: angolo strettissimo (sotto i 15 gradi) = la linea va e torna indietro
+    const out: Point[] = [];
+    for (let i = 0; i < r.length; i++) {
+      const p = out.length ? out[out.length - 1] : r[r.length - 1];
+      const c = r[i];
+      const q = r[(i + 1) % r.length];
+      const ax = p[0] - c[0], ay = p[1] - c[1], bx = q[0] - c[0], by = q[1] - c[1];
+      const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      const cos = la && lb ? (ax * bx + ay * by) / (la * lb) : 1;
+      if (r.length - (i - out.length) > 3 && cos > 0.966) continue;
+      out.push(c);
+    }
+    r = out;
+    if (r.length === before) break;
+  }
+  if (r.length < 4) return ring;
+  // tratti quasi dritti: un vertice basta (anello diviso in due meta' per la semplificazione)
+  const far = r.reduce((best, p, i) => (d(p, r[0]) > d(r[best], r[0]) ? i : best), 0);
+  const half = (pts: Point[]) => {
+    const keep = new Uint8Array(pts.length);
+    keep[0] = keep[pts.length - 1] = 1;
+    const stack: [number, number][] = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop()!;
+      const [ay, ax] = pts[a];
+      const [by, bx] = pts[b];
+      const l2 = (bx - ax) ** 2 + (by - ay) ** 2;
+      let idx = -1, best = tol;
+      for (let i = a + 1; i < b; i++) {
+        const [py, px] = pts[i];
+        const t = l2 ? Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / l2)) : 0;
+        const dist = Math.hypot(px - (ax + t * (bx - ax)), py - (ay + t * (by - ay)));
+        if (dist > best) {
+          best = dist;
+          idx = i;
+        }
+      }
+      if (idx > 0) {
+        keep[idx] = 1;
+        stack.push([a, idx], [idx, b]);
+      }
+    }
+    return pts.filter((_, i) => keep[i]);
+  };
+  const first = half(r.slice(0, far + 1));
+  const second = half([...r.slice(far), r[0]]);
+  const res = [...first, ...second.slice(1, -1)];
+  return res.length >= 4 ? res : r;
+}
