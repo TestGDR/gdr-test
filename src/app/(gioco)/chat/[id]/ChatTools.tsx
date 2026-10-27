@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { Message } from "@/lib/types";
 
 export type RoomInfo = {
@@ -95,19 +96,50 @@ export function ChatNotepad({
   );
 }
 
-// Salva: scarica la giocata in un file di testo
+// Salva: scarica in un file di testo tutta la giocata, dal momento in cui il
+// personaggio e' entrato in giocata fino ad adesso (dal database, non solo
+// l'ultima ora visibile in chat)
 export function ChatSave({
   room,
   messages,
+  characterId,
 }: {
   room: RoomInfo;
-  messages: Message[];
+  messages: Message[]; // quelle visibili: si usano se il PG non e' in giocata
+  characterId: string | null; // il mio PG in giocata in questa chat
 }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [game, setGame] = useState<{ since: string | null; list: Message[] } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: me } = characterId
+        ? await supabase
+            .from("chat_presence")
+            .select("joined_at")
+            .eq("room_id", room.id)
+            .eq("character_id", characterId)
+            .maybeSingle()
+        : { data: null };
+      const since = (me?.joined_at as string | undefined) ?? null;
+      if (!since) return setGame({ since: null, list: messages });
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("room_id", room.id)
+        .gte("created_at", new Date(Date.parse(since) - 1000).toISOString())
+        .order("created_at")
+        .order("id")
+        .limit(5000);
+      setGame({ since, list: (data ?? []) as Message[] });
+    })();
+  }, [supabase, room.id, characterId, messages]);
+
+  const list = game?.list ?? [];
+  const when = (iso: string) => new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome" });
+
   function download() {
-    const lines = messages.map((m) => {
-      const t = new Date(m.created_at).toLocaleString("it-IT", {
-        timeZone: "Europe/Rome",
-      });
+    const lines = list.map((m) => {
       const to = m.recipient ? ` → ${m.recipient}` : "";
       const tag =
         m.kind === "fuori_gioco"
@@ -116,11 +148,16 @@ export function ChatSave({
             ? "[MASTER] "
             : m.kind === "dado"
               ? "[DADO] "
-              : "";
-      return `[${t}] ${tag}${m.character_name}${to}: ${m.content}`;
+              : m.kind === "sistema"
+                ? "[SISTEMA] "
+                : "";
+      return `[${when(m.created_at)}] ${tag}${m.character_name}${to}: ${m.content}`;
     });
+    const head = game?.since
+      ? `Giocata dal ${when(game.since)} al ${when(new Date().toISOString())}`
+      : "Azioni visibili in chat";
     const blob = new Blob(
-      [`${room.name} — ${room.location_name}\n\n${lines.join("\n")}\n`],
+      [`${room.name} — ${room.location_name}\n${head}\n\n${lines.join("\n")}\n`],
       { type: "text/plain;charset=utf-8" },
     );
     const url = URL.createObjectURL(blob);
@@ -130,19 +167,29 @@ export function ChatSave({
     a.click();
     URL.revokeObjectURL(url);
   }
+  const actions = list.filter((m) => m.kind === "azione" || m.kind === "master").length;
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">
-        Scarica la giocata che vedi in chat ({messages.length} messaggi) in un
-        file di testo, con data, ora, personaggio e tipo di messaggio.
-      </p>
+      {!game ? (
+        <p className="text-sm text-muted">Caricamento della giocata...</p>
+      ) : game.since ? (
+        <p className="text-sm text-muted">
+          Scarica tutta la giocata, da quando il tuo personaggio è entrato ({when(game.since)}) a
+          adesso: {actions} {actions === 1 ? "azione" : "azioni"} ({list.length} messaggi in tutto, con dadi e avvisi),
+          in un file di testo con data, ora, personaggio e tipo di messaggio. Salvala prima di uscire dalla giocata.
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          Non sei in giocata in questa chat: puoi scaricare solo le azioni visibili adesso ({list.length} messaggi).
+        </p>
+      )}
       <button
         type="button"
         onClick={download}
-        disabled={!messages.length}
+        disabled={!list.length}
         className="btn px-4 py-1.5 text-sm"
       >
-        Scarica la chat
+        Scarica la giocata
       </button>
     </div>
   );

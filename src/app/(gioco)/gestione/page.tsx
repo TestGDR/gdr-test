@@ -3,10 +3,27 @@ import { notFound } from "next/navigation";
 import { GameArea } from "@/components/game/GameShell";
 import { getStaffContext } from "@/lib/staff";
 
+// Sezioni della pagina, in quest'ordine
+const SECTIONS = [
+  { id: "personaggi", title: "Personaggi", hint: "Schede, creazione, PX, PNG, oggetti e draghi" },
+  { id: "utenti", title: "Utenti e staff", hint: "Account, ruoli, iscrizioni, accessi e log" },
+  { id: "gioco", title: "Gioco e chat", hint: "Chat, dadi e spie" },
+  { id: "mondo", title: "Mondo", hint: "Mappe, data, meteo e viaggi" },
+  { id: "casate", title: "Casate ed economia", hint: "Casate, feudi, commerci ed eserciti" },
+  { id: "sito", title: "Sito", hint: "Manutenzione" },
+] as const;
+
 // Pannelli di gestione: ognuno compare solo a chi ha il relativo permesso
-const PANELS = [
+const PANELS: {
+  section: (typeof SECTIONS)[number]["id"];
+  permission: string | string[];
+  href: string;
+  title: string;
+  description: string;
+}[] = [
   {
     permission: "gestione.ruoli",
+    section: "utenti",
     href: "/gestione/ruoli",
     title: "Ruoli & Permessi",
     description:
@@ -14,12 +31,14 @@ const PANELS = [
   },
   {
     permission: "utenti.gestire",
+    section: "utenti",
     href: "/gestione/utenti",
     title: "Utenti",
     description: "Modifica, ban ed eliminazione degli account.",
   },
   {
     permission: "manutenzione.sito",
+    section: "sito",
     href: "/gestione/manutenzione",
     title: "Manutenzione",
     description:
@@ -27,12 +46,14 @@ const PANELS = [
   },
   {
     permission: "iscrizioni.gestire",
+    section: "utenti",
     href: "/gestione/iscrizioni",
     title: "Iscrizioni",
     description: "Apri e chiudi le iscrizioni: con le iscrizioni chiuse il pulsante Registrati della home è disattivato.",
   },
   {
     permission: ["chat.log", "messaggi.log"],
+    section: "utenti",
     href: "/gestione/log",
     title: "Log",
     description:
@@ -40,12 +61,14 @@ const PANELS = [
   },
   {
     permission: "gestione.accessi",
+    section: "utenti",
     href: "/gestione/accessi",
     title: "Registro accessi",
     description: "IP di accesso, controllo VPN e IP condivisi tra account.",
   },
   {
     permission: "casate.gestire",
+    section: "casate",
     href: "/gestione/casate",
     title: "Casate",
     description:
@@ -53,12 +76,14 @@ const PANELS = [
   },
   {
     permission: "px.assegnare",
+    section: "personaggi",
     href: "/gestione/px",
     title: "Assegna PX",
     description: "Dai PX a uno o più personaggi, con il motivo: si aggiungono a quelli che hanno e arriva un messaggio di SISTEMA.",
   },
   {
     permission: "draghi.gestire",
+    section: "personaggi",
     href: "/gestione/draghi",
     title: "Draghi",
     description:
@@ -66,6 +91,7 @@ const PANELS = [
   },
   {
     permission: "meteo.gestire",
+    section: "mondo",
     href: "/gestione/meteo",
     title: "Meteo",
     description:
@@ -73,6 +99,7 @@ const PANELS = [
   },
   {
     permission: "economia.gestire",
+    section: "casate",
     href: "/gestione/commerci",
     title: "Commerci",
     description:
@@ -80,6 +107,7 @@ const PANELS = [
   },
   {
     permission: "economia.gestire",
+    section: "casate",
     href: "/gestione/economia",
     title: "Economia",
     description:
@@ -87,6 +115,7 @@ const PANELS = [
   },
   {
     permission: "eserciti.gestire",
+    section: "casate",
     href: "/gestione/eserciti",
     title: "Eserciti",
     description:
@@ -94,6 +123,7 @@ const PANELS = [
   },
   {
     permission: "oggetti.gestire",
+    section: "personaggi",
     href: "/gestione/oggetti",
     title: "Oggetti",
     description:
@@ -101,6 +131,7 @@ const PANELS = [
   },
   {
     permission: "creazione.gestire",
+    section: "personaggi",
     href: "/gestione/creazione",
     title: "Creazione personaggio",
     description:
@@ -108,6 +139,7 @@ const PANELS = [
   },
   {
     permission: "dadi.gestire",
+    section: "gioco",
     href: "/gestione/dadi",
     title: "Dadi",
     description:
@@ -115,6 +147,7 @@ const PANELS = [
   },
   {
     permission: "regole.gestire",
+    section: "personaggi",
     href: "/gestione/salute",
     title: "Salute, ferite e peso",
     description:
@@ -122,6 +155,7 @@ const PANELS = [
   },
   {
     permission: "regole.gestire",
+    section: "personaggi",
     href: "/gestione/regole",
     title: "Statistiche, abilità e tratti",
     description:
@@ -129,6 +163,7 @@ const PANELS = [
   },
   {
     permission: "viaggi.gestire",
+    section: "mondo",
     href: "/gestione/viaggi",
     title: "Viaggi",
     description:
@@ -136,6 +171,7 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
+    section: "mondo",
     href: "/gestione/data",
     title: "Data di gioco",
     description:
@@ -143,18 +179,21 @@ const PANELS = [
   },
   {
     permission: ["chat.narrazione", "chat.moderare"],
+    section: "gioco",
     href: "/gestione/spie",
     title: "Spie",
     description: "Missioni delle spie dei personaggi: richieste, esito del dado, rapporto per il giocatore, spie catturate, regole e costi.",
   },
   {
     permission: "png.gestire",
+    section: "personaggi",
     href: "/gestione/png",
     title: "PNG",
     description: "Anagrafe dei personaggi non giocanti: crearli con la stessa scheda dei PG e usarli nelle chat.",
   },
   {
     permission: "mondo.gestire",
+    section: "gioco",
     href: "/gestione/chat",
     title: "Chat",
     description:
@@ -162,6 +201,7 @@ const PANELS = [
   },
   {
     permission: "mondo.gestire",
+    section: "mondo",
     href: "/gestione/mondo",
     title: "Gestione mondo",
     description:
@@ -205,33 +245,36 @@ export default async function GestionePage() {
         </p>
       )}
 
-      <ul className="grid gap-4 sm:grid-cols-2">
-        {visible.map((panel) => (
-          <li key={panel.title}>
-            {panel.href ? (
-              <Link
-                href={panel.href}
-                className="block h-full rounded-md border border-border bg-black/50 p-5 transition hover:border-accent hover:bg-blood/10"
-              >
-                <h2 className="font-serif text-xl text-accent">
-                  {panel.title}
-                </h2>
-                <p className="mt-2 text-sm text-muted">{panel.description}</p>
-              </Link>
-            ) : (
-              <div className="h-full rounded-md border border-border/60 bg-black/30 p-5 opacity-60">
-                <h2 className="font-serif text-xl">
-                  {panel.title}{" "}
-                  <span className="ml-1 rounded border border-border px-1.5 py-0.5 align-middle text-[0.625rem] tracking-wider uppercase">
-                    in arrivo
-                  </span>
-                </h2>
-                <p className="mt-2 text-sm text-muted">{panel.description}</p>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      {/* Elenco diviso per sezioni: titolo e, sotto, la descrizione */}
+      <div className="space-y-8">
+        {SECTIONS.map((sec) => {
+          const list = visible.filter((p) => p.section === sec.id);
+          if (!list.length) return null;
+          return (
+            <section key={sec.id}>
+              <h2 className="mb-1 flex flex-wrap items-baseline gap-x-3 border-b border-accent/40 pb-1.5 font-serif text-2xl tracking-wide text-foreground">
+                {sec.title}
+                <span className="font-sans text-xs tracking-normal text-muted">{sec.hint}</span>
+              </h2>
+              <ul className="divide-y divide-border/60">
+                {list.map((panel) => (
+                  <li key={panel.href}>
+                    <Link
+                      href={panel.href}
+                      className="group block px-3 py-3 transition hover:bg-blood/10"
+                    >
+                      <h3 className="font-serif text-xl text-accent group-hover:underline">
+                        {panel.title}
+                      </h3>
+                      <p className="mt-0.5 text-sm text-muted">{panel.description}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

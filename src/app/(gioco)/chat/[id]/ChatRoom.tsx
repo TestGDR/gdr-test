@@ -1082,7 +1082,7 @@ export default function ChatRoom({
             }}
           />
         )}
-        {tool === "salva" && <ChatSave room={room} messages={messages} />}
+        {tool === "salva" && <ChatSave room={room} messages={messages} characterId={myPresent?.id ?? null} />}
       </Modal>
     </div>
   );
