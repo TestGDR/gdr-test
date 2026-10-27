@@ -13,7 +13,7 @@ export type MapFeature = {
   color: string;
   place_type: PlaceType | RouteType | null; // tipo di luogo (luoghi) o di percorso (linee)
   house_id: string | null;
-  geometry: Point | Point[];
+  geometry: Point | Point[] | Point[][]; // luogo: un punto; percorso: una linea; area: uno o piu' pezzi
 };
 
 export type PlaceType =

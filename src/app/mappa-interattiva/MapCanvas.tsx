@@ -6,6 +6,7 @@ import "@geoman-io/leaflet-geoman-free";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
+import { geometryOf, pointInArea, ringArea, ringsOf, splitArea, traceLand } from "./geo-tools";
 import {
   CASTLE_TYPES,
   KIND_LABEL,
@@ -46,6 +47,14 @@ function placeIcon(f: Pick<MapFeature, "color" | "place_type">, selected = false
     : `<span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:9999px;background:${c};border:2px solid ${ring};color:#1a120c;font:700 11px/1 Georgia,serif">${esc(PLACE_TYPES.find((p) => p.id === type)?.letter ?? "•")}</span>`;
   return L.divIcon({ html, className: "map-place-icon", iconSize: [big, big], iconAnchor: [big / 2, big / 2] });
 }
+function outerRings(layer: L.Polygon): Point[][] {
+  const ll = layer.getLatLngs() as unknown;
+  const a = ll as L.LatLng[] | L.LatLng[][] | L.LatLng[][][];
+  if (a[0] instanceof L.LatLng) return [(a as L.LatLng[]).map(toPt)];
+  const b = a as L.LatLng[][] | L.LatLng[][][];
+  if (b[0][0] instanceof L.LatLng) return [(b as L.LatLng[][])[0].map(toPt)];
+  return (b as L.LatLng[][][]).map((p) => p[0].map(toPt));
+}
 const isCastle = (f: MapFeature) => f.kind === "luogo" && CASTLE_TYPES.includes(f.place_type ?? "castello");
 const routeOf = (f: Pick<MapFeature, "place_type">) => ROUTE_TYPES.find((r) => r.id === f.place_type) ?? ROUTE_TYPES[0];
 const typeLabel = (f: MapFeature) =>
@@ -85,6 +94,22 @@ export default function MapCanvas({
   const [q, setQ] = useState("");
   const [bgUrl, setBgUrl] = useState(initialSettings.image_url ?? "");
   const [bgOpen, setBgOpen] = useState(!initialSettings.image_url && canEdit);
+  // bacchetta: il prossimo clic sulla terra ne prende la costa
+  const [wand, setWand] = useState(false);
+  const wandRef = useRef(false);
+  // divisione: area da dividere con la linea, poi i pezzi tra cui scegliere la parte nuova
+  const splitRef = useRef<string | null>(null);
+  const [splitting, setSplitting] = useState<string | null>(null);
+  const [pieces, setPieces] = useState<{ id: string; rings: Point[][] } | null>(null);
+  const piecesRef = useRef<L.LayerGroup | null>(null);
+  const draftRef = useRef<L.LayerGroup | null>(null); // anteprima di cio' che si sta per salvare
+  const settingsRef = useRef(initialSettings);
+  const traceRef = useRef<(p: Point) => void>(() => {});
+  const splitDoneRef = useRef<(line: Point[]) => void>(() => {});
+  const chooseRef = useRef<(i: number) => void>(() => {});
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // --- Mappa (una volta) ---------------------------------------------------
   useEffect(() => {
@@ -98,8 +123,14 @@ export default function MapCanvas({
       attributionControl: false,
     });
     mapRef.current = map;
+    fitted.current = false; // mappa nuova: va inquadrata
     groupRef.current = L.layerGroup().addTo(map);
-    map.on("click", () => setSelected(null));
+    piecesRef.current = L.layerGroup().addTo(map);
+    draftRef.current = L.layerGroup().addTo(map);
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      if (wandRef.current) return traceRef.current(toPt(e.latlng));
+      setSelected(null);
+    });
 
     if (canEdit) {
       map.pm.setLang("it");
@@ -122,6 +153,11 @@ export default function MapCanvas({
       // disegnato un elemento nuovo: si apre il modulo per nome e descrizione
       map.on("pm:create", (e) => {
         const layer = e.layer as L.Layer;
+        // linea per dividere un'area
+        if (splitRef.current && e.shape === "Line") {
+          map.removeLayer(layer);
+          return splitDoneRef.current(((layer as L.Polyline).getLatLngs() as L.LatLng[]).map(toPt));
+        }
         let kind: FeatureKind;
         let geometry: Point | Point[];
         if (e.shape === "Marker") {
@@ -200,7 +236,7 @@ export default function MapCanvas({
               className: "map-label map-label-place",
             });
         } else if (f.kind === "confine") {
-          layer = L.polygon(f.geometry as Point[], {
+          layer = L.polygon(ringsOf(f.geometry).map((r) => [r]), {
             color: f.color,
             weight: sel ? 4 : 2,
             fillColor: f.color,
@@ -218,6 +254,8 @@ export default function MapCanvas({
           if (f.name) (layer as L.Polyline).bindTooltip(esc(f.name), { sticky: true, className: "map-label" });
         }
         layer.on("click", (e) => {
+          // con la bacchetta il clic passa alla mappa (si traccia la costa anche sopra un'area)
+          if (wandRef.current) return;
           L.DomEvent.stopPropagation(e);
           setDraft(null);
           setSelected(f.id);
@@ -274,7 +312,7 @@ export default function MapCanvas({
       f.kind === "luogo"
         ? toPt((layer as L.Marker).getLatLng())
         : f.kind === "confine"
-          ? ((layer as L.Polygon).getLatLngs()[0] as L.LatLng[]).map(toPt)
+          ? geometryOf(outerRings(layer as L.Polygon))
           : ((layer as L.Polyline).getLatLngs() as L.LatLng[]).map(toPt);
     setBusy(true);
     const { error } = await supabase
@@ -293,6 +331,133 @@ export default function MapCanvas({
     setShaping(null);
     setFeatures((x) => [...x]); // ridisegna com'era
   }
+
+  // --- Bacchetta: costa presa dall'immagine ------------------------------
+  const traceAt = async (p: Point) => {
+    const s = settingsRef.current;
+    wandRef.current = false;
+    setWand(false);
+    if (!s.image_url) return setMsg({ ok: false, text: "Prima metti l'immagine di sfondo." });
+    setBusy(true);
+    setMsg({ ok: true, text: "Sto seguendo la costa..." });
+    const r = await traceLand(s.image_url, s.width, s.height, p);
+    setBusy(false);
+    if ("error" in r) return setMsg({ ok: false, text: r.error });
+    setMsg(null);
+    setSelected(null);
+    setDraft({
+      kind: "confine",
+      name: "",
+      description: "",
+      color: "#3b6ea8",
+      place_type: null,
+      house_id: null,
+      geometry: r.ring,
+    });
+  };
+
+  // --- Dividere un'area con una linea --------------------------------------
+  function startSplit(id: string) {
+    const map = mapRef.current;
+    if (!map) return;
+    splitRef.current = id;
+    setSplitting(id);
+    setMsg(null);
+    map.pm.enableDraw("Line", { snappable: true });
+  }
+  function cancelSplit() {
+    splitRef.current = null;
+    setSplitting(null);
+    setPieces(null);
+    mapRef.current?.pm.disableDraw();
+    piecesRef.current?.clearLayers();
+  }
+  const onSplitLine = (line: Point[]) => {
+    const id = splitRef.current;
+    splitRef.current = null;
+    setSplitting(null);
+    const f = features.find((x) => x.id === id);
+    if (!f) return;
+    const parts = splitArea(ringsOf(f.geometry), line);
+    const before = ringsOf(f.geometry).length;
+    if (parts.length <= before)
+      return setMsg({ ok: false, text: "La linea deve attraversare tutta l'area, da un bordo all'altro: riprova." });
+    setPieces({ id: f.id, rings: parts });
+  };
+  // anteprima tratteggiata dell'elemento nuovo (non ancora salvato), con il colore scelto
+  useEffect(() => {
+    const group = draftRef.current;
+    if (!group) return;
+    group.clearLayers();
+    if (!draft || draft.id) return;
+    const style = { color: draft.color, weight: 3, dashArray: "6 5", interactive: false };
+    if (draft.kind === "confine")
+      L.polygon(ringsOf(draft.geometry).map((r) => [r]), { ...style, fillColor: draft.color, fillOpacity: 0.25 }).addTo(group);
+    else if (draft.kind === "strada") L.polyline(draft.geometry as Point[], style).addTo(group);
+    else L.marker(draft.geometry as Point, { icon: placeIcon(draft), interactive: false }).addTo(group);
+  }, [draft]);
+
+  // pezzi da scegliere: colorati a turno, cliccabili
+  useEffect(() => {
+    const group = piecesRef.current;
+    if (!group) return;
+    group.clearLayers();
+    if (!pieces) return;
+    const colors = ["#e0a33a", "#4f9d69", "#b04a8e", "#3b8fc4", "#c4543b", "#8a7bd1"];
+    pieces.rings.forEach((r, i) => {
+      const poly = L.polygon([r], { color: "#fff3c4", weight: 2, fillColor: colors[i % colors.length], fillOpacity: 0.55 });
+      poly.on("click", (e) => {
+        L.DomEvent.stopPropagation(e);
+        chooseRef.current(i);
+      });
+      poly.addTo(group);
+    });
+  }, [pieces]);
+
+  // la parte cliccata diventa una nuova area; il resto resta all'area di prima
+  async function chooseNewPart(i: number) {
+    if (!pieces) return;
+    const f = features.find((x) => x.id === pieces.id);
+    if (!f) return cancelSplit();
+    const part = pieces.rings[i];
+    const rest = pieces.rings.filter((_, k) => k !== i);
+    setBusy(true);
+    const now = new Date().toISOString();
+    const up = await supabase.from("map_features").update({ geometry: geometryOf(rest), updated_at: now }).eq("id", f.id);
+    const ins = up.error
+      ? up
+      : await supabase
+          .from("map_features")
+          .insert({
+            kind: "confine",
+            name: "Nuova area",
+            description: "",
+            color: f.color === "#b04a8e" ? "#3b8fc4" : "#b04a8e",
+            house_id: null,
+            place_type: null,
+            geometry: part,
+          })
+          .select("*")
+          .single();
+    setBusy(false);
+    setPieces(null);
+    piecesRef.current?.clearLayers();
+    if (ins.error) return setMsg({ ok: false, text: "Divisione non salvata." });
+    await reload();
+    const created = (ins as { data: MapFeature | null }).data;
+    if (created) {
+      setSelected(null);
+      setDraft({ ...created }); // subito nome, colore e casata della nuova area
+      setMsg({ ok: true, text: "Area divisa: dai un nome alla nuova area." });
+    }
+  }
+
+  // gli eventi della mappa usano sempre le funzioni aggiornate
+  useEffect(() => {
+    traceRef.current = traceAt;
+    splitDoneRef.current = onSplitLine;
+    chooseRef.current = chooseNewPart;
+  });
 
   async function remove(f: MapFeature) {
     if (!window.confirm(`Togliere dalla mappa "${f.name || KIND_LABEL[f.kind]}"?`)) return;
@@ -349,6 +514,22 @@ export default function MapCanvas({
     .filter((f) => f.name && (view === "politica" || isCastle(f)))
     .filter((f) => !text || f.name.toLowerCase().includes(text) || f.description.toLowerCase().includes(text))
     .sort((a, b) => a.name.localeCompare(b.name, "it"));
+  // gruppi: ogni luogo nell'area (confine) che lo contiene, la piu' piccola se sono una dentro l'altra
+  const areas = features
+    .filter((f) => f.kind === "confine")
+    .map((f) => ({ f, rings: ringsOf(f.geometry), size: ringsOf(f.geometry).reduce((a, r) => a + ringArea(r), 0) }))
+    .sort((a, b) => a.size - b.size);
+  const areaOf = (f: MapFeature) =>
+    f.kind === "luogo" ? (areas.find((a) => pointInArea(f.geometry as Point, a.rings))?.f.id ?? null) : null;
+  const groups = [
+    ...areas
+      .map((a) => ({ id: a.f.id, area: a.f as MapFeature | null, items: listed.filter((f) => f.kind === "luogo" && areaOf(f) === a.f.id) }))
+      .filter((g) => g.items.length || (view === "politica" && listed.some((f) => f.id === g.id)))
+      .sort((a, b) => (a.area?.name ?? "").localeCompare(b.area?.name ?? "", "it")),
+    { id: "fuori", area: null, items: listed.filter((f) => f.kind === "luogo" && !areaOf(f)) },
+    { id: "percorsi", area: null, items: listed.filter((f) => f.kind === "strada") },
+  ].filter((g) => g.area || g.items.length);
+  const [closed, setClosed] = useState<Set<string>>(new Set());
   const label = "mb-1 block text-[0.65rem] tracking-[0.14em] text-muted uppercase";
 
   return (
@@ -375,6 +556,18 @@ export default function MapCanvas({
             </button>
           ))}
         </div>
+        {(splitting || pieces) && (
+          <div className="absolute bottom-4 left-1/2 z-[1000] flex w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-center gap-2 border border-accent/60 bg-black/90 px-3 py-2 text-sm shadow-xl">
+            <span className="min-w-0 flex-1">
+              {pieces
+                ? "Clicca la parte che diventa una nuova area (il resto rimane all'area di prima)."
+                : "Disegna la linea di divisione: parti da fuori dell'area, attraversala e finisci fuori (doppio clic o clic sull'ultimo punto per finire)."}
+            </span>
+            <button type="button" onClick={cancelSplit} className="btn-ghost px-3 py-1 text-xs">
+              Annulla
+            </button>
+          </div>
+        )}
         {shaping && (
           <div className="absolute bottom-4 left-1/2 z-[1000] flex -translate-x-1/2 flex-wrap items-center gap-2 border border-accent/60 bg-black/90 px-3 py-2 text-sm shadow-xl">
             <span>Trascina i punti per cambiare la forma (o il segnaposto per spostarlo).</span>
@@ -406,6 +599,23 @@ export default function MapCanvas({
               segnaposto aggiunge un <strong>luogo</strong> (capitale, castello, fortezza, città, luogo d&apos;interesse…), la
               linea un <strong>percorso</strong> (strada, sentiero o rotta marittima), il poligono un{" "}
               <strong>confine</strong> (clicca il primo punto per chiuderlo). Poi scrivi nome e descrizione qui.
+            </p>
+            <button
+              type="button"
+              disabled={busy || !settings.image_url}
+              onClick={() => {
+                wandRef.current = !wand;
+                setWand(!wand);
+                setMsg(wand ? null : { ok: true, text: "Clicca sulla terra: prendo la costa da sola." });
+              }}
+              className={`block w-full border px-3 py-1.5 text-left text-xs ${wand ? "border-accent bg-blood/30 text-accent" : "border-border hover:border-accent hover:text-accent"} disabled:opacity-40`}
+              title={settings.image_url ? undefined : "Prima metti l'immagine di sfondo"}
+            >
+              🪄 {wand ? "Bacchetta attiva: clicca sulla terra (clicca qui per annullare)" : "Traccia la costa con la bacchetta"}
+            </button>
+            <p>
+              Con la bacchetta clicchi sulla terra e il contorno diventa un&apos;area (es. tutto il continente). Poi
+              selezioni l&apos;area e usi <strong>Dividi con una linea</strong> per creare le aree interne.
             </p>
             <button type="button" onClick={() => setBgOpen((o) => !o)} className="underline hover:text-accent">
               {bgOpen ? "Chiudi lo sfondo" : "Cambia l'immagine di sfondo"}
@@ -558,6 +768,11 @@ export default function MapCanvas({
                 <button type="button" onClick={() => startShape(sel.id)} className="text-muted underline hover:text-accent">
                   {sel.kind === "luogo" ? "Sposta" : "Modifica forma"}
                 </button>
+                {sel.kind === "confine" && (
+                  <button type="button" onClick={() => startSplit(sel.id)} className="text-muted underline hover:text-accent">
+                    Dividi con una linea
+                  </button>
+                )}
                 <button type="button" onClick={() => remove(sel)} className="text-red-400 underline hover:text-red-300">
                   Togli
                 </button>
@@ -578,21 +793,61 @@ export default function MapCanvas({
                 {features.length === 0 ? "La mappa è ancora vuota." : "Nessun elemento trovato."}
               </p>
             ) : (
-              <ul className="divide-y divide-border/40">
-                {listed.map((f) => (
-                  <li key={f.id}>
-                    <button
-                      type="button"
-                      onClick={() => focus(f)}
-                      className="flex w-full items-center gap-2 py-1.5 text-left text-sm hover:text-accent"
-                    >
-                      <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
-                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                      <span className="shrink-0 text-[0.65rem] text-muted uppercase">{typeLabel(f)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-2">
+                {groups.map((g) => {
+                  const open = !closed.has(g.id) || !!text;
+                  const title = g.area ? g.area.name || "Area senza nome" : g.id === "fuori" ? "Fuori dalle aree" : "Percorsi";
+                  return (
+                    <section key={g.id} className="border border-border/40">
+                      <div className="flex items-center gap-2 bg-black/40 px-2 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setClosed((s) => {
+                              const n = new Set(s);
+                              if (n.has(g.id)) n.delete(g.id);
+                              else n.add(g.id);
+                              return n;
+                            })
+                          }
+                          aria-expanded={open}
+                          className="w-4 text-xs text-muted"
+                        >
+                          {open ? "▾" : "▸"}
+                        </button>
+                        {g.area && (
+                          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: g.area.color }} />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => (g.area ? focus(g.area) : undefined)}
+                          className="min-w-0 flex-1 truncate text-left font-serif text-sm tracking-wide text-accent"
+                        >
+                          {title}
+                        </button>
+                        <span className="text-[0.65rem] text-muted">{g.items.length}</span>
+                      </div>
+                      {open && g.items.length > 0 && (
+                        <ul className="divide-y divide-border/30 px-2">
+                          {g.items.map((f) => (
+                            <li key={f.id}>
+                              <button
+                                type="button"
+                                onClick={() => focus(f)}
+                                className="flex w-full items-center gap-2 py-1 text-left text-sm hover:text-accent"
+                              >
+                                <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: f.color }} />
+                                <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                                <span className="shrink-0 text-[0.6rem] text-muted uppercase">{typeLabel(f)}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
             )}
           </section>
         )}

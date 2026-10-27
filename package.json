@@ -24,6 +24,7 @@
     "marked": "^18.0.14",
     "next": "16.4.3",
     "nodemailer": "^10.0.13",
+    "polygon-clipping": "^0.15.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
