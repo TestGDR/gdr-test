@@ -7,8 +7,11 @@ import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
 import {
+  CASTLE_TYPES,
   KIND_LABEL,
   PLACE_TYPES,
+  ROUTE_TYPES,
+  type RouteType,
   type FeatureKind,
   type House,
   type MapFeature,
@@ -24,16 +27,33 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const toPt = (ll: L.LatLng): Point => [Math.round(ll.lat * 10) / 10, Math.round(ll.lng * 10) / 10];
 const DEFAULT_COLOR: Record<FeatureKind, string> = { confine: "#b8322a", strada: "#d8c39a", luogo: "#c9a45c" };
 
-// Icona di un luogo: torre per i castelli, cerchio con l'iniziale per gli altri
+// Disegni delle icone (24x24): capitale con la corona, castello, fortezza con le mura, stella per i luoghi d'interesse
+const SHAPES: Record<string, string> = {
+  castello: "M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12h-6v-5a2 2 0 0 0-4 0v5z",
+  capitale: "M3 21V11h3V8h2v3h2V5l2-3 2 3v6h2V8h2v3h3v10h-7v-4a2 2 0 0 0-4 0v4z",
+  fortezza: "M2 21V10h2V7h2v3h2V7h2v3h4V7h2v3h2V7h2v3h2v11h-7v-5a3 3 0 0 0-6 0v5z",
+  interesse: "M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z",
+};
+
+// Icona di un luogo: disegno per capitali, castelli, fortezze e luoghi d'interesse; cerchio con l'iniziale per gli altri
 function placeIcon(f: Pick<MapFeature, "color" | "place_type">, selected = false) {
   const c = f.color;
   const ring = selected ? "#fff3c4" : "#1a120c";
-  const html =
-    f.place_type === "castello" || !f.place_type
-      ? `<svg viewBox="0 0 24 24" width="24" height="24"><path d="M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12h-6v-5a2 2 0 0 0-4 0v5z" fill="${c}" stroke="${ring}" stroke-width="1.5"/></svg>`
-      : `<span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:9999px;background:${c};border:2px solid ${ring};color:#1a120c;font:700 11px/1 Georgia,serif">${esc(PLACE_TYPES.find((p) => p.id === f.place_type)?.letter ?? "•")}</span>`;
-  return L.divIcon({ html, className: "map-place-icon", iconSize: [24, 24], iconAnchor: [12, 12] });
+  const type = f.place_type ?? "castello";
+  const big = type === "capitale" ? 30 : 24;
+  const html = SHAPES[type]
+    ? `<svg viewBox="0 0 24 24" width="${big}" height="${big}"><path d="${SHAPES[type]}" fill="${c}" stroke="${ring}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
+    : `<span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:9999px;background:${c};border:2px solid ${ring};color:#1a120c;font:700 11px/1 Georgia,serif">${esc(PLACE_TYPES.find((p) => p.id === type)?.letter ?? "•")}</span>`;
+  return L.divIcon({ html, className: "map-place-icon", iconSize: [big, big], iconAnchor: [big / 2, big / 2] });
 }
+const isCastle = (f: MapFeature) => f.kind === "luogo" && CASTLE_TYPES.includes(f.place_type ?? "castello");
+const routeOf = (f: Pick<MapFeature, "place_type">) => ROUTE_TYPES.find((r) => r.id === f.place_type) ?? ROUTE_TYPES[0];
+const typeLabel = (f: MapFeature) =>
+  f.kind === "luogo"
+    ? (PLACE_TYPES.find((p) => p.id === f.place_type)?.label ?? "Luogo")
+    : f.kind === "strada"
+      ? routeOf(f).label
+      : KIND_LABEL[f.kind];
 
 export default function MapCanvas({
   canEdit,
@@ -122,7 +142,7 @@ export default function MapCanvas({
           name: "",
           description: "",
           color: DEFAULT_COLOR[kind],
-          place_type: kind === "luogo" ? "castello" : null,
+          place_type: kind === "luogo" ? "castello" : kind === "strada" ? "strada" : null,
           house_id: null,
           geometry,
         });
@@ -167,7 +187,7 @@ export default function MapCanvas({
     for (const kind of order)
       for (const f of features.filter((x) => x.kind === kind)) {
         // vista "castelli": solo i castelli, senza confini e strade
-        if (view === "castelli" && !(f.kind === "luogo" && (f.place_type ?? "castello") === "castello")) continue;
+        if (view === "castelli" && !isCastle(f)) continue;
         const sel = f.id === selected;
         let layer: L.Layer;
         if (f.kind === "luogo") {
@@ -193,7 +213,8 @@ export default function MapCanvas({
               className: "map-label map-label-border",
             });
         } else {
-          layer = L.polyline(f.geometry as Point[], { color: f.color, weight: sel ? 5 : 3, dashArray: "8 6" });
+          const r = routeOf(f);
+          layer = L.polyline(f.geometry as Point[], { color: f.color, weight: r.weight + (sel ? 2 : 0), dashArray: r.dash });
           if (f.name) (layer as L.Polyline).bindTooltip(esc(f.name), { sticky: true, className: "map-label" });
         }
         layer.on("click", (e) => {
@@ -221,7 +242,7 @@ export default function MapCanvas({
       name: draft.name.trim(),
       description: draft.description.trim(),
       color: draft.color,
-      place_type: draft.kind === "luogo" ? draft.place_type : null,
+      place_type: draft.kind === "confine" ? null : draft.place_type,
       house_id: draft.kind === "confine" ? draft.house_id : draft.kind === "luogo" ? draft.house_id : null,
       geometry: draft.geometry,
       updated_at: new Date().toISOString(),
@@ -325,7 +346,7 @@ export default function MapCanvas({
   const houseOf = (id: string | null) => houses.find((h) => h.id === id) ?? null;
   const text = q.trim().toLowerCase();
   const listed = features
-    .filter((f) => f.name && (view === "politica" || (f.kind === "luogo" && (f.place_type ?? "castello") === "castello")))
+    .filter((f) => f.name && (view === "politica" || isCastle(f)))
     .filter((f) => !text || f.name.toLowerCase().includes(text) || f.description.toLowerCase().includes(text))
     .sort((a, b) => a.name.localeCompare(b.name, "it"));
   const label = "mb-1 block text-[0.65rem] tracking-[0.14em] text-muted uppercase";
@@ -372,7 +393,7 @@ export default function MapCanvas({
         <header>
           <h1 className="font-serif text-2xl tracking-wide text-accent">Mappa di Westeros</h1>
           <p className="text-xs text-muted">
-            {view === "politica" ? "Vista politica: confini, strade e luoghi." : "Vista dei castelli."} Usa + e − (o la
+            {view === "politica" ? "Vista politica: confini, percorsi e luoghi." : "Vista dei castelli: capitali, castelli e fortezze."} Usa + e − (o la
             rotella) per avvicinarti e allontanarti.
           </p>
         </header>
@@ -382,7 +403,8 @@ export default function MapCanvas({
           <section className="space-y-2 border border-border/60 p-3 text-xs text-muted">
             <p>
               <strong className="text-foreground">Per disegnare</strong> usa i pulsanti a sinistra della mappa: il
-              segnaposto aggiunge un <strong>luogo</strong>, la linea una <strong>strada</strong>, il poligono un{" "}
+              segnaposto aggiunge un <strong>luogo</strong> (capitale, castello, fortezza, città, luogo d&apos;interesse…), la
+              linea un <strong>percorso</strong> (strada, sentiero o rotta marittima), il poligono un{" "}
               <strong>confine</strong> (clicca il primo punto per chiuderlo). Poi scrivi nome e descrizione qui.
             </p>
             <button type="button" onClick={() => setBgOpen((o) => !o)} className="underline hover:text-accent">
@@ -439,6 +461,22 @@ export default function MapCanvas({
                 </select>
               </label>
             )}
+            {draft.kind === "strada" && (
+              <label className="block">
+                <span className={label}>Tipo di percorso</span>
+                <select
+                  value={draft.place_type ?? "strada"}
+                  onChange={(e) => setDraft({ ...draft, place_type: e.target.value as RouteType })}
+                  className="input py-1.5"
+                >
+                  {ROUTE_TYPES.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {draft.kind !== "strada" && (
               <label className="block">
                 <span className={label}>Casata (facoltativa)</span>
@@ -489,11 +527,7 @@ export default function MapCanvas({
             <button type="button" onClick={() => setSelected(null)} className="text-xs text-muted hover:text-accent">
               ← Elenco
             </button>
-            <p className="text-[0.65rem] tracking-[0.14em] text-[#d8c39a] uppercase">
-              {sel.kind === "luogo"
-                ? (PLACE_TYPES.find((p) => p.id === sel.place_type)?.label ?? "Luogo")
-                : KIND_LABEL[sel.kind]}
-            </p>
+            <p className="text-[0.65rem] tracking-[0.14em] text-[#d8c39a] uppercase">{typeLabel(sel)}</p>
             <h2 className="flex items-center gap-2 font-serif text-xl leading-tight text-accent">
               <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: sel.color }} />
               {sel.name || "Senza nome"}
@@ -554,11 +588,7 @@ export default function MapCanvas({
                     >
                       <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
                       <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                      <span className="shrink-0 text-[0.65rem] text-muted uppercase">
-                        {f.kind === "luogo"
-                          ? (PLACE_TYPES.find((p) => p.id === f.place_type)?.label ?? "Luogo")
-                          : KIND_LABEL[f.kind]}
-                      </span>
+                      <span className="shrink-0 text-[0.65rem] text-muted uppercase">{typeLabel(f)}</span>
                     </button>
                   </li>
                 ))}
