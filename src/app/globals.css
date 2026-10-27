@@ -974,3 +974,65 @@ textarea.input {
 .leaflet-container.map-interattiva {
   background: #1a140f;
 }
+
+/* Mappa interattiva: fumetto dei luoghi */
+.map-popup .leaflet-popup-content-wrapper {
+  background: #1d1611;
+  color: #e8d8b4;
+  border: 1px solid #7a5530;
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.6);
+}
+.map-popup .leaflet-popup-tip {
+  background: #1d1611;
+  border: 1px solid #7a5530;
+}
+.map-popup .leaflet-popup-content {
+  margin: 10px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.map-popup a.leaflet-popup-close-button {
+  color: #b8a283;
+}
+.map-popup-body p {
+  margin: 0;
+}
+.map-popup-type {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d8c39a;
+}
+.map-popup-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  color: #c9a45c;
+  margin-bottom: 4px !important;
+}
+.map-popup-house {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px !important;
+}
+.map-popup-house img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.map-popup-text {
+  white-space: pre-line;
+  color: #b8a283;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.map-popup-edit {
+  margin-top: 8px;
+  font-size: 11px;
+  text-decoration: underline;
+  color: #b8a283;
+}
+.map-popup-edit:hover {
+  color: #c9a45c;
+}

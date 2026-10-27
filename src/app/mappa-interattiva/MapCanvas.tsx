@@ -97,6 +97,13 @@ export default function MapCanvas({
   // bacchetta: il prossimo clic sulla terra ne prende la costa
   const [wand, setWand] = useState(false);
   const wandRef = useRef(false);
+  // bacchetta per aggiungere pezzi (isole) a un'area gia' salvata
+  const [addTo, setAddTo] = useState<string | null>(null);
+  const setWandOn = (on: boolean) => setWand(on);
+  // il clic sulla mappa legge la bacchetta da qui
+  useEffect(() => {
+    wandRef.current = wand;
+  }, [wand]);
   // divisione: area da dividere con la linea, poi i pezzi tra cui scegliere la parte nuova
   const splitRef = useRef<string | null>(null);
   const [splitting, setSplitting] = useState<string | null>(null);
@@ -127,6 +134,14 @@ export default function MapCanvas({
     groupRef.current = L.layerGroup().addTo(map);
     piecesRef.current = L.layerGroup().addTo(map);
     draftRef.current = L.layerGroup().addTo(map);
+    map.on("popupopen", (e: L.PopupEvent) => {
+      const btn = e.popup.getElement()?.querySelector<HTMLButtonElement>("[data-edit]");
+      btn?.addEventListener("click", () => {
+        map.closePopup();
+        setDraft(null);
+        setSelected(btn.dataset.edit ?? null);
+      });
+    });
     map.on("click", (e: L.LeafletMouseEvent) => {
       if (wandRef.current) return traceRef.current(toPt(e.latlng));
       setSelected(null);
@@ -253,17 +268,31 @@ export default function MapCanvas({
           layer = L.polyline(f.geometry as Point[], { color: f.color, weight: r.weight + (sel ? 2 : 0), dashArray: r.dash });
           if (f.name) (layer as L.Polyline).bindTooltip(esc(f.name), { sticky: true, className: "map-label" });
         }
+        // luoghi: un fumetto con nome, tipo, casata e descrizione (lo staff ha anche "Modifica")
+        if (f.kind === "luogo") {
+          const h = houses.find((x) => x.id === f.house_id);
+          const html =
+            `<div class="map-popup-body">` +
+            `<p class="map-popup-type">${esc(typeLabel(f))}</p>` +
+            `<p class="map-popup-name">${esc(f.name || "Senza nome")}</p>` +
+            (h ? `<p class="map-popup-house">${h.sigil_url ? `<img src="${esc(h.sigil_url)}" alt="">` : ""}Casata ${esc(h.name)}</p>` : "") +
+            (f.description ? `<p class="map-popup-text">${esc(f.description)}</p>` : "") +
+            (canEdit ? `<button type="button" class="map-popup-edit" data-edit="${f.id}">Modifica</button>` : "") +
+            `</div>`;
+          (layer as L.Marker).bindPopup(html, { className: "map-popup", maxWidth: 280, minWidth: 180, offset: [0, -6] });
+        }
         layer.on("click", (e) => {
           // con la bacchetta il clic passa alla mappa (si traccia la costa anche sopra un'area)
           if (wandRef.current) return;
           L.DomEvent.stopPropagation(e);
+          if (f.kind === "luogo") return; // si apre il fumetto
           setDraft(null);
           setSelected(f.id);
         });
         layer.addTo(group);
         layersRef.current.set(f.id, layer);
       }
-  }, [features, view, selected, shaping]);
+  }, [features, view, selected, shaping, houses, canEdit]);
 
   const reload = async () => {
     const { data } = await supabase.from("map_features").select("*").order("created_at");
@@ -291,6 +320,7 @@ export default function MapCanvas({
     setBusy(false);
     if (res.error) return setMsg({ ok: false, text: "Non salvato." });
     setDraft(null);
+    setWandOn(false);
     await reload();
     setSelected(res.data.id as string);
   }
@@ -333,17 +363,36 @@ export default function MapCanvas({
   }
 
   // --- Bacchetta: costa presa dall'immagine ------------------------------
+  // ogni clic aggiunge un pezzo: la bacchetta resta attiva (continente, poi le isole...)
   const traceAt = async (p: Point) => {
     const s = settingsRef.current;
-    wandRef.current = false;
-    setWand(false);
     if (!s.image_url) return setMsg({ ok: false, text: "Prima metti l'immagine di sfondo." });
+    // pezzo gia' preso: non si ripete
+    const target = addTo ? features.find((x) => x.id === addTo) : null;
+    const taken = target ? ringsOf(target.geometry) : draft && !draft.id && draft.kind === "confine" ? ringsOf(draft.geometry) : [];
+    if (taken.length && pointInArea(p, taken)) return setMsg({ ok: false, text: "Questo pezzo è già preso: clicca un'altra isola." });
     setBusy(true);
     setMsg({ ok: true, text: "Sto seguendo la costa..." });
     const r = await traceLand(s.image_url, s.width, s.height, p);
     setBusy(false);
     if ("error" in r) return setMsg({ ok: false, text: r.error });
-    setMsg(null);
+    // pezzo in piu' per un'area gia' salvata
+    if (target) {
+      const geometry = geometryOf([...ringsOf(target.geometry), r.ring]);
+      const { error } = await supabase
+        .from("map_features")
+        .update({ geometry, updated_at: new Date().toISOString() })
+        .eq("id", target.id);
+      if (error) return setMsg({ ok: false, text: "Pezzo non salvato." });
+      await reload();
+      return setMsg({ ok: true, text: `Pezzo aggiunto a ${target.name || "l'area"}: clicca altre isole, oppure Fine.` });
+    }
+    // pezzo in piu' per l'area nuova che si sta creando
+    if (draft && !draft.id && draft.kind === "confine") {
+      setDraft({ ...draft, geometry: geometryOf([...ringsOf(draft.geometry), r.ring]) });
+      return setMsg({ ok: true, text: `Preso! L'area ha ${taken.length + 1} pezzi: clicca altre isole o salva.` });
+    }
+    setMsg({ ok: true, text: "Preso! Clicca altre isole per aggiungerle alla stessa area, oppure salva." });
     setSelected(null);
     setDraft({
       kind: "confine",
@@ -501,13 +550,22 @@ export default function MapCanvas({
     const map = mapRef.current;
     const layer = layersRef.current.get(f.id);
     setDraft(null);
-    setSelected(f.id);
+    if (f.kind !== "luogo") setSelected(f.id);
     if (!map || !layer) return;
-    if (layer instanceof L.Marker) map.setView(layer.getLatLng(), Math.max(map.getZoom(), 0));
+    if (layer instanceof L.Marker) {
+      map.setView(layer.getLatLng(), Math.max(map.getZoom(), 0));
+      layer.openPopup();
+      return;
+    }
     else map.fitBounds((layer as L.Polyline).getBounds(), { maxZoom: 1, padding: [40, 40] });
   }
 
   const sel = features.find((f) => f.id === selected) ?? null;
+  // cambiando selezione si smette di aggiungere isole all'area di prima
+  if (addTo && addTo !== selected) {
+    setAddTo(null);
+    setWand(false);
+  }
   const houseOf = (id: string | null) => houses.find((h) => h.id === id) ?? null;
   const text = q.trim().toLowerCase();
   const listed = features
@@ -604,7 +662,6 @@ export default function MapCanvas({
               type="button"
               disabled={busy || !settings.image_url}
               onClick={() => {
-                wandRef.current = !wand;
                 setWand(!wand);
                 setMsg(wand ? null : { ok: true, text: "Clicca sulla terra: prendo la costa da sola." });
               }}
@@ -727,10 +784,31 @@ export default function MapCanvas({
               <button type="button" disabled={busy} onClick={saveDraft} className="btn px-4 py-1.5 text-sm">
                 {busy ? "..." : "Salva"}
               </button>
-              <button type="button" onClick={() => setDraft(null)} className="btn-ghost px-4 py-1.5 text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(null);
+                  setWandOn(false);
+                  setMsg(null);
+                }}
+                className="btn-ghost px-4 py-1.5 text-sm"
+              >
                 Annulla
               </button>
             </div>
+            {!draft.id && draft.kind === "confine" && settings.image_url && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWandOn(!wand);
+                  setMsg(wand ? null : { ok: true, text: "Clicca le isole da aggiungere a quest'area." });
+                }}
+                className={`block w-full border px-3 py-1.5 text-left text-xs ${wand ? "border-accent bg-blood/30 text-accent" : "border-border text-muted hover:border-accent hover:text-accent"}`}
+              >
+                🪄 {wand ? "Bacchetta attiva: ogni clic sulla terra aggiunge un pezzo (clicca qui per fermarla)" : "Aggiungi altri pezzi con la bacchetta (isole)"}
+                <span className="block text-[0.65rem] text-muted">Pezzi presi: {ringsOf(draft.geometry).length}</span>
+              </button>
+            )}
           </section>
         ) : sel ? (
           <section className="space-y-2">
@@ -771,6 +849,20 @@ export default function MapCanvas({
                 {sel.kind === "confine" && (
                   <button type="button" onClick={() => startSplit(sel.id)} className="text-muted underline hover:text-accent">
                     Dividi con una linea
+                  </button>
+                )}
+                {sel.kind === "confine" && settings.image_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const on = addTo !== sel.id;
+                      setAddTo(on ? sel.id : null);
+                      setWandOn(on);
+                      setMsg(on ? { ok: true, text: "Clicca le isole da aggiungere a quest'area, poi Fine." } : null);
+                    }}
+                    className={`underline ${addTo === sel.id ? "text-accent" : "text-muted hover:text-accent"}`}
+                  >
+                    {addTo === sel.id ? "🪄 Fine (smetti di aggiungere)" : "🪄 Aggiungi isole"}
                   </button>
                 )}
                 <button type="button" onClick={() => remove(sel)} className="text-red-400 underline hover:text-red-300">
