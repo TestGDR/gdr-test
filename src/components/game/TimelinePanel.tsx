@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import RichEditor from "@/components/guide/RichEditor";
+import { cleanPlayerHtml } from "@/components/scheda/player-html";
 import { createClient } from "@/lib/supabase/client";
 import { MOONS, MOON_DAYS, gameYearNow, moonName } from "@/lib/game-date";
 
@@ -13,6 +15,29 @@ type Ev = {
   summary: string;
 };
 type Draft = { id?: string; year: string; month: string; day: string; title: string; summary: string };
+
+const SUMMARY_MAX = 20000;
+const looksHtml = (s: string) => /<[a-z][^>]*>/i.test(s);
+// testo semplice dei vecchi eventi -> paragrafi per l'editor
+const asEditorHtml = (s: string) =>
+  !s.trim() || looksHtml(s)
+    ? s
+    : s
+        .split(/\n{2,}/)
+        .map((p) => `<p>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")}</p>`)
+        .join("");
+// riassunto mostrato: HTML pulito (come aspetto e forum), o testo semplice
+function Summary({ text }: { text: string }) {
+  if (!looksHtml(text)) return <p className="mt-0.5 text-xs leading-relaxed whitespace-pre-line text-muted">{text}</p>;
+  return (
+    <div
+      className="guide-content mt-0.5 overflow-hidden text-xs leading-relaxed text-muted [contain:paint]"
+      dangerouslySetInnerHTML={{ __html: cleanPlayerHtml(text) }}
+    />
+  );
+}
+// testo senza tag, per la ricerca
+const plain = (s: string) => s.replace(/<[^>]*>/g, " ");
 
 const empty = (): Draft => ({ year: String(gameYearNow()), month: "", day: "", title: "", summary: "" });
 
@@ -62,6 +87,7 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
     const day = month && draft.day ? Number(draft.day) : null;
     if (!Number.isFinite(year) || !draft.year.trim()) return setError("Scrivi l'anno.");
     if (!draft.title.trim()) return setError("Scrivi il titolo dell'evento.");
+    if (draft.summary.length > SUMMARY_MAX) return setError(`Il racconto è troppo lungo (massimo ${SUMMARY_MAX.toLocaleString("it-IT")} caratteri).`);
     if (month && day && day > MOON_DAYS[month - 1]) return setError(`La ${moonName(month)} ha ${MOON_DAYS[month - 1]} giorni.`);
     setBusy(true);
     setError(null);
@@ -84,7 +110,7 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
 
   const text = q.trim().toLowerCase();
   const shown = (events ?? []).filter(
-    (e) => !text || e.title.toLowerCase().includes(text) || e.summary.toLowerCase().includes(text) || String(e.year).includes(text),
+    (e) => !text || e.title.toLowerCase().includes(text) || plain(e.summary).toLowerCase().includes(text) || String(e.year).includes(text),
   );
   // un titoletto per ogni anno
   const years = [...new Set(shown.map((e) => e.year))];
@@ -161,16 +187,11 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
               className="input py-1.5"
             />
           </label>
-          <label className="block">
-            <span className="mb-1 block text-xs tracking-wider text-muted uppercase">Cosa è successo</span>
-            <textarea
-              value={draft.summary}
-              maxLength={4000}
-              rows={6}
-              onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-              className="input text-sm"
-            />
-          </label>
+          <p className="mb-1 text-xs tracking-wider text-muted uppercase">Cosa è successo</p>
+          <RichEditor value={draft.summary} onChange={(v) => setDraft({ ...draft, summary: v })} scroll managePalette={false} />
+          <p className={`text-xs ${draft.summary.length > SUMMARY_MAX ? "text-red-400" : "text-muted"}`}>
+            {draft.summary.length.toLocaleString("it-IT")} / {SUMMARY_MAX.toLocaleString("it-IT")} caratteri
+          </p>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button type="button" disabled={busy} onClick={save} className="btn px-4 py-1.5 text-sm">
@@ -207,7 +228,7 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
                       />
                       <p className="text-[0.625rem] tracking-[0.14em] text-[#d8c39a] uppercase">{dateLabel(e)}</p>
                       <h4 className="font-serif text-sm leading-tight font-semibold text-foreground">{e.title}</h4>
-                      {e.summary && <p className="mt-0.5 text-xs leading-relaxed whitespace-pre-line text-muted">{e.summary}</p>}
+                      {e.summary && <Summary text={e.summary} />}
                       {canEdit && (
                         <p className="mt-1 flex gap-3 text-[0.6875rem]">
                           <button
@@ -220,7 +241,7 @@ export default function TimelinePanel({ canEdit }: { canEdit: boolean }) {
                                 month: e.month ? String(e.month) : "",
                                 day: e.day ? String(e.day) : "",
                                 title: e.title,
-                                summary: e.summary,
+                                summary: asEditorHtml(e.summary),
                               });
                             }}
                             className="text-muted hover:text-accent"

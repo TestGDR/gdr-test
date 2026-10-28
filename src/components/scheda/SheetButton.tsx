@@ -1374,6 +1374,14 @@ function RichSection({
 // impaginarlo; il testo semplice di prima si vede come sempre
 // ---------------------------------------------------------------------
 const looksHtml = (s: string) => /<[a-z][^>]*>/i.test(s);
+// testo semplice di prima -> paragrafi, cosi' l'editor non perde gli a capo
+const asEditorHtml = (s: string) =>
+  !s.trim() || looksHtml(s)
+    ? s
+    : s
+        .split(/\n{2,}/)
+        .map((p) => `<p>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")}</p>`)
+        .join("");
 
 function AppearanceView({ text }: { text: string }) {
   const clean = useMemo(
@@ -1432,7 +1440,7 @@ function AppearancePage({
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(character.appearance ?? "");
+  const [text, setText] = useState(asEditorHtml(character.appearance ?? ""));
   const { busy, error, save } = useSectionSave(character, onSaved, () =>
     setEditing(false),
   );
@@ -1446,37 +1454,21 @@ function AppearancePage({
       {editing ? (
         <div className="space-y-3">
           <p className="text-xs text-muted">
-            Puoi scrivere testo semplice oppure HTML per impaginare questa
-            pagina: colori, caratteri, riquadri e immagini (solo indirizzi
-            https). Gli stili vanno dentro i tag, per esempio{" "}
-            <code>{'<p style="color:#c9a45c">'}</code>; niente{" "}
-            <code>{"<style>"}</code>, script o moduli: vengono tolti.
+            Scrivi con l&apos;editor (grassetto, colori, caratteri, allineamento, immagini con un link https) oppure
+            passa alla modalità HTML per impaginare a mano. Script, moduli e <code>{"<style>"}</code> vengono tolti.
           </p>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={APPEARANCE_MAX}
-            rows={12}
-            spellCheck={false}
-            className="input resize-y font-mono text-xs"
-          />
-          <p className="text-xs text-muted">
+          <RichEditor value={text} onChange={setText} scroll managePalette={false} />
+          <p className={`text-xs ${text.length > APPEARANCE_MAX ? "text-red-400" : "text-muted"}`}>
             {text.length.toLocaleString("it-IT")} /{" "}
             {APPEARANCE_MAX.toLocaleString("it-IT")} caratteri
           </p>
-          <p className="text-[0.7rem] tracking-wider text-muted uppercase">
-            Anteprima
-          </p>
-          <div className="border border-border p-3">
-            <AppearanceView text={text} />
-          </div>
           <EditButtons
             busy={busy}
             error={error}
-            onSave={() => save({ appearance: text })}
+            onSave={() => (text.length > APPEARANCE_MAX ? undefined : save({ appearance: text }))}
             onCancel={() => {
               setEditing(false);
-              setText(character.appearance ?? "");
+              setText(asEditorHtml(character.appearance ?? ""));
             }}
           />
         </div>
