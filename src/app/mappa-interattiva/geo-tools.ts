@@ -475,3 +475,15 @@ export function cleanRing(ring: Point[], tol = 0.9): Point[] {
   const res = [...first, ...second.slice(1, -1)];
   return res.length >= 4 ? res : r;
 }
+
+// Taglierino: unisce un pezzo disegnato all'area, oppure lo toglie. Restituisce i
+// contorni esterni e se e' rimasto un buco (un taglio tutto dentro, senza toccare il bordo)
+export function editArea(rings: Point[][], shape: Point[], mode: "aggiungi" | "taglia"): { rings: Point[][]; hole: boolean } {
+  const area: MultiPolygon = rings.map((r) => [r.map(toXY)] as Polygon);
+  const piece: Polygon = [shape.map(toXY)];
+  const out = mode === "aggiungi" ? polygonClipping.union(area, piece) : polygonClipping.difference(area, piece);
+  return {
+    rings: out.map((poly) => poly[0].map(toPt)).filter((r) => ringArea(r) > 4),
+    hole: out.some((poly) => poly.length > 1),
+  };
+}

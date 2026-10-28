@@ -6,7 +6,7 @@ import "@geoman-io/leaflet-geoman-free";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import { createClient } from "@/lib/supabase/client";
-import { cleanRing, extendLine, geometryOf, pointInArea, ringArea, ringsOf, shareInside, splitArea, subtractAreas, traceLand } from "./geo-tools";
+import { cleanRing, editArea, extendLine, geometryOf, pointInArea, ringArea, ringsOf, shareInside, splitArea, subtractAreas, traceLand } from "./geo-tools";
 import {
   CASTLE_TYPES,
   KIND_LABEL,
@@ -120,6 +120,11 @@ export default function MapCanvas({
   const traceRef = useRef<(p: Point) => void>(() => {});
   const splitDoneRef = useRef<(line: Point[]) => void>(() => {});
   const chooseRef = useRef<(i: number) => void>(() => {});
+  // taglierino: area su cui si aggiunge o si toglie il pezzo che si sta disegnando
+  type EditMode = "aggiungi" | "taglia";
+  const editRef = useRef<{ id: string; mode: EditMode } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; mode: EditMode } | null>(null);
+  const editDoneRef = useRef<(shape: Point[]) => void>(() => {});
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
@@ -178,6 +183,11 @@ export default function MapCanvas({
       // disegnato un elemento nuovo: si apre il modulo per nome e descrizione
       map.on("pm:create", (e) => {
         const layer = e.layer as L.Layer;
+        // pezzo da aggiungere o togliere (taglierino)
+        if (editRef.current && e.shape === "Polygon") {
+          map.removeLayer(layer);
+          return editDoneRef.current(((layer as L.Polygon).getLatLngs()[0] as L.LatLng[]).map(toPt));
+        }
         // linea per dividere un'area
         if (splitRef.current && e.shape === "Line") {
           map.removeLayer(layer);
@@ -586,8 +596,53 @@ export default function MapCanvas({
     }
   }
 
+  // --- Taglierino: aggiungere o togliere un pezzo disegnato ------------------
+  function startEdit(id: string, mode: EditMode) {
+    const map = mapRef.current;
+    if (!map) return;
+    editRef.current = { id, mode };
+    setEditing({ id, mode });
+    setMsg(null);
+    map.pm.enableDraw("Polygon", { snappable: true });
+  }
+  function cancelEdit() {
+    editRef.current = null;
+    setEditing(null);
+    mapRef.current?.pm.disableDraw();
+  }
+  const onEditShape = async (shape: Point[]) => {
+    const job = editRef.current;
+    editRef.current = null;
+    setEditing(null);
+    const f = features.find((x) => x.id === job?.id);
+    if (!job || !f) return;
+    const before = ringsOf(f.geometry);
+    const res = editArea(before, shape, job.mode);
+    if (job.mode === "taglia" && res.hole)
+      return setMsg({ ok: false, text: "Il pezzo da togliere deve toccare il bordo dell'area (un buco in mezzo non si può fare): riprova." });
+    const rings = res.rings.map((r) => cleanRing(r));
+    if (!rings.length) return setMsg({ ok: false, text: "Così l'area sparirebbe tutta: per toglierla usa Togli." });
+    const area = (rs: Point[][]) => rs.reduce((a, r) => a + ringArea(r), 0);
+    if (Math.abs(area(rings) - area(before)) < 1)
+      return setMsg({
+        ok: false,
+        text: job.mode === "aggiungi" ? "Il pezzo è già tutto dentro l'area: non cambia niente." : "Il pezzo non tocca l'area: non cambia niente.",
+      });
+    setBusy(true);
+    const { error } = await supabase
+      .from("map_features")
+      .update({ geometry: geometryOf(rings), updated_at: new Date().toISOString() })
+      .eq("id", f.id);
+    setBusy(false);
+    if (error) return setMsg({ ok: false, text: "Modifica non salvata." });
+    await reload();
+    setSelected(f.id);
+    setMsg({ ok: true, text: job.mode === "aggiungi" ? "Pezzo aggiunto." : "Pezzo tolto." });
+  };
+
   // gli eventi della mappa usano sempre le funzioni aggiornate
   useEffect(() => {
+    editDoneRef.current = onEditShape;
     traceRef.current = traceAt;
     splitDoneRef.current = onSplitLine;
     chooseRef.current = chooseNewPart;
@@ -739,6 +794,18 @@ export default function MapCanvas({
             </button>
           ))}
         </div>
+        {editing && (
+          <div className="absolute bottom-4 left-1/2 z-[1000] flex w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-center gap-2 border border-accent/60 bg-black/90 px-3 py-2 text-sm shadow-xl">
+            <span className="min-w-0 flex-1">
+              {editing.mode === "aggiungi"
+                ? "Disegna il pezzo da aggiungere: deve toccare o sovrapporsi all'area. Clicca il primo punto per chiuderlo."
+                : "Disegna il pezzo da togliere sul bordo dell'area (deve uscire fuori dall'area). Clicca il primo punto per chiuderlo."}
+            </span>
+            <button type="button" onClick={cancelEdit} className="btn-ghost px-3 py-1 text-xs">
+              Annulla
+            </button>
+          </div>
+        )}
         {(splitting || pieces) && (
           <div className="absolute bottom-4 left-1/2 z-[1000] flex w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-center gap-2 border border-accent/60 bg-black/90 px-3 py-2 text-sm shadow-xl">
             <span className="min-w-0 flex-1">
@@ -1000,6 +1067,16 @@ export default function MapCanvas({
                   <button type="button" disabled={busy} onClick={() => cleanArea(sel)} className="text-muted underline hover:text-accent">
                     Ripulisci il bordo
                   </button>
+                )}
+                {sel.kind === "confine" && (
+                  <span className="flex w-full flex-wrap gap-3">
+                    <button type="button" disabled={busy} onClick={() => startEdit(sel.id, "aggiungi")} className="text-muted underline hover:text-accent">
+                      ➕ Aggiungi un pezzo
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => startEdit(sel.id, "taglia")} className="text-muted underline hover:text-accent">
+                      ✂️ Taglia via un pezzo
+                    </button>
+                  </span>
                 )}
                 {sel.kind === "confine" && settings.image_url && (
                   <button
