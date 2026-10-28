@@ -15,11 +15,59 @@ import {
   addEditorColor,
   listEditorColors,
   removeEditorColor,
-  uploadGuideImage,
   type EditorColor,
 } from "./actions";
 
+// Cosa sa rappresentare l'editor visuale: tutto il resto (div, tabelle, classi,
+// stili diversi da colore/carattere/grandezza/allineamento...) lo perderebbe
+const VISUAL_TAGS = new Set([
+  "p", "br", "strong", "b", "em", "i", "u", "s", "strike", "del", "code", "pre",
+  "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr",
+  "a", "img", "span",
+]);
+const VISUAL_ATTRS: Record<string, string[]> = {
+  a: ["href", "target", "rel"],
+  img: ["src", "alt", "title", "width", "height"],
+  ol: ["start", "type"],
+};
+const VISUAL_STYLES: Record<string, string[]> = {
+  span: ["color", "font-size", "font-family"],
+  img: ["width", "height"],
+};
+const ALIGN_TAGS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6"]);
+
+// true se passando all'editor visuale una parte del codice andrebbe persa
+// (solo espressioni regolari: da' lo stesso risultato sul server e nel browser)
+export function visualEditorWouldLose(html: string) {
+  for (const [, rawTag, attrs] of html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+    const tag = rawTag.toLowerCase();
+    if (!VISUAL_TAGS.has(tag)) return true;
+    const attrRe = /([^\s=/]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g;
+    for (const [, rawName, rawValue = ""] of attrs.matchAll(attrRe)) {
+      const name = rawName.toLowerCase();
+      if (name === "style") {
+        const allowed = [
+          ...(VISUAL_STYLES[tag] ?? []),
+          ...(ALIGN_TAGS.has(tag) ? ["text-align"] : []),
+        ];
+        const props = rawValue
+          .replace(/^["']|["']$/g, "")
+          .split(";")
+          .map((r) => r.split(":")[0].trim().toLowerCase())
+          .filter(Boolean);
+        if (props.some((prop) => !allowed.includes(prop))) return true;
+      } else if (!(VISUAL_ATTRS[tag] ?? []).includes(name)) return true;
+    }
+  }
+  return false;
+}
+
+const LOSE_WARNING =
+  "Questo codice contiene elementi che l'editor visuale non sa mostrare (ad esempio div, tabelle, classi o stili particolari).\n\n" +
+  "Passando all'editor andrebbero persi. Vuoi continuare lo stesso?";
+
 // Editor di testo con due modalita': visuale (TipTap) e HTML. Restituisce sempre HTML.
+// Se il testo contiene codice che l'editor visuale perderebbe, si apre in HTML.
 export default function RichEditor({
   value,
   onChange,
@@ -33,7 +81,9 @@ export default function RichEditor({
   scroll?: boolean; // altezza fissa di 400px: il testo lungo scorre dentro
   managePalette?: boolean; // selettore visivo dei colori (la tavolozza salvata la vede solo la gestione)
 }) {
-  const [mode, setMode] = useState<"visuale" | "html">("visuale");
+  const [mode, setMode] = useState<"visuale" | "html">(() =>
+    visualEditorWouldLose(value) ? "html" : "visuale",
+  );
 
   const editor = useEditor({
     extensions: [
@@ -80,9 +130,12 @@ export default function RichEditor({
   });
 
   function switchTo(next: "visuale" | "html") {
-    // Tornando all'editor visuale, carica l'HTML scritto a mano
-    if (next === "visuale" && editor)
+    if (next === mode) return;
+    // Tornando all'editor visuale, carica l'HTML scritto a mano (avvisando se ne perde una parte)
+    if (next === "visuale" && editor) {
+      if (visualEditorWouldLose(value) && !window.confirm(LOSE_WARNING)) return;
       editor.commands.setContent(value, { emitUpdate: false });
+    }
     setMode(next);
   }
 
@@ -775,14 +828,12 @@ function FontSizeSelect({ editor }: { editor: Editor }) {
 }
 
 // ---------------------------------------------------------------------
-// Immagine: caricata dal computer oppure da un indirizzo web
+// Immagine: solo da un indirizzo web (nulla viene salvato nel nostro archivio)
 // ---------------------------------------------------------------------
 function ImageButton({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [alt, setAlt] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -796,23 +847,11 @@ function ImageButton({ editor }: { editor: Editor }) {
   }, [open]);
 
   // Non e' un <form>: l'editor puo' stare dentro un altro modulo (es. dati della casata)
-  async function insert() {
+  function insert() {
     setError(null);
-    let src = url.trim();
-    if (file) {
-      setBusy(true);
-      const form = new FormData();
-      form.set("image", file);
-      const res = await uploadGuideImage(form);
-      setBusy(false);
-      if (res.error || !res.url)
-        return setError(res.error ?? "Caricamento non riuscito.");
-      src = res.url;
-    }
+    const src = url.trim();
     if (!src.toLowerCase().startsWith("https://"))
-      return setError(
-        "Carica un file oppure incolla un indirizzo che inizia con https://",
-      );
+      return setError("Incolla un indirizzo che inizia con https://");
     editor
       .chain()
       .focus()
@@ -821,7 +860,6 @@ function ImageButton({ editor }: { editor: Editor }) {
     setOpen(false);
     setUrl("");
     setAlt("");
-    setFile(null);
   }
 
   return (
@@ -841,18 +879,7 @@ function ImageButton({ editor }: { editor: Editor }) {
         <div className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black">
           <label className="block">
             <span className="mb-1 block tracking-wider text-muted uppercase">
-              Dal computer (max 2 MB)
-            </span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full text-muted file:mr-2 file:rounded file:border file:border-border file:bg-background file:px-2 file:py-1 file:text-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block tracking-wider text-muted uppercase">
-              Oppure indirizzo web
+              Indirizzo web dell'immagine
             </span>
             <input
               value={url}
@@ -863,7 +890,6 @@ function ImageButton({ editor }: { editor: Editor }) {
                   insert();
                 }
               }}
-              disabled={!!file}
               placeholder="https://..."
               className="input py-1 text-xs"
             />
@@ -891,9 +917,9 @@ function ImageButton({ editor }: { editor: Editor }) {
             type="button"
             onClick={insert}
             className="btn w-full py-1.5 text-xs"
-            disabled={busy || (!file && !url.trim())}
+            disabled={!url.trim()}
           >
-            {busy ? "Caricamento..." : "Inserisci"}
+            Inserisci
           </button>
           <p className="text-[0.625rem] leading-snug text-muted">
             Dopo l&apos;inserimento trascina l&apos;angolo dell&apos;immagine
