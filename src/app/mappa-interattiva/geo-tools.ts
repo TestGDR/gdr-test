@@ -88,7 +88,7 @@ export async function traceLand(
   if (!ok) return { error: "Non riesco a leggere l'immagine: il sito che la ospita non lo permette (prova a caricarla su imgur)." };
 
   // si lavora su una copia ridotta (al massimo ~2600 px di lato): piu' veloce
-  const s = Math.max(1, Math.ceil(Math.max(width, height) / 2600));
+  const s = Math.max(1, Math.ceil(Math.max(width, height) / 5400));
   const W = Math.round(width / s);
   const H = Math.round(height / s);
   const canvas = document.createElement("canvas");
@@ -162,7 +162,9 @@ export async function traceLand(
     const c = at(x, y);
     if (dist(c, sea) <= limit && (!blueSea || c[2] >= c[1])) return true;
     const blue = c[2] - Math.max(c[0], c[1] * 0.85);
-    return blue > 35 && c[2] - c[0] > 45;
+    if (blue > 35 && c[2] - c[0] > 45) return true;
+    // ciano chiaro (bassi fondali): blu almeno quanto il verde, entrambi ben sopra il rosso
+    return c[2] - c[0] > 30 && c[2] >= c[1] * 0.97 && c[1] - c[0] > 20;
   };
   const isSea = new Uint8Array(W * H);
   for (let y = 0; y < H; y++)
@@ -170,20 +172,29 @@ export async function traceLand(
       isSea[y * W + x] = x < margin || y < margin || x >= W - margin || y >= H - margin || seaHere(x, y) ? 1 : 0;
   // fiumi e laghetti blu dentro la terra (linee sottili) non tagliano la terra:
   // il mare resta mare solo dove e' largo almeno qualche pixel (apertura)
-  const R = 2;
-  const eroded = new Uint8Array(W * H);
-  for (let y = R; y < H - R; y++)
-    for (let x = R; x < W - R; x++) {
-      let all = 1;
-      for (let dy = -R; dy <= R && all; dy++) for (let dx = -R; dx <= R; dx++) if (!isSea[(y + dy) * W + x + dx]) { all = 0; break; }
-      eroded[y * W + x] = all;
-    }
-  const wide = new Uint8Array(W * H);
-  for (let y = R; y < H - R; y++)
-    for (let x = R; x < W - R; x++) {
-      if (!eroded[y * W + x]) continue;
-      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) wide[(y + dy) * W + x + dx] = 1;
-    }
+  // raggio in pixel veri (~3), separabile: righe e poi colonne
+  const R = Math.max(1, Math.round(3 / s));
+  const pass = (src: Uint8Array, keepIfAll: boolean, horizontal: boolean) => {
+    const dst = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        let v = keepIfAll ? 1 : 0;
+        for (let k = -R; k <= R; k++) {
+          const xx = horizontal ? x + k : x, yy = horizontal ? y : y + k;
+          const inside = xx >= 0 && yy >= 0 && xx < W && yy < H;
+          const val = inside ? src[yy * W + xx] : 1;
+          if (keepIfAll ? !val : val) {
+            v = keepIfAll ? 0 : 1;
+            break;
+          }
+        }
+        dst[y * W + x] = v;
+      }
+    return dst;
+  };
+  // apertura del mare: erosione (resta solo il mare largo) e poi dilatazione (torna alla sua forma)
+  const eroded = pass(pass(isSea, true, true), true, false);
+  const wide = pass(pass(eroded, false, true), false, false);
   const isLand = (x: number, y: number) =>
     x >= margin && y >= margin && x < W - margin && y < H - margin && !wide[y * W + x];
   if (!isLand(cx, cy)) return { error: "Qui il colore è quello del mare: clicca sulla terra." };
@@ -250,7 +261,7 @@ export async function traceLand(
   if (pts.length < 4) return { error: "La zona è troppo piccola." };
 
   // meno punti (il contorno resta fedele entro ~1,5 pixel della copia ridotta)
-  const simple = simplify(pts, 1.2);
+  const simple = simplify(pts, 0.8 / s);
   const ring: Point[] = simple.map(([px, py]) => [
     Math.round((height - py * s) * 10) / 10,
     Math.round(px * s * 10) / 10,
