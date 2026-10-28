@@ -160,16 +160,96 @@ export async function traceLand(
   const blueSea = sea[2] > sea[1] + 20 && sea[2] > sea[0] + 20;
   const seaHere = (x: number, y: number) => {
     const c = at(x, y);
-    if (dist(c, sea) <= limit && (!blueSea || c[2] >= c[1])) return true;
+    // (foreste verde-blu scure: non sono mare, il mare dev'essere davvero piu' blu che verde)
+    if (dist(c, sea) <= limit && (!blueSea || c[2] >= c[1] + 10)) return true;
     const blue = c[2] - Math.max(c[0], c[1] * 0.85);
     if (blue > 35 && c[2] - c[0] > 45) return true;
     // ciano chiaro (bassi fondali): blu almeno quanto il verde, entrambi ben sopra il rosso
-    return c[2] - c[0] > 30 && c[2] >= c[1] * 0.97 && c[1] - c[0] > 20;
+    // (abbastanza chiaro: le ombre verde-azzurre scure delle foreste non sono acqua)
+    return c[2] - c[0] > 30 && c[2] >= c[1] * 0.97 && c[1] - c[0] > 20 && (c[0] + c[1] + c[2]) / 3 > 110;
   };
   const isSea = new Uint8Array(W * H);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
       isSea[y * W + x] = x < margin || y < margin || x >= W - margin || y >= H - margin || seaHere(x, y) ? 1 : 0;
+  // riva grigio-azzurra (acqua bassa dipinta piu' spenta): e' mare solo se attaccata al mare
+  // aperto, cosi' le ombre azzurrine di neve e montagne in mezzo alla terra restano terra
+  const weak = (x: number, y: number) => {
+    const c = at(x, y);
+    const avg = (c[0] + c[1] + c[2]) / 3;
+    return c[2] - c[0] > 18 && c[2] >= c[1] && avg < 185 && avg > 95;
+  };
+  {
+    // acqua vera (senza la fascia del bordo dell'immagine, dove la terra puo' toccare il bordo)
+    const raw = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) raw[y * W + x] = seaHere(x, y) ? 1 : 0;
+    // solo acqua larga: le macchioline blu tra montagne e neve non contano (apertura, ~4 pixel)
+    const r0 = Math.max(1, Math.round(4 / s));
+    const run = (src: Uint8Array, all: boolean, horiz: boolean) => {
+      const dst = new Uint8Array(W * H);
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          let v = all ? 1 : 0;
+          for (let k = -r0; k <= r0; k++) {
+            const xx = horiz ? x + k : x, yy = horiz ? y : y + k;
+            const val = xx >= 0 && yy >= 0 && xx < W && yy < H ? src[yy * W + xx] : 0;
+            if (all ? !val : val) { v = all ? 0 : 1; break; }
+          }
+          dst[y * W + x] = v;
+        }
+      return dst;
+    };
+    const real = run(run(run(run(raw, true, true), true, false), false, true), false, false);
+    // la riva cresce dall'acqua vera, al massimo per ~25 pixel veri
+    const maxStep = Math.max(3, Math.round(25 / s));
+    const step = new Int16Array(W * H).fill(-1);
+    const queue = new Int32Array(W * H);
+    let head = 0, tail = 0;
+    for (let i = 0; i < W * H; i++)
+      if (real[i]) {
+        step[i] = 0;
+        queue[tail++] = i;
+      }
+    while (head < tail) {
+      const p = queue[head++];
+      const x = p % W, y = (p - x) / W;
+      const d = step[p];
+      if (d >= maxStep) continue;
+      const nb = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1];
+      for (const q of nb) {
+        if (q < 0 || step[q] >= 0) continue;
+        const qx = q % W, qy = (q - qx) / W;
+        if (weak(qx, qy)) {
+          step[q] = d + 1;
+          queue[tail++] = q;
+        }
+      }
+    }
+    // la riva conta solo se attaccata al mare aperto: si parte dall'acqua vera ai bordi dell'immagine
+    const open = new Uint8Array(W * H);
+    head = 0;
+    tail = 0;
+    const seed = (i: number) => {
+      if (step[i] >= 0 && !open[i]) {
+        open[i] = 1;
+        queue[tail++] = i;
+      }
+    };
+    for (let x = 0; x < W; x++) for (let y = 0; y < margin; y++) { seed(y * W + x); seed((H - 1 - y) * W + x); }
+    for (let y = 0; y < H; y++) for (let x = 0; x < margin; x++) { seed(y * W + x); seed(y * W + W - 1 - x); }
+    while (head < tail) {
+      const p = queue[head++];
+      const x = p % W, y = (p - x) / W;
+      const nb = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1];
+      for (const q of nb) {
+        if (q < 0 || open[q] || step[q] < 0) continue;
+        open[q] = 1;
+        queue[tail++] = q;
+      }
+    }
+    // riva attaccata al mare: e' mare (l'acqua vera c'era gia')
+    for (let i = 0; i < W * H; i++) if (open[i] && step[i] > 0) isSea[i] = 1;
+  }
   // fiumi e laghetti blu dentro la terra (linee sottili) non tagliano la terra:
   // il mare resta mare solo dove e' largo almeno qualche pixel (apertura)
   // raggio in pixel veri (~3), separabile: righe e poi colonne
