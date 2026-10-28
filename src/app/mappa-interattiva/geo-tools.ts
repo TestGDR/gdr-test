@@ -147,14 +147,45 @@ export async function traceLand(
     }
   const land = acc.map((v) => v / n);
   const gap = dist(land, sea);
-  if (gap < 25) return { error: "Qui il colore è quello del mare: clicca sulla terra." };
+  if (gap < 25 && dist(land, sea) < 25) return { error: "Qui il colore è quello del mare: clicca sulla terra." };
   const limit = gap * 0.45;
 
   // terra = tutto cio' che non somiglia al mare (anche fiumi, foreste e montagne disegnate);
   // una fascia sui bordi resta fuori, cosi' la cornice dell'immagine non si attacca alla terra
   const margin = Math.round(Math.min(W, H) * 0.02);
+  // mare = colore vicino a quello del mare aperto, oppure chiaramente blu/azzurro
+  // (mappe dipinte: blu scuro al largo, azzurro vicino alla costa). La neve, quasi
+  // bianca, non e' "blu": resta terra
+  // se il mare aperto e' chiaramente blu, i verdi scuri (foreste) non sono mare
+  const blueSea = sea[2] > sea[1] + 20 && sea[2] > sea[0] + 20;
+  const seaHere = (x: number, y: number) => {
+    const c = at(x, y);
+    if (dist(c, sea) <= limit && (!blueSea || c[2] >= c[1])) return true;
+    const blue = c[2] - Math.max(c[0], c[1] * 0.85);
+    return blue > 35 && c[2] - c[0] > 45;
+  };
+  const isSea = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      isSea[y * W + x] = x < margin || y < margin || x >= W - margin || y >= H - margin || seaHere(x, y) ? 1 : 0;
+  // fiumi e laghetti blu dentro la terra (linee sottili) non tagliano la terra:
+  // il mare resta mare solo dove e' largo almeno qualche pixel (apertura)
+  const R = 2;
+  const eroded = new Uint8Array(W * H);
+  for (let y = R; y < H - R; y++)
+    for (let x = R; x < W - R; x++) {
+      let all = 1;
+      for (let dy = -R; dy <= R && all; dy++) for (let dx = -R; dx <= R; dx++) if (!isSea[(y + dy) * W + x + dx]) { all = 0; break; }
+      eroded[y * W + x] = all;
+    }
+  const wide = new Uint8Array(W * H);
+  for (let y = R; y < H - R; y++)
+    for (let x = R; x < W - R; x++) {
+      if (!eroded[y * W + x]) continue;
+      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) wide[(y + dy) * W + x + dx] = 1;
+    }
   const isLand = (x: number, y: number) =>
-    x >= margin && y >= margin && x < W - margin && y < H - margin && dist(at(x, y), sea) > limit;
+    x >= margin && y >= margin && x < W - margin && y < H - margin && !wide[y * W + x];
   if (!isLand(cx, cy)) return { error: "Qui il colore è quello del mare: clicca sulla terra." };
 
   // riempimento dal punto cliccato
