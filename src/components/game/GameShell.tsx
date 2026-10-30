@@ -1420,21 +1420,37 @@ function RailZone({ children }: { children: ReactNode }) {
   );
 }
 
-// Aggiorna, Gestione (solo moderatori e admin) ed Esci: in alto a destra, su computer
-function TopActions({ canManage }: { canManage: boolean }) {
+// Pulsante Aggiorna: in una chat in cui si e' entrati in giocata ("Entra in chat")
+// ricarica la chat; in tutti gli altri casi torna alla mappa (e la ricarica)
+function useRefreshButton() {
   const router = useRouter();
   const pathname = usePathname();
-  const inPlace = pathname.startsWith("/chat/") || pathname === "/mappa";
+  const supabase = useMemo(() => createClient(), []);
+  return useCallback(async () => {
+    const chat = /^\/chat\/([^/?#]+)/.exec(pathname)?.[1];
+    if (chat) {
+      const { data } = await supabase.rpc("in_chat", { r: chat });
+      if (data === true) return window.location.reload();
+    }
+    if (pathname === "/mappa") window.location.reload();
+    else router.push("/mappa");
+  }, [router, pathname, supabase]);
+}
+const REFRESH_TITLE = "Aggiorna (in giocata ricarica la chat, altrimenti torna alla mappa)";
+
+// Aggiorna, Gestione (solo moderatori e admin) ed Esci: in alto a destra, su computer
+function TopActions({ canManage }: { canManage: boolean }) {
+  const refresh = useRefreshButton();
   const btn =
     "group flex w-14 flex-col items-center gap-0.5 rounded-md py-1 text-muted transition hover:bg-blood/25 hover:text-accent";
   return (
     <div className="absolute top-1/2 right-3 hidden -translate-y-1/2 items-start gap-1 lg:flex">
       <button
         type="button"
-        onClick={() => (inPlace ? window.location.reload() : router.push("/mappa"))}
+        onClick={refresh}
         className={btn}
-        aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
-        title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+        aria-label="Aggiorna"
+        title={REFRESH_TITLE}
       >
         <RefreshIcon />
         <Caption>Aggiorna</Caption>
@@ -1573,8 +1589,8 @@ function RightRail({
   newRequests: number;
   inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
-  const router = useRouter();
   const pathname = usePathname();
+  const refresh = useRefreshButton();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
 
   return (
@@ -1586,12 +1602,10 @@ function RightRail({
         {/* Aggiorna ed Esci: su computer stanno in alto a destra; qui restano per il cellulare */}
         <button
           type="button"
-          onClick={() => {
-            if (pathname.startsWith("/chat/") || pathname === "/mappa") window.location.reload();
-            else router.push("/mappa");
-          }}
+          onClick={refresh}
           className={`${railBtn} lg:hidden`}
-          aria-label={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+          aria-label="Aggiorna"
+          title={REFRESH_TITLE}
         >
           <RefreshIcon />
         </button>
@@ -1648,8 +1662,7 @@ function DesktopTopBar({
   unread: Record<MessageKind, number>;
   onOpenMessages: (kind: MessageKind) => void;
 }) {
-  const router = useRouter();
-  const inPlace = pathname.startsWith("/chat/") || pathname === "/mappa";
+  const refresh = useRefreshButton();
   const badge = (n: number) =>
     n > 0 && <span className="absolute top-3 right-5 min-w-5 rounded-full bg-blood px-1.5 text-center text-[0.6875rem] font-bold text-white shadow">{n}</span>;
   const action =
@@ -1717,9 +1730,9 @@ function DesktopTopBar({
         <div className="absolute right-0 bottom-0 flex h-[44px] w-[190px] items-center justify-end bg-[url('/images/ui/interno/targa-comandi.png')] bg-[length:100%_100%] bg-no-repeat pr-2 pl-7 [&>*+*]:border-l [&>*+*]:border-[#7a5530]/60">
           <button
             type="button"
-            onClick={() => (inPlace ? window.location.reload() : router.push("/mappa"))}
+            onClick={refresh}
             className={action}
-            title={pathname.startsWith("/chat/") ? "Aggiorna la chat" : "Torna alla mappa e aggiorna"}
+            title={REFRESH_TITLE}
           >
             <RefreshIcon />
             <span className="sr-only">Aggiorna</span>
