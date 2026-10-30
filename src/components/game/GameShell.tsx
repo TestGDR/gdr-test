@@ -108,9 +108,14 @@ const EventsUnseenContext = createContext(false);
 // Ticket: quanti da leggere e come aprire la finestra dei ticket
 const TicketContext = createContext<{ count: number; open: () => void }>({ count: 0, open: () => {} });
 
+// Le pagine di Gestione non cambiano il luogo a destra: il PG resta dov'e'
+// (es. nella giocata in corso), anche se si apre Gestione
 export function GameArea({ title, image, description, weatherRegionId }: Area) {
   const setArea = useContext(AreaContext);
-  useEffect(() => setArea({ title, image, description, weatherRegionId }), [setArea, title, image, description, weatherRegionId]);
+  const management = usePathname().startsWith("/gestione");
+  useEffect(() => {
+    if (!management) setArea({ title, image, description, weatherRegionId });
+  }, [setArea, management, title, image, description, weatherRegionId]);
   return null;
 }
 
@@ -192,7 +197,9 @@ export default function GameShell({
   const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname();
   const inChat = pathname.startsWith("/chat/"); // cellulare: la chat occupa tutto lo schermo
-  const [area, setArea] = useState<Area>({ title: "Westeros" });
+  // luogo mostrato a destra: lo imposta la pagina di gioco aperta (chat, mappa...);
+  // le pagine di Gestione non lo cambiano (null = nessuna pagina di gioco ancora aperta)
+  const [area, setArea] = useState<Area | null>(null);
   // su computer le colonne restano sempre aperte
   const leftOpen = true;
   const rightOpen = true;
@@ -251,6 +258,7 @@ export default function GameShell({
     };
   }, [supabase, chatId, characterId, pathname]);
   const placeChat = chatId ?? playing?.id ?? null;
+  const shownArea: Area = area ?? (playing ? { title: playing.label } : { title: "Westeros" });
   const online = usePresence({
     userId,
     characterId: character?.id ?? null,
@@ -265,7 +273,7 @@ export default function GameShell({
     availability,
     place: placeChat ? "chat" : "mappa",
     placeKey: placeChat ? `chat:${placeChat}` : "mappa",
-    placeLabel: !chatId && playing ? playing.label : area.title,
+    placeLabel: !chatId && playing ? playing.label : shownArea.title,
   }, invisible); // invisibile: niente annuncio in tempo reale (lo vede solo chi ha il permesso)
 
   // PG in attesa di approvazione: quando arriva il messaggio di SISTEMA (approvato)
@@ -490,7 +498,7 @@ export default function GameShell({
               ✕
             </button>
             <LeftColumn
-              area={area}
+              area={shownArea}
               userId={userId}
               displayName={displayName}
               character={character}
@@ -520,7 +528,7 @@ export default function GameShell({
 
           {/* Computer: colonna destra (localita' e presenti) */}
           <DesktopRight
-            area={area}
+            area={shownArea}
             userId={userId}
             online={online}
             onOpenOnline={() => setOnlineOpen(true)}
