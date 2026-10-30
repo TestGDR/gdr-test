@@ -47,7 +47,7 @@ type Data = {
   spies: Spy[];
   missions: Mission[];
   replies: Reply[];
-  places: { id: string; name: string }[];
+  places: SpyPlace[];
   coins: number;
   canHouse: boolean; // ha un ruolo che gestisce le risorse della casata
 };
@@ -87,7 +87,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
       // le risposte dello staff nei ticket delle missioni finite
       supabase.rpc("spy_my_replies", { p_character: characterId }),
       supabase.from("spies").select("*").eq("character_id", characterId).order("created_at"),
-      supabase.from("locations").select("id, name").eq("kind", "luogo").eq("in_game", true).order("name"),
+      supabase.rpc("spy_places"), // tutte le mappe, anche quelle non attive
       supabase.from("characters").select("coins, house_role:house_roles(can_build)").eq("id", characterId).maybeSingle(),
     ]);
     if (settings.error || !settings.data || levels.error) return setMissing(true);
@@ -102,7 +102,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
       spies: ((fresh.data ?? spies.data ?? []) as Spy[]),
       missions: (missions.data ?? []) as Mission[],
       replies: (replies.data ?? []) as Reply[],
-      places: (places.data ?? []) as { id: string; name: string }[],
+      places: (places.data ?? []) as SpyPlace[],
       coins: (me.data?.coins as number | undefined) ?? 0,
       canHouse: !!(me.data?.house_role as unknown as { can_build: boolean } | null)?.can_build,
     });
@@ -397,6 +397,15 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
 }
 
 // Nuova missione: dove, chi o cosa, quanto a fondo, che cosa scoprire
+// Destinazioni delle spie: macroaree di tutte le mappe, divise per mappa
+type SpyPlace = { id: string; name: string; map_id: string; map_name: string };
+
+function groupByMap(places: SpyPlace[]) {
+  const groups = new Map<string, SpyPlace[]>();
+  for (const p of places) groups.set(p.map_name, [...(groups.get(p.map_name) ?? []), p]);
+  return [...groups];
+}
+
 function SendForm({
   spy,
   settings,
@@ -406,7 +415,7 @@ function SendForm({
 }: {
   spy: Spy;
   settings: SpyRules;
-  places: { id: string; name: string }[];
+  places: SpyPlace[];
   onCancel: () => void;
   onSent: () => void;
 }) {
@@ -452,10 +461,14 @@ function SendForm({
         Dove
         <select value={place} onChange={(e) => setPlace(e.target.value)} required className="input normal-case">
           <option value="">Scegli il luogo...</option>
-          {places.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
+          {groupByMap(places).map(([map, list]) => (
+            <optgroup key={map} label={map}>
+              {list.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>
