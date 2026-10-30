@@ -225,6 +225,32 @@ export default function GameShell({
 
   // Presenze: dove sono io e chi c'e' online
   const chatId = pathname.startsWith("/chat/") ? pathname.split("/")[2] : null;
+  // Giocata in corso: anche fuori dalla chat (Gestione, mappa...) si resta in
+  // quella chat finche' non si usa "Esci dalla chat" (o passa un'ora senza scrivere)
+  const [playing, setPlaying] = useState<{ id: string; label: string } | null>(null);
+  const characterId = character?.id ?? null;
+  useEffect(() => {
+    if (chatId || !characterId) return;
+    let stale = false;
+    supabase
+      .from("chat_presence")
+      .select("room_id, room:rooms(name)")
+      .eq("character_id", characterId)
+      .gt("last_active_at", new Date(Date.now() - 60 * 60_000).toISOString())
+      .order("last_active_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (stale) return;
+        const room = data?.room as { name?: string } | { name?: string }[] | null | undefined;
+        const name = Array.isArray(room) ? room[0]?.name : room?.name;
+        setPlaying(data ? { id: data.room_id as string, label: name ?? "" } : null);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [supabase, chatId, characterId, pathname]);
+  const placeChat = chatId ?? playing?.id ?? null;
   const online = usePresence({
     userId,
     characterId: character?.id ?? null,
@@ -237,9 +263,9 @@ export default function GameShell({
     active: character?.status === "attivo",
     phrase,
     availability,
-    place: chatId ? "chat" : "mappa",
-    placeKey: chatId ? `chat:${chatId}` : "mappa",
-    placeLabel: area.title,
+    place: placeChat ? "chat" : "mappa",
+    placeKey: placeChat ? `chat:${placeChat}` : "mappa",
+    placeLabel: !chatId && playing ? playing.label : area.title,
   }, invisible); // invisibile: niente annuncio in tempo reale (lo vede solo chi ha il permesso)
 
   // PG in attesa di approvazione: quando arriva il messaggio di SISTEMA (approvato)
