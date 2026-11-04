@@ -566,11 +566,33 @@ textarea.input {
 }
 
 /* Testo dei messaggi in chat (azioni, narrazioni, sussurri): carattere e grandezza di base */
+/* Aspetto della chat scelto da ogni giocatore (strumento "Aspetto" della chat):
+   --chat-size grandezza in pt (se non c'e': automatica, segue lo schermo),
+   --chat-font carattere, --chat-name colore dei nomi. Solo i messaggi della chat */
 .chat-text {
-  font-family: var(--font-chat), var(--font-body), sans-serif;
-  font-size: 0.875rem;
+  font-family: var(--chat-font, var(--font-chat)), var(--font-body), sans-serif;
+  font-size: var(--chat-size, 0.875rem);
   font-weight: 400;
   line-height: 1.45;
+}
+/* righe brevi: dadi, sussurri, OFF, avvisi */
+.chat-line {
+  font-size: var(--chat-size, 0.875rem);
+}
+/* nome del personaggio sopra l'azione */
+.chat-name {
+  font-size: calc(var(--chat-size, 0.875rem) * 9 / 7); /* in proporzione al testo */
+  color: var(--chat-name, #d4b394);
+}
+/* tag tra [ ]: non e' parlato, un'indicazione in piu' */
+.chat-tag {
+  color: var(--chat-tag, #9fb8cf);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+/* nome nelle righe brevi (dadi): stessa grandezza del testo */
+.chat-name-inline {
+  color: var(--chat-name, #d4b394);
 }
 
 /* ---------------------------------------------------------------------

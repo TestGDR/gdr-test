@@ -16,7 +16,25 @@ export type Prefs = {
   text_scale: number; // percento: 100 = normale
   speech_color: string; // parlato in chat (tra virgolette)
   action_color: string; // testo dell'azione in chat
+  // Aspetto della chat (strumento "Aspetto" della chat): solo i messaggi della chat
+  chat_font_pt: number | null; // grandezza del testo in pt; null = automatica (segue lo schermo)
+  chat_font: ChatFont;
+  chat_name_color: string; // nomi dei personaggi nei messaggi
+  chat_tag_color: string; // testo tra [ ] in chat
 };
+
+// Grandezza del testo della chat in pt: limiti e misure pronte
+export const CHAT_PT_MIN = 8;
+export const CHAT_PT_MAX = 30;
+export const CHAT_PT_PRESETS = [10, 11, 12, 13, 14, 16, 18];
+
+export type ChatFont = "mukta" | "open-sans" | "lora" | "georgia";
+export const CHAT_FONTS: { value: ChatFont; label: string; css: string }[] = [
+  { value: "mukta", label: "Mukta (predefinito)", css: "var(--font-chat)" },
+  { value: "open-sans", label: "Open Sans", css: "var(--font-body)" },
+  { value: "lora", label: "Lora", css: "var(--font-lora)" },
+  { value: "georgia", label: "Georgia", css: "Georgia, serif" },
+];
 
 export const DEFAULT_PREFS: Prefs = {
   sounds_on: true,
@@ -28,6 +46,10 @@ export const DEFAULT_PREFS: Prefs = {
   text_scale: 100,
   speech_color: "#fde68a",
   action_color: "#e4dfdb",
+  chat_font_pt: null,
+  chat_font: "mukta",
+  chat_name_color: "#d4b394",
+  chat_tag_color: "#9fb8cf",
 };
 
 export const TEXT_SCALES = [
@@ -47,6 +69,14 @@ export function applyPrefs(p: Prefs) {
   root.setProperty("--text-scale", String(p.text_scale / 100));
   root.setProperty("--chat-speech", p.speech_color);
   root.setProperty("--chat-action", p.action_color);
+  if (p.chat_font_pt) root.setProperty("--chat-size", `${p.chat_font_pt}pt`);
+  else root.removeProperty("--chat-size");
+  root.setProperty(
+    "--chat-font",
+    (CHAT_FONTS.find((f) => f.value === p.chat_font) ?? CHAT_FONTS[0]).css,
+  );
+  root.setProperty("--chat-name", p.chat_name_color);
+  root.setProperty("--chat-tag", p.chat_tag_color);
   setSoundPrefs({
     on: p.sounds_on,
     volume: p.volume,
@@ -81,7 +111,7 @@ export async function loadPrefs(
   const { data } = await supabase
     .from("user_prefs")
     .select(
-      "sounds_on, volume, sound_missiva, sound_off, sound_chat, chat_sound_on, text_scale, speech_color, action_color",
+      "sounds_on, volume, sound_missiva, sound_off, sound_chat, chat_sound_on, text_scale, speech_color, action_color, chat_font_pt, chat_font, chat_name_color, chat_tag_color",
     )
     .eq("user_id", userId)
     .maybeSingle();

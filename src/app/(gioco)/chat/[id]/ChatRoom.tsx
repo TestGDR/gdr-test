@@ -26,6 +26,7 @@ import {
   setMasterMode,
 } from "../presence-actions";
 import ChatCommands, { type CommandTab } from "./ChatCommands";
+import ChatAppearance from "./ChatAppearance";
 import { ChatNotepad, ChatSave, type RoomInfo } from "./ChatTools";
 
 type Props = {
@@ -48,7 +49,11 @@ type Props = {
 };
 type Present = { id: string; name: string; isNpc?: boolean };
 
-type Tool = "comandi" | "notepad" | "salva" | "tipo";
+type Tool = "comandi" | "notepad" | "salva" | "aspetto" | "tipo";
+// Narrazioni del master: non seguono il limite della chat, solo questo tetto
+// (lo stesso del database, migrazione 0178)
+const MASTER_NARRATION_MAX = 10000;
+
 const KIND_LABEL: Partial<Record<MessageKind, string>> = {
   azione: "Parlato / Azione",
   fuori_gioco: "Fuori gioco (OFF)",
@@ -124,6 +129,8 @@ export default function ChatRoom({
   }
   const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
   const [kind, setKind] = useState<MessageKind>("azione");
+  // limite di caratteri di quello che si sta scrivendo: la narrazione master ne ha di piu'
+  const limit = kind === "master" ? MASTER_NARRATION_MAX : MAX_LEN;
   const [recipient, setRecipient] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -401,6 +408,10 @@ export default function ChatRoom({
   // content: testo da mandare (di base quello della barra di scrittura)
   async function send(content = text.trim()): Promise<boolean> {
     if (!content || !actorId || sending) return false;
+    if (content.length > limit) {
+      setError(`Il messaggio supera il limite di ${limit} caratteri (ne ha ${content.length}).`);
+      return false;
+    }
     if (kind === "azione" && master && content.length < master.min) {
       setError(
         `Modalità master: l'azione deve avere almeno ${master.min} caratteri (ne ha ${content.length}).`,
@@ -476,15 +487,22 @@ export default function ChatRoom({
       label: "Salva",
       icon: <path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6" />,
     },
+    {
+      id: "aspetto",
+      label: "Aspetto della chat",
+      // "Aa": grandezza, carattere e colori del testo della chat
+      icon: <path d="M3 19 8 5l5 14M4.8 14h6.4M15 12.5c.6-.9 1.6-1.5 2.8-1.5 1.7 0 2.7 1 2.7 2.7V19M20.5 15.2c-3.2 0-5.5.6-5.5 2.2 0 1 .8 1.6 2 1.6 1.8 0 3.5-1.3 3.5-3.8" />,
+    },
   ];
   const titles: Record<Tool, string> = {
     comandi: "Dadi",
     notepad: "Notepad",
     salva: "Salva la chat",
+    aspetto: "Aspetto della chat",
     tipo: "Destinatario",
   };
 
-  const left = MAX_LEN - text.length;
+  const left = limit - text.length;
   const lbl =
     "w-24 shrink-0 text-[0.65rem] font-semibold tracking-[0.14em] text-[#c97a7a] uppercase";
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -929,11 +947,11 @@ export default function ChatRoom({
             </div>
             <textarea
               value={text}
-              onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
+              onChange={(e) => setText(e.target.value.slice(0, limit))}
               onKeyDown={onKey}
               rows={4}
-              maxLength={MAX_LEN}
-              placeholder={`Scrivi qui la tua azione...\nInserire il parlato tra < >, il descritto fuori. Massimo ${MAX_LEN} caratteri. Invio per inviare, Maiusc+Invio per andare a capo.`}
+              maxLength={limit}
+              placeholder={`Scrivi qui la tua azione...\nInserire il parlato tra < >, i tag tra [ ], il descritto fuori. Massimo ${limit} caratteri. Invio per inviare, Maiusc+Invio per andare a capo.`}
               className="input block min-h-24 w-full resize-none text-sm"
             />
             {error && <p className="text-sm text-red-400">{error}</p>}
@@ -986,17 +1004,17 @@ export default function ChatRoom({
               <div className="relative min-w-0 flex-1">
                 <textarea
                   value={text}
-                  onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
+                  onChange={(e) => setText(e.target.value.slice(0, limit))}
                   onKeyDown={onKey}
                   rows={2}
-                  maxLength={MAX_LEN}
+                  maxLength={limit}
                   placeholder="Scrivi qui la tua azione..."
                   className="block max-h-40 w-full resize-none rounded-2xl border border-border bg-black/60 px-3 py-2.5 pr-16 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
                 />
                 <span
                   className={`pointer-events-none absolute right-3 bottom-2 text-[0.625rem] ${left < 100 ? "text-red-400" : "text-muted"}`}
                 >
-                  {text.length}/{MAX_LEN}
+                  {text.length}/{limit}
                 </span>
               </div>
               <button
@@ -1034,7 +1052,7 @@ export default function ChatRoom({
             {recipientInput}
             {kindSelect}
             <p className="text-xs text-muted">
-              Il parlato va tra &lt; &gt;, il descritto fuori. Massimo {MAX_LEN}{" "}
+              Il parlato va tra &lt; &gt;, il descritto fuori. Massimo {limit}{" "}
               caratteri.
             </p>
             <button
@@ -1072,17 +1090,18 @@ export default function ChatRoom({
         {tool === "notepad" && (
           <ChatNotepad
             characterId={actorId}
-            maxLen={MAX_LEN}
+            maxLen={limit}
             sendAs={`A: ${recipient.trim() || "tutti"} · ${KIND_LABEL[kind]}`}
             onSend={async (t) => {
               // copia l'azione nella barra di scrittura e la invia
-              setText(t.slice(0, MAX_LEN));
+              setText(t.slice(0, limit));
               setTool(null);
-              return send(t.slice(0, MAX_LEN));
+              return send(t.slice(0, limit));
             }}
           />
         )}
         {tool === "salva" && <ChatSave room={room} messages={messages} characterId={myPresent?.id ?? null} />}
+        {tool === "aspetto" && <ChatAppearance onClose={() => setTool(null)} />}
       </Modal>
     </div>
   );
@@ -1145,11 +1164,11 @@ function MessageRow({
       /^(tira|effettua|attacca) /.test(message.content);
     return (
       <div className={card}>
-        <div className="chat-dado flex items-center gap-3 px-3 py-1.5 text-sm text-[#d9cfc3]">
+        <div className="chat-dado flex items-center gap-3 px-3 py-1.5 chat-line text-[#d9cfc3]">
           <DieIcon />
           <p className="min-w-0 flex-1">
             <span className="mr-3 text-xs text-[#8a8077]">{time}</span>
-            <strong className="font-serif tracking-wide text-[#d4b394] uppercase">
+            <strong className="chat-name-inline font-serif tracking-wide uppercase">
               {message.character_name}
             </strong>{" "}
             {/* i tiri vecchi non avevano il verbo nel testo */}
@@ -1170,7 +1189,7 @@ function MessageRow({
           <div className="mb-1.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
             <span aria-hidden />
             <span
-              className="min-w-0 truncate text-center font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase"
+              className="min-w-0 truncate text-center font-serif chat-name leading-tight font-semibold tracking-wide uppercase"
               title={`Narrazione di ${message.character_name}`}
             >
               Master
@@ -1192,7 +1211,7 @@ function MessageRow({
   // Avviso di sistema (entrate, uscite, modalita' master): una riga come i sussurri OFF
   if (message.kind === "sistema") {
     return (
-      <p className="rounded-md bg-gradient-to-r from-black/80 via-[#5a1414]/55 to-black/80 px-3 py-1.5 text-sm text-[#d9b8b8] shadow shadow-black/60 max-lg:mt-2">
+      <p className="rounded-md bg-gradient-to-r from-black/80 via-[#5a1414]/55 to-black/80 px-3 py-1.5 chat-line text-[#d9b8b8] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
         <strong className="mr-1 text-xs font-bold tracking-wide text-foreground uppercase">
           {message.character_name}
@@ -1205,7 +1224,7 @@ function MessageRow({
   // Sussurro privato tra due personaggi: lo vedono solo loro (e gli admin)
   if (message.kind === "sussurro") {
     return (
-      <p className="rounded-md border border-[#6d4a8c]/50 bg-gradient-to-r from-black/80 via-[#3a2352]/60 to-black/80 px-3 py-1.5 text-sm text-[#d9c8ea] shadow shadow-black/60 max-lg:mt-2">
+      <p className="rounded-md border border-[#6d4a8c]/50 bg-gradient-to-r from-black/80 via-[#3a2352]/60 to-black/80 px-3 py-1.5 chat-line text-[#d9c8ea] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
         <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
           <span aria-hidden>🔒 </span>
@@ -1220,7 +1239,7 @@ function MessageRow({
   // Raggiro scoperto: lo vede il bersaglio, come intuizione
   if (message.kind === "intuizione" && forMe) {
     return (
-      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 text-sm text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
+      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 chat-line text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
         <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
           <span aria-hidden>👁 </span>
@@ -1236,7 +1255,7 @@ function MessageRow({
   if (message.kind === "intuizione") {
     const r = (message.roll_data ?? {}) as { discovered?: boolean; attack?: string; defense?: string };
     return (
-      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 text-sm text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
+      <p className="rounded-md border border-[#8c7a3a]/50 bg-gradient-to-r from-black/80 via-[#3d3414]/60 to-black/80 px-3 py-1.5 chat-line text-[#eadfb8] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
         <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
           <span aria-hidden>👁 </span>
@@ -1256,7 +1275,7 @@ function MessageRow({
   // Sussurro OFF: una riga, con una sfumatura sui toni del rosso
   if (message.kind === "fuori_gioco") {
     return (
-      <p className="rounded-md bg-gradient-to-r from-black/80 via-[#5a1414]/55 to-black/80 px-3 py-1.5 text-sm text-[#d9b8b8] shadow shadow-black/60 max-lg:mt-2">
+      <p className="rounded-md bg-gradient-to-r from-black/80 via-[#5a1414]/55 to-black/80 px-3 py-1.5 chat-line text-[#d9b8b8] shadow shadow-black/60 max-lg:mt-2">
         <span className="mr-2 text-xs text-muted">{time}</span>
         <strong className="mr-2 text-xs font-bold tracking-wide text-foreground uppercase">
           {message.character_name} sussurra a {message.recipient || "tutti"}
@@ -1300,7 +1319,7 @@ function MessageRow({
             className="h-7 w-7 shrink-0 object-contain"
           />
         )}
-        <span className="min-w-0 truncate font-serif text-lg leading-tight font-semibold tracking-wide text-[#d4b394] uppercase">
+        <span className="min-w-0 truncate font-serif chat-name leading-tight font-semibold tracking-wide uppercase">
           {message.character_name}
           {to}
         </span>
@@ -1385,13 +1404,19 @@ function Highlighted({ text, names }: { text: string; names?: string[] }) {
 }
 
 // Evidenzia il parlato scritto tra < > o «caporali» (le virgolette " " restano testo normale)
+// e i tag tra [ ]: non sono parlato, solo un'indicazione in piu' (luogo, tono, a chi...)
 function FormattedText({ text, names }: { text: string; names?: string[] }) {
-  // Con il gruppo di cattura, le parti del parlato finiscono agli indici dispari
-  const parts = text.split(/(<[^>]*>|«[^»]*»)/g);
+  // Con il gruppo di cattura, parlato e tag finiscono agli indici dispari
+  const parts = text.split(/(<[^>]*>|«[^»]*»|\[[^\]]*\])/g);
   return (
     <>
       {parts.map((part, i) =>
-        i % 2 === 1 ? (
+        i % 2 === 1 && part.startsWith("[") ? (
+          // colore dei tag scelto in "Aspetto della chat"
+          <span key={i} className="chat-tag">
+            <Highlighted text={part} names={names} />
+          </span>
+        ) : i % 2 === 1 ? (
           // colore del parlato scelto nelle Opzioni della scheda; sul cellulare in corsivo
           <span
             key={i}

@@ -18,7 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 // Colori proposti per il testo della chat (si puo' anche scegliere un colore libero)
-const SPEECH_COLORS = [
+export const SPEECH_COLORS = [
   "#fde68a",
   "#f0c75e",
   "#ffffff",
@@ -27,7 +27,7 @@ const SPEECH_COLORS = [
   "#f4a3a3",
   "#d7b8ff",
 ];
-const ACTION_COLORS = [
+export const ACTION_COLORS = [
   "#e4dfdb",
   "#ffffff",
   "#c9c2bc",
@@ -358,7 +358,7 @@ function SoundPicker({
   );
 }
 
-function ColorPicker({
+export function ColorPicker({
   label,
   colors,
   value,
