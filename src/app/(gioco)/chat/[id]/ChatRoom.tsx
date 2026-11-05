@@ -1200,7 +1200,7 @@ function MessageRow({
               <span className="shrink-0 text-xs text-[#b8bec0]">{time}</span>
             </span>
           </div>
-          <p className="chat-text whitespace-pre-line">
+          <p className="chat-text text-justify whitespace-pre-line">
             <FormattedText text={message.content} names={myNames} />
           </p>
         </div>
