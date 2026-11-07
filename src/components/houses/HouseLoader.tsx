@@ -27,7 +27,7 @@ export default function HouseLoader({ houseId }: { houseId: string }) {
       supabase.from("houses").select("*").eq("id", houseId).single(),
       supabase.from("house_roles").select("*").eq("house_id", houseId).order("sort_order").order("name"),
       supabase.from("house_npcs").select("*").eq("house_id", houseId).order("sort_order").order("name"),
-      supabase.from("characters").select("id, name, status, avatar_url, house_role_id").eq("house_id", houseId).order("name"),
+      supabase.from("characters").select("id, name, status, avatar_url, house_role_id, sex").eq("house_id", houseId).order("name"),
       supabase.from("house_family_members").select("*").eq("house_id", houseId).order("sort_order").order("name"),
       supabase.from("house_family_relations").select("*").eq("house_id", houseId).order("created_at"),
       supabase.from("house_npcs").select("*"),

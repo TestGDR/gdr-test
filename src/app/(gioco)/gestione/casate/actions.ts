@@ -125,6 +125,7 @@ export async function saveHouseRole(input: {
   id?: string;
   house_id: string;
   name: string;
+  name_female?: string | null; // nome per i PG donna (vuoto = come name)
   daily_salary: number;
   sort_order: number;
   signup_available: boolean;
@@ -140,6 +141,9 @@ export async function saveHouseRole(input: {
 
   const name = input.name.trim().replace(/\s+/g, " ");
   if (name.length < 2 || name.length > 40) return { error: "Il nome del ruolo deve avere tra 2 e 40 caratteri." };
+  const nameFemale = (input.name_female ?? "").trim().replace(/\s+/g, " ");
+  if (nameFemale && (nameFemale.length < 2 || nameFemale.length > 40))
+    return { error: "Il nome al femminile deve avere tra 2 e 40 caratteri." };
   const salary = Math.trunc(Number(input.daily_salary));
   if (!Number.isFinite(salary) || salary < 0 || salary > 1_000_000) {
     return { error: "Lo stipendio deve essere un numero tra 0 e 1.000.000." };
@@ -168,6 +172,7 @@ export async function saveHouseRole(input: {
 
   const row = {
     name,
+    name_female: nameFemale && nameFemale !== name ? nameFemale : null,
     daily_salary: salary,
     sort_order: Math.trunc(input.sort_order) || 0,
     signup_available: signup,

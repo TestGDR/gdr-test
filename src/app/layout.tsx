@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Lora, Mukta, Open_Sans } from "next/font/google";
+import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
 
 // Titoli, sezioni e nomi: Cinzel. Tutti gli altri testi: Open Sans (sans-serif
@@ -13,6 +14,9 @@ const chat = Mukta({ variable: "--font-chat", subsets: ["latin"], weight: ["400"
 export const metadata: Metadata = {
   title: "Westeros GDR",
   description: "Gioco di ruolo play by chat amatoriale ambientato a Westeros",
+  // app installabile: il manifest e' in app/manifest.ts; questi servono a iPhone e iPad
+  appleWebApp: { capable: true, title: "Westeros GDR", statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
@@ -25,7 +29,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="it" className={`${title.variable} ${body.variable} ${lora.variable} ${chat.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+      <body className="flex min-h-full flex-col font-sans">
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

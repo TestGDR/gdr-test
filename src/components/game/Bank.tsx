@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { roleNameFor } from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
 
 type Account = {
@@ -10,7 +11,8 @@ type Account = {
   pocket: number; // in tasca
   status: "bozza" | "revisione" | "attivo";
   last_salary_on: string | null;
-  house_role: { name: string; daily_salary: number } | null;
+  sex: string | null;
+  house_role: { name: string; name_female: string | null; daily_salary: number } | null;
 };
 type Movement = { id: number; amount: number; kind: string; description: string; balance_after: number; created_at: string };
 type Recipient = { id: string; label: string };
@@ -32,7 +34,7 @@ export default function Bank() {
     const { data: session } = await supabase.auth.getSession();
     const { data: pg } = await supabase
       .from("characters")
-      .select("id, name, coins, pocket, status, last_salary_on, house_role:house_roles(name, daily_salary)")
+      .select("id, name, coins, pocket, status, last_salary_on, sex, house_role:house_roles(name, name_female, daily_salary)")
       .eq("owner_id", session.session?.user.id ?? "")
       .order("created_at")
       .limit(1)
@@ -107,7 +109,7 @@ export default function Bank() {
           ) : salary > 0 ? (
             <>
               <p className="font-serif text-2xl text-foreground">{salary}</p>
-              <p className="text-xs text-muted">al giorno · {account.house_role?.name}</p>
+              <p className="text-xs text-muted">al giorno · {roleNameFor(account.house_role, account.sex)}</p>
               <p className={`text-xs ${paidToday ? "text-green-300" : "text-amber-200"}`}>
                 {paidToday ? "Ritirato oggi" : "Si ritira al prossimo accesso"}
               </p>

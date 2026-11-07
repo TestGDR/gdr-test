@@ -17,6 +17,7 @@ import {
   type HouseRole,
   type RelationKind,
   type SignupRole,
+  roleNameBoth,
 } from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
 import RichEditor from "@/components/guide/RichEditor";
@@ -242,7 +243,7 @@ function AssignPgView({ houses, roles, pgs }: { houses: House[]; roles: HouseRol
                 <option value="">Senza ruolo</option>
                 {houseRoles.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name}
+                    {roleNameBoth(r)}
                     {r.max_members !== null ? ` (${taken(r.id)}/${r.max_members})` : ""}
                   </option>
                 ))}
@@ -633,6 +634,7 @@ function RoleRow({
   const { run, pending, feedback } = useAction();
   const [form, setForm] = useState({
     name: role?.name ?? "",
+    nameFemale: role?.name_female ?? "",
     salary: String(role?.daily_salary ?? 0),
     order: String(role?.sort_order ?? 0),
     signup: role?.signup_available ?? false,
@@ -653,6 +655,7 @@ function RoleRow({
           id: role?.id,
           house_id: houseId,
           name: form.name,
+          name_female: form.nameFemale,
           daily_salary: Number(form.salary),
           sort_order: Number(form.order),
           signup_available: form.signup,
@@ -677,8 +680,9 @@ function RoleRow({
 
   return (
     <form onSubmit={save} className={`rounded-md border p-3 ${role ? "border-border/60" : "border-dashed border-accent/50"}`}>
-      <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_6rem_auto]">
-        <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={role ? "" : "Nuovo ruolo (es. Maestro d'armi)"} maxLength={40} className="input py-1.5" aria-label="Nome del ruolo" />
+      <div className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_6rem_auto]">
+        <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={role ? "" : "Nuovo ruolo (es. Principe)"} maxLength={40} className="input py-1.5" aria-label="Nome del ruolo" title="Nome del ruolo (per i PG uomo, e per tutti se il nome al femminile è vuoto)" />
+        <input value={form.nameFemale} onChange={(e) => set({ nameFemale: e.target.value })} placeholder="Al femminile (es. Principessa)" maxLength={40} className="input py-1.5" aria-label="Nome al femminile" title="Nome del ruolo per i PG donna. Vuoto = lo stesso nome per tutti" />
         <input type="number" min={0} max={1000000} value={form.salary} onChange={(e) => set({ salary: e.target.value })} className="input py-1.5" aria-label="Stipendio giornaliero" />
         <input type="number" value={form.order} onChange={(e) => set({ order: e.target.value })} className="input py-1.5" aria-label="Ordine" />
         <div className="flex gap-2">
@@ -1311,7 +1315,7 @@ function NpcForm({
           <option value="">— Nessun ruolo —</option>
           {roles.map((r) => (
             <option key={r.id} value={r.id}>
-              {r.name} ({r.daily_salary}/giorno)
+              {roleNameBoth(r)} ({r.daily_salary}/giorno)
             </option>
           ))}
         </select>
@@ -1380,7 +1384,7 @@ function MembersTab({ house, roles, members }: { house: House; roles: HouseRole[
             <option value="">— Nessun ruolo —</option>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.name} ({r.daily_salary}/giorno)
+                {roleNameBoth(r)} ({r.daily_salary}/giorno)
               </option>
             ))}
           </select>
@@ -1408,7 +1412,7 @@ function MembersTab({ house, roles, members }: { house: House; roles: HouseRole[
               <option value="">— Nessun ruolo —</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} ({r.daily_salary}/giorno)
+                  {roleNameBoth(r)} ({r.daily_salary}/giorno)
                 </option>
               ))}
             </select>

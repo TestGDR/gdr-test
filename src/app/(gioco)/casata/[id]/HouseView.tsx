@@ -13,6 +13,8 @@ import {
   type House,
   type HouseNpc,
   type HouseRole,
+  roleNameBoth,
+  roleNameFor,
 } from "@/lib/houses";
 
 export type HouseMemberPg = {
@@ -21,6 +23,7 @@ export type HouseMemberPg = {
   status: "bozza" | "revisione" | "attivo";
   avatar_url: string | null;
   house_role_id: string | null;
+  sex?: string | null; // il nome del ruolo cambia per le donne (es. Principessa)
 };
 
 type Props = {
@@ -85,7 +88,7 @@ export default function HouseView({ house, roles, npcs, members, family, relatio
                         {m.name} <span className="text-foreground">{house.name}</span>
                       </span>
                       <span className="block text-xs text-muted">
-                        {roles.find((r) => r.id === m.house_role_id)?.name ?? "Senza ruolo"}
+                        {roleNameFor(roles.find((r) => r.id === m.house_role_id), m.sex) ?? "Senza ruolo"}
                         {m.status !== "attivo" && " · PG non attivo"}
                       </span>
                     </span>
@@ -107,7 +110,7 @@ export default function HouseView({ house, roles, npcs, members, family, relatio
                 return (
                   <li key={r.id} className="py-2">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-serif text-foreground">{r.name}</span>
+                      <span className="font-serif text-foreground">{roleNameBoth(r)}</span>
                       <span className="text-xs text-muted">
                         {r.daily_salary} monete/giorno
                         {r.signup_available && r.max_members !== null && ` · ${pgs.length + pngs.length}/${r.max_members} posti`}

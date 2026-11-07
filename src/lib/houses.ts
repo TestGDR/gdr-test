@@ -14,6 +14,7 @@ export type HouseRole = {
   id: string;
   house_id: string;
   name: string;
+  name_female?: string | null; // nome per i PG donna (es. "Principessa"); vuoto = come name
   daily_salary: number;
   sort_order: number;
   // disponibilita' all'iscrizione (creazione del PG)
@@ -25,6 +26,21 @@ export type HouseRole = {
   can_build: boolean; // chi ha questo ruolo costruisce strutture nei feudi della casata
   description?: string; // indicazioni sul BG e note OFF su come giocarlo
 };
+
+// Nome del ruolo per il sesso del personaggio: "Principe" / "Principessa".
+// Senza nome al femminile (o senza sesso) resta il nome del ruolo
+export function roleNameFor(
+  role: { name: string; name_female?: string | null } | null | undefined,
+  sex: string | null | undefined,
+) {
+  if (!role) return null;
+  return sex === "donna" && role.name_female ? role.name_female : role.name;
+}
+
+// Tutti e due i nomi, per gli elenchi dei ruoli: "Principe / Principessa"
+export function roleNameBoth(role: { name: string; name_female?: string | null }) {
+  return role.name_female && role.name_female !== role.name ? `${role.name} / ${role.name_female}` : role.name;
+}
 
 // Una riga di signup_house_roles(): ruolo che un PG puo' scegliere all'iscrizione
 export type SignupRole = {

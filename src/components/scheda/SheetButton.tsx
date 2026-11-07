@@ -26,6 +26,7 @@ import { formatBirth, validBirth } from "@/lib/game-date";
 import { RULES } from "@/lib/rules/config";
 import { useStats } from "@/lib/rules/useStats";
 import { createClient } from "@/lib/supabase/client";
+import { roleNameFor } from "@/lib/houses";
 import type { Character } from "@/lib/types";
 import CreationWizard from "./CreationWizard";
 import Affections from "./Affections";
@@ -132,7 +133,7 @@ export function SheetContent({
       supabase
         .from("characters")
         .select(
-          "*, house:houses(name, sigil_url), house_role:house_roles(name)",
+          "*, house:houses(name, sigil_url), house_role:house_roles(name, name_female)",
         )
         .eq("id", characterId)
         .single<Character>()
@@ -716,7 +717,7 @@ function CoverPage({
         {character.house && (
           <p className="mt-1 text-sm tracking-[0.18em] text-[#d8c39a] uppercase">
             Casata {character.house.name}
-            {character.house_role && <> · {character.house_role.name}</>}
+            {character.house_role && <> · {roleNameFor(character.house_role, character.sex)}</>}
           </p>
         )}
       </div>
@@ -860,7 +861,7 @@ function DataPage({
     );
 
   const fullName = fullNameOf(character);
-  const subtitle = [character.house_role?.name, character.house?.name ? `di casa ${character.house.name}` : null]
+  const subtitle = [roleNameFor(character.house_role, character.sex), character.house?.name ? `di casa ${character.house.name}` : null]
     .filter(Boolean)
     .join(" ");
   const section = (icon: string, title: string) => (
@@ -930,7 +931,7 @@ function DataPage({
             <div className="sm:pl-6">
               {section("nobilta", "Nobiltà")}
               <PaperRow label="Casata" value={<span className="font-semibold text-[#8b1d14]">{character.house?.name ?? "—"}</span>} />
-              <PaperRow label="Ruolo in casata" value={character.house_role?.name ?? "—"} />
+              <PaperRow label="Ruolo in casata" value={roleNameFor(character.house_role, character.sex) ?? "—"} />
               <PositionRow characterId={character.id} />
               <div className="mt-3">{section("legami", "Legami")}</div>
               <PaperRow label="Stato civile" wrap value={<MaritalValue character={character} />} />

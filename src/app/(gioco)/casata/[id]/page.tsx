@@ -24,7 +24,7 @@ export default async function CasataPage({ params }: PageProps<"/casata/[id]">) 
     supabase.from("house_npcs").select("*").eq("house_id", id).order("sort_order").order("name"),
     supabase
       .from("characters")
-      .select("id, name, status, avatar_url, house_role_id")
+      .select("id, name, status, avatar_url, house_role_id, sex")
       .eq("house_id", id)
       .order("name"),
     supabase.from("house_family_members").select("*").eq("house_id", id).order("sort_order").order("name"),

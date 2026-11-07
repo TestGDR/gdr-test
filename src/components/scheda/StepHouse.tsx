@@ -6,6 +6,7 @@ import {
   houseAgeTaken,
   type CreationData,
 } from "@/lib/character-creation";
+import { roleNameFor } from "@/lib/houses";
 import { createClient } from "@/lib/supabase/client";
 
 type SignupRole = {
@@ -35,7 +36,8 @@ type Props = {
 };
 
 // Casata del ruolo scelto (serve al blocco Drago e al riepilogo)
-function useRoleHouse(roleId: string | undefined) {
+// (il nome del ruolo segue il sesso scelto: "Principe" / "Principessa")
+function useRoleHouse(roleId: string | undefined, sex: string | null | undefined) {
   const supabase = useMemo(() => createClient(), []);
   const [info, setInfo] = useState<{
     roleId: string;
@@ -47,10 +49,11 @@ function useRoleHouse(roleId: string | undefined) {
     if (!roleId) return;
     supabase
       .from("house_roles")
-      .select("name, house_id, house:houses(name)")
+      .select("name, name_female, house_id, house:houses(name)")
       .eq("id", roleId)
       .maybeSingle<{
         name: string;
+        name_female: string | null;
         house_id: string;
         house: { name: string } | null;
       }>()
@@ -61,12 +64,12 @@ function useRoleHouse(roleId: string | undefined) {
                 roleId,
                 house_id: data.house_id,
                 house: data.house?.name ?? "",
-                role: data.name,
+                role: roleNameFor(data, sex) ?? data.name,
               }
             : null,
         ),
       );
-  }, [supabase, roleId]);
+  }, [supabase, roleId, sex]);
   return roleId && info?.roleId === roleId ? info : null;
 }
 
@@ -212,7 +215,7 @@ export function StepHouse({ data, update }: Props) {
 // ---------------------------------------------------------------------
 export function StepDragon({ data, update }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const house = useRoleHouse(data.house_role_id);
+  const house = useRoleHouse(data.house_role_id, data.sex);
   const [dragons, setDragons] = useState<{
     house: string;
     list: FreeDragon[];
@@ -318,7 +321,7 @@ export function StepDragon({ data, update }: Props) {
 
 // Riepilogo
 export function HouseSummary({ data }: { data: CreationData }) {
-  const house = useRoleHouse(data.house_role_id);
+  const house = useRoleHouse(data.house_role_id, data.sex);
   return (
     <div>
       <dt className="text-xs text-muted uppercase">Casata e ruolo</dt>

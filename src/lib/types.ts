@@ -52,7 +52,7 @@ export type Character = {
   house_role_id?: string | null;
   // presenti solo quando la query li richiede
   house?: { name: string; sigil_url: string | null } | null;
-  house_role?: { name: string } | null;
+  house_role?: { name: string; name_female?: string | null } | null;
 };
 
 export type GameMap = {
