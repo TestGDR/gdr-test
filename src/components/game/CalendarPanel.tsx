@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
+import type { CountersApi } from "@/components/game/counters";
 
 type GameEvent = {
   id: string;
@@ -390,36 +390,11 @@ function EventForm({
 }
 
 // Eventi creati da altri dopo l'ultima apertura del calendario: l'icona si accende
-export function useEventsUnseen(userId: string, viewing: boolean) {
-  const supabase = useMemo(() => createClient(), []);
-  const [unseen, setUnseen] = useState(false);
-  const check = useCallback(async () => {
-    const { data: seen } = await supabase.from("events_seen").select("seen_at").eq("user_id", userId).maybeSingle();
-    let q = supabase
-      .from("events")
-      .select("id", { count: "exact", head: true })
-      .or(`created_by.is.null,created_by.neq.${userId}`)
-      .gt("starts_at", new Date(Date.now() - 86_400_000).toISOString());
-    if (seen?.seen_at) q = q.gt("created_at", seen.seen_at as string);
-    const { count, error } = await q;
-    return !error && (count ?? 0) > 0;
-  }, [supabase, userId]);
-  useEffect(() => {
-    const ch = supabase
-      .channel(`eventi-nuovi:${userId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "events" }, () => {
-        check().then(setUnseen);
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, check]);
-  useEffect(() => {
-    if (!viewing) check().then(setUnseen);
-  }, [viewing, check]);
-  useResync(() => {
-    if (!viewing) check().then(setUnseen);
-  });
-  return { unseen: unseen && !viewing, clear: useCallback(() => setUnseen(false), []) };
+// (il valore arriva con gli altri contatori: useCounters, una richiesta sola)
+export function useEventsUnseen(viewing: boolean, c: CountersApi) {
+  const { patch } = c;
+  return {
+    unseen: c.data.events && !viewing,
+    clear: useCallback(() => patch({ events: false }), [patch]),
+  };
 }

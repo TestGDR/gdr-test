@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
 import type { MainCharacter } from "@/lib/main-character";
+import type { CountersApi } from "@/components/game/counters";
 
 type Absence = {
   id: string;
@@ -21,63 +21,14 @@ const day = (d: string) =>
 
 // Assenze degli altri: nuove (il simbolo lampeggia) e ancora in corso o future
 // (resta colorato finche' ce ne sono). Si aggiorna in tempo reale
-export function useAbsencesUnseen(userId: string, viewing: boolean) {
+// I numeri arrivano con gli altri contatori (useCounters, una richiesta sola)
+export function useAbsencesUnseen(userId: string, viewing: boolean, c: CountersApi) {
   const supabase = useMemo(() => createClient(), []);
-  const [count, setCount] = useState(0);
-  const [active, setActive] = useState(0);
-
-  const fetchCounts = useCallback(async () => {
-    const [{ data: seen }, open] = await Promise.all([
-      supabase.from("absences_seen").select("seen_at").eq("user_id", userId).maybeSingle(),
-      supabase
-        .from("absences")
-        .select("id", { count: "exact", head: true })
-        .neq("author_id", userId)
-        .gte("to_date", today()),
-    ]);
-    let q = supabase
-      .from("absences")
-      .select("id", { count: "exact", head: true })
-      .neq("author_id", userId)
-      .gte("to_date", today());
-    if (seen) q = q.gt("created_at", seen.seen_at);
-    const { count: fresh } = await q;
-    return { fresh: fresh ?? 0, open: open.count ?? 0 };
-  }, [supabase, userId]);
-
-  const refresh = useCallback(() => {
-    fetchCounts().then((c) => {
-      setCount(c.fresh);
-      setActive(c.open);
-    });
-  }, [fetchCounts]);
-
-  useEffect(() => {
-    const ch = supabase
-      .channel(`assenze:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "absences" }, () => refresh())
-      .subscribe();
-    // a mezzanotte le assenze finite smettono di contare: si riconta ogni 10 minuti
-    const t = setInterval(refresh, 600_000);
-    return () => {
-      clearInterval(t);
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, refresh]);
-
-  useResync(refresh);
-
-  // chiuso il pannello si riconta
-  useEffect(() => {
-    fetchCounts().then((c) => {
-      setCount(viewing ? 0 : c.fresh);
-      setActive(c.open);
-    });
-  }, [viewing, fetchCounts]);
+  const { patch } = c;
 
   // Pannello aperto: tutte le assenze sono viste (ora dell'ultima, orologio del server)
   const markSeen = useCallback(async () => {
-    setCount(0);
+    patch({ absences_new: 0 });
     const { data: last } = await supabase
       .from("absences")
       .select("created_at")
@@ -85,9 +36,9 @@ export function useAbsencesUnseen(userId: string, viewing: boolean) {
       .limit(1)
       .maybeSingle();
     if (last) await supabase.from("absences_seen").upsert({ user_id: userId, seen_at: last.created_at });
-  }, [supabase, userId]);
+  }, [supabase, userId, patch]);
 
-  return { count: viewing ? 0 : count, active, markSeen };
+  return { count: viewing ? 0 : c.data.absences_new, active: c.data.absences_active, markSeen };
 }
 
 // Assenze: ognuno segna le proprie, tutti vedono quelle in corso e future

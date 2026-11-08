@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import Modal from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
 import { when } from "./forum-data";
+import type { CountersApi } from "@/components/game/counters";
 
 export type Highlight = {
   post_id: string;
@@ -18,46 +18,22 @@ export type Highlight = {
 
 // Post segnalati dallo staff che chi guarda non ha ancora visto.
 // Si aggiorna in tempo reale quando qualcuno segnala un post
-export function useForumHighlights(userId: string) {
+// (l'elenco arriva con gli altri contatori: useCounters, una richiesta sola)
+export function useForumHighlights(c: CountersApi) {
   const supabase = useMemo(() => createClient(), []);
-  const [items, setItems] = useState<Highlight[]>([]);
-
-  const refresh = useCallback(
-    () =>
-      supabase.rpc("forum_pending_highlights").then(({ data, error }) => {
-        if (!error) setItems((data as Highlight[] | null) ?? []);
-      }),
-    [supabase],
-  );
-
-  useEffect(() => {
-    refresh();
-    const ch = supabase
-      .channel(`forum-segnalati:${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "forum_posts" },
-        // segnalato o tolto (le modifiche ai testi sono rare: si ricontrolla comunque)
-        () => refresh(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, refresh]);
-
-  useResync(refresh);
+  const { data, patch, refresh } = c;
+  const items = data.highlights;
 
   // letta o chiusa: non torna piu'
   const markSeen = useCallback(
     async (ids: string[]) => {
-      setItems((x) => x.filter((h) => !ids.includes(h.post_id)));
+      patch({ highlights: items.filter((h) => !ids.includes(h.post_id)) });
       if (ids.length)
         await supabase
           .from("forum_highlight_seen")
           .upsert(ids.map((post_id) => ({ post_id })), { ignoreDuplicates: true });
     },
-    [supabase],
+    [supabase, items, patch],
   );
 
   return { items, refresh, markSeen };

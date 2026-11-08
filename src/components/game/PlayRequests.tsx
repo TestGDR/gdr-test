@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
 import type { MainCharacter } from "@/lib/main-character";
 import { Avatar, type Contact } from "./MessagesModal";
+import type { CountersApi } from "@/components/game/counters";
 
 type PlayRequest = {
   id: string;
@@ -34,66 +34,16 @@ function romeToDate(day: string, hm: string) {
 
 // Richieste di gioco nuove (non ancora viste), aggiornate in tempo reale:
 // finche' ce n'e' qualcuna l'icona lampeggia
-export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
+// Ricerche gioco degli altri: nuove (il simbolo lampeggia) e ancora aperte.
+// I numeri arrivano con gli altri contatori (useCounters, una richiesta sola)
+export function usePlayRequestsUnseen(userId: string, viewing: boolean, c: CountersApi) {
   const supabase = useMemo(() => createClient(), []);
-  const [count, setCount] = useState(0);
-  const [active, setActive] = useState(0); // ricerche ancora aperte (anche gia' lette)
-
-  // ricerche degli altri non ancora scadute
-  const fetchActive = useCallback(async () => {
-    const { count } = await supabase
-      .from("play_requests")
-      .select("id", { count: "exact", head: true })
-      .neq("author_id", userId)
-      .gt("ends_at", new Date().toISOString());
-    return count ?? 0;
-  }, [supabase, userId]);
-
-  const fetchCount = useCallback(async () => {
-    const { data: seen } = await supabase.from("play_requests_seen").select("seen_at").eq("user_id", userId).maybeSingle();
-    let q = supabase
-      .from("play_requests")
-      .select("id", { count: "exact", head: true })
-      .neq("author_id", userId)
-      .gt("ends_at", new Date().toISOString());
-    if (seen) q = q.gt("created_at", seen.seen_at);
-    const { count } = await q;
-    return count ?? 0;
-  }, [supabase, userId]);
-
-  const refresh = useCallback(() => {
-    fetchCount().then(setCount);
-    fetchActive().then(setActive);
-  }, [fetchCount, fetchActive]);
-
-  // nuove, tolte o cambiate: si riconta; ogni 2 minuti per quelle che scadono da sole
-  useEffect(() => {
-    const ch = supabase
-      .channel(`ricerca-gioco:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "play_requests" }, () => refresh())
-      .subscribe();
-    const t = setInterval(() => fetchActive().then(setActive), 120_000);
-    return () => {
-      clearInterval(t);
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, fetchCount, fetchActive, refresh]);
-
-  useResync(() => {
-    if (!viewing) refresh();
-    else fetchActive().then(setActive);
-  });
-
-  // chiuso il pannello si riconta (il segno di "visto" e' gia' salvato)
-  useEffect(() => {
-    if (!viewing) fetchCount().then(setCount);
-    fetchActive().then(setActive);
-  }, [viewing, fetchCount, fetchActive]);
+  const { patch } = c;
 
   // Pannello aperto: tutte le richieste sono viste. Il segno e' l'ora dell'ultima
   // richiesta (orologio del server), cosi' un orologio del computer sbagliato non conta
   const markSeen = useCallback(async () => {
-    setCount(0);
+    patch({ requests_new: 0 });
     const { data: last } = await supabase
       .from("play_requests")
       .select("created_at")
@@ -101,10 +51,10 @@ export function usePlayRequestsUnseen(userId: string, viewing: boolean) {
       .limit(1)
       .maybeSingle();
     if (last) await supabase.from("play_requests_seen").upsert({ user_id: userId, seen_at: last.created_at });
-  }, [supabase, userId]);
+  }, [supabase, userId, patch]);
 
   // mentre il pannello e' aperto non lampeggia
-  return { count: viewing ? 0 : count, active, markSeen };
+  return { count: viewing ? 0 : c.data.requests_new, active: c.data.requests_active, markSeen };
 }
 
 // Prima cosa: tutte le ricerche gioco inserite. "Nuova ricerca gioco" apre il modulo

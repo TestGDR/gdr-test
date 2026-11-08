@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
+import type { CountersApi } from "@/components/game/counters";
 
 type Roll = {
   id: string;
@@ -804,21 +805,8 @@ function DiceSettings() {
 }
 
 // Per chi approva i pettegolezzi: quanti sono in attesa (l'icona si accende).
-// Si ricontrolla ogni 30 secondi e quando si chiude il pannello
-export function useGossipPending(canReview: boolean, panelOpen: boolean) {
-  const supabase = useMemo(() => createClient(), []);
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!canReview || panelOpen) return;
-    const check = () =>
-      supabase
-        .from("gossip_reports")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "attesa")
-        .then(({ count }) => setCount(count ?? 0));
-    check();
-    const t = setInterval(check, 30_000);
-    return () => clearInterval(t);
-  }, [supabase, canReview, panelOpen]);
-  return canReview ? count : 0;
+// Si aggiorna in tempo reale (con un piccolo ritardo per risparmiare richieste)
+// (il numero arriva con gli altri contatori: useCounters, una richiesta sola)
+export function useGossipPending(canReview: boolean, c: CountersApi) {
+  return canReview ? c.data.gossip : 0;
 }

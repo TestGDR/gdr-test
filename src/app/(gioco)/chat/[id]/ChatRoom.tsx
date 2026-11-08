@@ -99,17 +99,39 @@ export default function ChatRoom({
       );
     setHidden((n as number | null) ?? 0);
   }, [supabase, roomId]);
+  // Solo entrate e uscite di QUESTA chat (non gli aggiornamenti che ogni messaggio
+  // di ogni chat fa su chat_presence); piu' avvisi ravvicinati = una sola rilettura.
+  // Il controllo periodico (chi esce da solo dopo un'ora) solo a scheda visibile.
   useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => {
+      if (pending) return;
+      pending = setTimeout(() => {
+        pending = null;
+        loadPresence();
+      }, 1500);
+    };
     const channel = supabase
       .channel(`presenti:${roomId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_presence" },
-        () => loadPresence(),
+        { event: "INSERT", schema: "public", table: "chat_presence", filter: `room_id=eq.${roomId}` },
+        soon,
+      )
+      // le uscite non si possono filtrare: arriva la chiave della riga, si guarda la chat
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_presence" },
+        (payload) => {
+          if ((payload.old as { room_id?: string }).room_id === roomId) soon();
+        },
       )
       .subscribe();
-    const t = setInterval(loadPresence, 60_000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") loadPresence();
+    }, 180_000);
     return () => {
+      if (pending) clearTimeout(pending);
       supabase.removeChannel(channel);
       clearInterval(t);
     };

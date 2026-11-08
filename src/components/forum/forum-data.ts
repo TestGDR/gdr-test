@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
+import { createContext } from "react";
 
 export type ForumCategory = { id: string; name: string; sort_order: number };
 export type ForumSection = {
@@ -62,38 +54,6 @@ export const when = (iso: string) =>
     minute: "2-digit",
   });
 
-// Quante discussioni hanno interventi nuovi: l'icona del forum si accende.
-// Si aggiorna in tempo reale quando qualcuno scrive
-export function useForumUnread(userId: string) {
-  const supabase = useMemo(() => createClient(), []);
-  const [count, setCount] = useState(0);
-
-  const refresh = useCallback(
-    () =>
-      supabase.rpc("forum_unread").then(({ data, error }) => {
-        if (!error) setCount(((data as Unread[] | null) ?? []).length);
-      }),
-    [supabase],
-  );
-
-  useEffect(() => {
-    refresh();
-    const ch = supabase
-      .channel(`forum:${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "forum_posts" },
-        () => refresh(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, refresh]);
-
-  useResync(refresh);
-
-  return { count, refresh };
-}
-
+// Quante discussioni hanno interventi nuovi (l'icona del forum si accende):
+// il numero arriva con gli altri contatori del gioco (components/game/counters.ts)
 export const ForumUnreadContext = createContext(0);

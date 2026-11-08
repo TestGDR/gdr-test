@@ -25,7 +25,7 @@ import { AVAILABILITY_COOKIE, type Availability } from "@/lib/availability";
 import GameDateLabel from "./GameDateLabel";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
-import { useResync } from "@/lib/use-resync";
+import { useCounters, type CountersApi } from "./counters";
 import { useNewVersion } from "./new-version";
 import { everyEvenInBackground, playEvent, playMessageChime } from "@/lib/notify-sound";
 import { applyPrefs, cachedPrefs, loadPrefs } from "@/lib/prefs";
@@ -72,7 +72,7 @@ import MarketPanel from "./MarketPanel";
 import GossipPanel, { useGossipPending } from "./GossipPanel";
 import { useIdleLogout } from "./idle-logout";
 import Forum from "@/components/forum/Forum";
-import { ForumUnreadContext, useForumUnread } from "@/components/forum/forum-data";
+import { ForumUnreadContext } from "@/components/forum/forum-data";
 import { HighlightsModal, useForumHighlights } from "@/components/forum/ForumHighlights";
 import { useNewsUnseen } from "./news-unseen";
 import Tickets from "./Tickets";
@@ -236,12 +236,15 @@ export default function GameShell({
   // quella chat finche' non si usa "Esci dalla chat" (o passa un'ora senza scrivere)
   const [playing, setPlaying] = useState<{ id: string; label: string } | null>(null);
   const characterId = character?.id ?? null;
+  // Si rilegge solo all'avvio e uscendo da una chat (non a ogni cambio di pagina);
+  // la giocata scade da sola un'ora dopo l'ultima azione
   useEffect(() => {
     if (chatId || !characterId) return;
     let stale = false;
+    let expire: ReturnType<typeof setTimeout> | undefined;
     supabase
       .from("chat_presence")
-      .select("room_id, room:rooms(name)")
+      .select("room_id, last_active_at, room:rooms(name)")
       .eq("character_id", characterId)
       .gt("last_active_at", new Date(Date.now() - 60 * 60_000).toISOString())
       .order("last_active_at", { ascending: false })
@@ -252,11 +255,16 @@ export default function GameShell({
         const room = data?.room as { name?: string } | { name?: string }[] | null | undefined;
         const name = Array.isArray(room) ? room[0]?.name : room?.name;
         setPlaying(data ? { id: data.room_id as string, label: name ?? "" } : null);
+        if (data) {
+          const left = Date.parse(data.last_active_at as string) + 60 * 60_000 - Date.now();
+          expire = setTimeout(() => setPlaying(null), Math.max(0, Math.min(left, 2_147_000_000)));
+        }
       });
     return () => {
       stale = true;
+      clearTimeout(expire);
     };
-  }, [supabase, chatId, characterId, pathname]);
+  }, [supabase, chatId, characterId]);
   const placeChat = chatId ?? playing?.id ?? null;
   const shownArea: Area = area ?? (playing ? { title: playing.label } : { title: "Westeros" });
   const online = usePresence({
@@ -294,7 +302,10 @@ export default function GameShell({
     };
   }, [supabase, pendingId, router]);
 
-  const unread = useUnread(character?.id ?? null);
+  // Tutti i contatori (missive, OFF, ticket, forum, notizie, eventi, assenze,
+  // ricerche gioco, pettegolezzi) con una richiesta sola: vedi counters.ts
+  const counters = useCounters(userId, character?.id ?? null, canReviewGossip);
+  const unread = useUnread(counters);
   // Gravidanze: controllo giornaliero dei sintomi (e parto) al primo accesso del giorno
   const tickId = character?.status === "attivo" ? character.id : null;
   // non a ogni caricamento di pagina: al massimo una volta ogni mezz'ora
@@ -308,10 +319,10 @@ export default function GameShell({
   // Pannelli aperti (anche piu' d'uno insieme): 0 = chiuso; a ogni apertura il numero sale e il pannello si ricarica
   const [panels, setPanels] = useState<Partial<Record<Panel, number>>>({});
   const panelOpen = (p: Panel) => (panels[p] ?? 0) > 0;
-  const playRequests = usePlayRequestsUnseen(userId, panelOpen("ricerca"));
-  const absences = useAbsencesUnseen(userId, panelOpen("assenze"));
+  const playRequests = usePlayRequestsUnseen(userId, panelOpen("ricerca"), counters);
+  const absences = useAbsencesUnseen(userId, panelOpen("assenze"), counters);
   const absencesInfo = useMemo(() => ({ count: absences.count, active: absences.active }), [absences.count, absences.active]);
-  const tickets = useTicketUnread(userId);
+  const tickets = useTicketUnread(counters);
   const [ticketsOpen, setTicketsOpen] = useState(0); // 0 = chiuso; a ogni apertura si ricarica
   // dalla scheda di un PG: Missiva OFF / Missiva ON verso di lui
   const sheetActions = useMemo(() => ({ message: (kind: MessageKind, to: Contact) => openMessages(kind, to) }), []);
@@ -324,10 +335,10 @@ export default function GameShell({
   }, [supabase, userId]);
   const idle = useIdleLogout(); // uscita automatica dopo 60 minuti di inattivita'
   const newVersion = useNewVersion(); // il sito e' stato aggiornato mentre la pagina era aperta
-  const forumUnread = useForumUnread(userId);
-  const highlights = useForumHighlights(userId); // post segnalati dallo staff non ancora visti
+  const forumUnread = useMemo(() => ({ count: counters.data.forum, refresh: counters.refresh }), [counters.data.forum, counters.refresh]);
+  const highlights = useForumHighlights(counters); // post segnalati dallo staff non ancora visti
   const [forumTarget, setForumTarget] = useState<{ thread: string } | null>(null);
-  const gossipPending = useGossipPending(canReviewGossip, panelOpen("voci")); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
+  const gossipPending = useGossipPending(canReviewGossip, counters); // pettegolezzi da approvare // discussioni con interventi nuovi: l'icona del forum si accende
   // Avviso a schermo quando arriva una risposta a un ticket: resta finche' non lo si chiude
   const [ticketSeenCount, setTicketSeenCount] = useState(tickets.count);
   const [ticketToast, setTicketToast] = useState(false);
@@ -337,8 +348,8 @@ export default function GameShell({
     else if (tickets.count === 0) setTicketToast(false);
   }
   const ticketCtx = useMemo(() => ({ count: tickets.count, open: () => setTicketsOpen((n) => n + 1) }), [tickets.count]);
-  const news = useNewsUnseen(userId, panelOpen("notizie-on") ? "on" : panelOpen("notizie-off") ? "off" : null);
-  const events = useEventsUnseen(userId, panelOpen("calendario"));
+  const news = useNewsUnseen(userId, panelOpen("notizie-on") ? "on" : panelOpen("notizie-off") ? "off" : null, counters);
+  const events = useEventsUnseen(panelOpen("calendario"), counters);
   const openPanel = (p: Panel) => {
     setPanels((x) => ({ ...x, [p]: (x[p] ?? 0) + 1 }));
     setDrawerOpen(false); // su cellulare il menu si richiude: resta la finestra
@@ -1192,79 +1203,14 @@ const QuillIcon = () => (
 );
 
 // Messaggi non letti per tipo, aggiornati in tempo reale
-function useUnread(characterId: string | null) {
-  const supabase = useMemo(() => createClient(), []);
+// Missive e messaggi OFF da leggere: arrivano con gli altri contatori (useCounters)
+function useUnread(c: CountersApi) {
   const pathname = usePathname(); // cambiando pagina il titolo torna quello di base: si rimette il numero
-  const [counts, setCounts] = useState<Record<MessageKind, number>>({ missiva: 0, off: 0 });
-  const nextDelivery = useRef<string | null>(null); // prossimo cartiglio in arrivo
-
-  const fetchCounts = useCallback(async (): Promise<Record<MessageKind, number>> => {
-    const count = (kind: MessageKind) =>
-      supabase
-        .from("private_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", characterId)
-        .eq("kind", kind)
-        .is("read_at", null)
-        .then(({ count }) => count ?? 0);
-    const [scrolls, off, offShared] = await Promise.all([
-      // missive: cartigli gia' consegnati e ancora sigillati; prossima consegna in arrivo
-      supabase
-        .rpc("scrolls_unread", { p_character: characterId })
-        .then(({ data }) => ((data as { unread: number; next_delivery: string | null }[] | null) ?? [])[0] ?? { unread: 0, next_delivery: null }),
-      count("off"),
-      supabase.rpc("off_unread", { p_character: characterId }).then(({ data }) => (data as number | null) ?? 0),
-    ]);
-    nextDelivery.current = scrolls.next_delivery;
-    return { missiva: scrolls.unread, off: off + offShared };
-  }, [supabase, characterId]);
-
-  const refresh = useCallback(() => {
-    fetchCounts().then(setCounts);
-  }, [fetchCounts]);
-  useResync(() => {
-    if (characterId) refresh();
-  });
-
-  useEffect(() => {
-    if (!characterId) return;
-    fetchCounts().then(setCounts);
-    const ch = supabase
-      .channel(`unread:${characterId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "private_messages", filter: `recipient_id=eq.${characterId}` },
-        () => refresh(),
-      )
-      // letto da un altro dispositivo o da un'altra scheda
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "private_messages", filter: `recipient_id=eq.${characterId}` },
-        () => refresh(),
-      )
-      // gruppi e messaggi a tutti
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_group_messages" }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "off_group_members" }, () => refresh())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_broadcasts" }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "system_messages", filter: `character_id=eq.${characterId}` }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "off_broadcast_reads", filter: `character_id=eq.${characterId}` }, () => refresh())
-      // un cartiglio e' partito per me: si conta all'ora di consegna
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "scroll_notices", filter: `character_id=eq.${characterId}` }, () => refresh())
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, characterId, fetchCounts, refresh]);
-
-  // Cartiglio in arrivo: all'ora di consegna l'icona delle missive si accende
-  const [deliveryTick, setDeliveryTick] = useState(0);
-  useEffect(() => {
-    const next = nextDelivery.current;
-    if (!next) return;
-    const wait = Math.max(0, Date.parse(next) - Date.now()) + 1500;
-    const timer = setTimeout(() => fetchCounts().then((c) => (setCounts(c), setDeliveryTick((t) => t + 1))), Math.min(wait, 2_147_000_000));
-    return () => clearTimeout(timer);
-  }, [counts, deliveryTick, fetchCounts]);
+  const counts = useMemo<Record<MessageKind, number>>(
+    () => ({ missiva: c.data.missive, off: c.data.off }),
+    [c.data.missive, c.data.off],
+  );
+  const refresh = c.refresh;
 
   // Avviso sonoro: subito quando arriva un messaggio (il suono scelto per le missive
   // o per gli OFF), poi ogni 15 secondi finche' resta qualcosa da leggere.
@@ -1344,27 +1290,10 @@ function TicketButton({ className, tip, caption }: { className: string; tip?: bo
   );
 }
 
-function useTicketUnread(userId: string) {
-  const supabase = useMemo(() => createClient(), []);
-  const [count, setCount] = useState(0);
-  const fetchCount = useCallback(
-    () => supabase.rpc("ticket_unread_ids").then(({ data }) => ((data as unknown[] | null) ?? []).length),
-    [supabase],
-  );
-  const refresh = useCallback(() => {
-    fetchCount().then(setCount);
-  }, [fetchCount]);
-  useEffect(() => {
-    fetchCount().then(setCount);
-    const ch = supabase
-      .channel(`ticket-da-leggere:${userId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages" }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => refresh())
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId, fetchCount, refresh]);
+// Ticket con risposte da leggere: arrivano con gli altri contatori (useCounters)
+function useTicketUnread(c: CountersApi) {
+  const count = c.data.tickets;
+  const refresh = c.refresh;
 
   // risposta nuova a un ticket: suona (l'icona lampeggia finche' non si apre il ticket)
   const previous = useRef(0);

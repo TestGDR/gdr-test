@@ -32,9 +32,15 @@ export type OnlinePlayer = {
 
 export type PresencePayload = Omit<OnlinePlayer, "live">;
 
-const HEARTBEAT_MS = 60_000; // ogni quanto si lascia il segnale nel database
-const POLL_MS = 20_000; // ogni quanto si rilegge chi ha dato segnale di recente
+// Richieste al database tenute basse (consumi di Supabase): il "dal vivo" arriva
+// dal canale in tempo reale, il database serve solo per chi non e' collegato adesso.
+// Battito e rilettura partono solo con la scheda in primo piano.
+const HEARTBEAT_MS = 5 * 60_000; // ogni quanto si lascia il segnale nel database
+const POLL_MS = 2 * 60_000; // ogni quanto si rilegge chi ha fatto un'azione nell'ultima ora
+const RECENT_MIN_GAP_MS = 30_000; // riletture per entrate e uscite: al massimo una ogni 30 s
+const TOUCH_DEBOUNCE_MS = 1_500; // cambio di pagina: un solo segnale con titolo e posto gia' giusti
 const RETRY_MS = 4_000; // dopo quanto si ricrea il collegamento in tempo reale caduto
+const visible = () => typeof document === "undefined" || document.visibilityState === "visible";
 
 // Dati arrivati da altri browser: completati con valori neutri se mancano
 function normalize(
@@ -103,6 +109,30 @@ export function usePresence(me: PresencePayload, invisible = false) {
     [supabase],
   );
 
+  // Rilettura "presto" (entrate, uscite, ritorno sulla scheda): al massimo una ogni
+  // 30 secondi; se ne arrivano altre nel frattempo, una sola alla fine dell'attesa
+  const lastRecent = useRef(0);
+  const pendingRecent = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshRecentSoon = useCallback(
+    (delay = 1500) => {
+      if (pendingRecent.current) return;
+      const wait = Math.max(delay, lastRecent.current + RECENT_MIN_GAP_MS - Date.now());
+      pendingRecent.current = setTimeout(() => {
+        pendingRecent.current = null;
+        if (!visible()) return;
+        lastRecent.current = Date.now();
+        refreshRecent();
+      }, wait);
+    },
+    [refreshRecent],
+  );
+  useEffect(
+    () => () => {
+      if (pendingRecent.current) clearTimeout(pendingRecent.current);
+    },
+    [],
+  );
+
   // --- Tempo reale -------------------------------------------------------
   useEffect(() => {
     let disposed = false;
@@ -110,6 +140,7 @@ export function usePresence(me: PresencePayload, invisible = false) {
     const ch = supabase.channel("online", {
       config: { presence: { key: me.userId } },
     });
+    let keys = "";
     ch.on("presence", { event: "sync" }, () => {
       // Una voce per utente (con piu' schede vale l'ultima); l'id dalla chiave della presenza
       const state = ch.presenceState<Partial<OnlinePlayer>>();
@@ -118,9 +149,13 @@ export function usePresence(me: PresencePayload, invisible = false) {
           normalize(key, entries[entries.length - 1], true),
         ),
       );
-      // Qualcuno e' entrato o uscito: rileggo presto anche i segnali (chi ha chiuso il
-      // sito ha appena spento il suo), cosi' l'uscita si vede subito
-      setTimeout(refreshRecent, 1500);
+      // Qualcuno e' entrato o uscito (non un semplice cambio di pagina): rileggo
+      // anche i segnali, chi ha chiuso il sito ha appena spento il suo
+      const now = Object.keys(state).sort().join(",");
+      if (now !== keys) {
+        if (keys) refreshRecentSoon();
+        keys = now;
+      }
     }).subscribe((status) => {
       if (disposed) return;
       if (
@@ -146,25 +181,35 @@ export function usePresence(me: PresencePayload, invisible = false) {
       setChannel(null);
       supabase.removeChannel(ch);
     };
-  }, [supabase, me.userId, refreshRecent, attempt]);
+  }, [supabase, me.userId, refreshRecentSoon, attempt]);
 
   // --- Segnale nel database ----------------------------------------------
   useEffect(() => {
-    const beat = (action = false) =>
+    const beat = () =>
       supabase.rpc("touch_online", {
         p_info: JSON.parse(latest.current),
-        p_action: action,
+        p_action: false,
       });
-    const loadRecent = refreshRecent;
+    const loadRecent = () => {
+      lastRecent.current = Date.now();
+      return refreshRecent();
+    };
 
-    beat(true).then(loadRecent); // aprire o aggiornare la pagina e' un'azione
-    const beatTimer = setInterval(() => beat(), HEARTBEAT_MS);
-    const pollTimer = setInterval(loadRecent, POLL_MS);
+    // all'apertura: subito la lista (il segnale con l'azione lo manda l'effetto del posto)
+    loadRecent();
+    const beatTimer = setInterval(() => visible() && beat(), HEARTBEAT_MS);
+    const pollTimer = setInterval(() => visible() && loadRecent(), POLL_MS);
 
-    // Tornando sulla scheda o quando torna la rete: subito segnale, annuncio e lista aggiornata
+    // Tornando sulla scheda o quando torna la rete: annuncio e lista aggiornata
+    // (la lista al massimo ogni 30 secondi: il "focus" capita spesso)
+    let lastBack = 0;
     const onBack = () => {
       if (document.visibilityState !== "visible") return;
-      beat().then(loadRecent);
+      if (Date.now() - lastBack > RECENT_MIN_GAP_MS) {
+        lastBack = Date.now();
+        beat();
+        refreshRecentSoon(0);
+      }
       const ch = supabase
         .getChannels()
         .find((c) => c.topic === "realtime:online");
@@ -181,7 +226,7 @@ export function usePresence(me: PresencePayload, invisible = false) {
       document.removeEventListener("visibilitychange", onBack);
       window.removeEventListener("online", onBack);
     };
-  }, [supabase, refreshRecent]);
+  }, [supabase, refreshRecent, refreshRecentSoon]);
 
   // Ogni volta che cambio posto, frase, disponibilita'... aggiorno subito cio' che vedono
   // gli altri. Cambiare pagina o frase e' un'azione: tiene presenti per un'altra ora.
@@ -189,11 +234,18 @@ export function usePresence(me: PresencePayload, invisible = false) {
     if (invisible) channel?.untrack();
     else channel?.track(JSON.parse(payload));
   }, [channel, payload, invisible]);
+  // Nel database un solo segnale per cambio di pagina: il titolo del posto arriva
+  // un attimo dopo l'indirizzo, si aspetta che sia tutto pronto
   useEffect(() => {
-    supabase.rpc("touch_online", {
-      p_info: JSON.parse(payload),
-      p_action: true,
-    });
+    const t = setTimeout(
+      () =>
+        supabase.rpc("touch_online", {
+          p_info: JSON.parse(payload),
+          p_action: true,
+        }),
+      TOUCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(t);
   }, [supabase, payload]);
 
   return useMemo(() => {
