@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 // Versione del sito pubblicata adesso: chi ha la pagina aperta da prima di un
-// aggiornamento la confronta con la sua e vede "Aggiorna"
-export const dynamic = "force-dynamic";
+// aggiornamento la confronta con la sua e vede "Aggiorna".
+// È statica: la prepara il build di ogni pubblicazione (niente chiamate alle funzioni).
 
 export function GET() {
   return NextResponse.json(

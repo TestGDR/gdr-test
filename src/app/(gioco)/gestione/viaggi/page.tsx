@@ -19,7 +19,7 @@ export default async function ViaggiPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <GameArea title="Viaggi" />
-      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
+      <Link prefetch={false} href="/gestione" className="text-sm text-muted hover:text-accent">
         ← Gestione
       </Link>
       <h1 className="mt-1 mb-5 font-serif text-3xl tracking-wide text-accent">Viaggi</h1>

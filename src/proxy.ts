@@ -62,7 +62,16 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
   matcher: [
-    // Tutto tranne file statici, immagini e suoni (e i file dell'app installabile)
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/|maps/|sounds/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp3|wav|ogg)$).*)",
+    {
+      // Tutto tranne file statici, immagini e suoni (e i file dell'app installabile),
+      // il controllo della versione e i prefetch: ogni richiesta che passa da qui
+      // è una chiamata alle funzioni di Vercel
+      source:
+        "/((?!_next/static|_next/image|api/versione|favicon.ico|manifest.webmanifest|sw.js|icons/|maps/|sounds/|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|mp3|mp4|wav|ogg|woff|woff2|ttf|json|txt|xml)$).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
   ],
 };

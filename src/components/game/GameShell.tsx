@@ -1414,7 +1414,7 @@ function ManageButton({ canManage, className, caption }: { canManage: boolean; c
   const [denied, setDenied] = useState(false);
   if (canManage)
     return (
-      <Link href="/gestione" className={className} aria-label="Gestione">
+      <Link prefetch={false} href="/gestione" className={className} aria-label="Gestione">
         <GearIcon />
         {caption && <Caption>{caption}</Caption>}
       </Link>
@@ -1549,7 +1549,7 @@ function RightRail({
 
         {/* Zona ON game: il mondo di gioco */}
         <RailZone>On game</RailZone>
-        <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
+        <Link prefetch={false} href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />
           <RailCaption>Mappa</RailCaption>
         </Link>
@@ -1675,7 +1675,7 @@ function DesktopTopBar({
             <span className="sr-only">Aggiorna</span>
           </button>
           {canManage && (
-            <Link href="/gestione" className={action} title="Gestione">
+            <Link prefetch={false} href="/gestione" className={action} title="Gestione">
               <GearIcon />
               <span className="sr-only">Gestione</span>
             </Link>

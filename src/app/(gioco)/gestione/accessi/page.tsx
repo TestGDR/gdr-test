@@ -65,13 +65,13 @@ export default async function AccessiPage({ searchParams }: PageProps<"/gestione
   const header = (
     <>
       <GameArea title="Registro accessi" />
-      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
+      <Link prefetch={false} href="/gestione" className="text-sm text-muted hover:text-accent">
         ← Gestione
       </Link>
       <h1 className="font-serif text-3xl text-accent">Registro accessi</h1>
       <nav className="flex gap-1 border-b border-border">
         {TABS.map(([id, label]) => (
-          <Link
+          <Link prefetch={false}
             key={id}
             href={id === "accessi" ? "/gestione/accessi" : "/gestione/accessi?vista=attivita"}
             aria-current={view === id ? "page" : undefined}

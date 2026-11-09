@@ -18,7 +18,7 @@ export default async function Header() {
           <GuideButton book="ambientazione" label="Ambientazione" />
         </div>
         {user && (
-          <Link href="/mappa" className="text-accent hover:underline sm:absolute sm:right-4">
+          <Link prefetch={false} href="/mappa" className="text-accent hover:underline sm:absolute sm:right-4">
             Entra nel gioco →
           </Link>
         )}

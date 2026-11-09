@@ -55,7 +55,7 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
       {allMaps.length > 1 && (
         <nav className="mb-3 flex flex-wrap justify-center gap-2 text-xs">
           {allMaps.map((m) => (
-            <Link
+            <Link prefetch={false}
               key={m.id}
               href={`/mappa?id=${m.id}`}
               className={`rounded border px-2 py-1 ${m.id === map.id ? "border-accent text-accent" : "border-border text-muted hover:text-accent"}`}

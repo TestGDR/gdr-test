@@ -803,7 +803,7 @@ export default function ChatRoom({
               {busyIn && (
                 <p className="border border-[#f0c75e]/50 bg-[#f0c75e]/10 px-3 py-2 text-sm text-[#f0c75e]">
                   Hai una giocata in corso in{" "}
-                  <Link
+                  <Link prefetch={false}
                     href={`/chat/${busyIn.roomId}`}
                     className="font-semibold underline hover:text-accent"
                   >
@@ -1548,7 +1548,7 @@ function PresenceBar({
       </Modal>
       {/* nessun PNG da portare: si creano in Gestione -> PNG */}
       {canNpc && npcs.length === 0 && !present.some((p) => p.isNpc) && (
-        <Link
+        <Link prefetch={false}
           href="/gestione/png"
           className="shrink-0 border border-dashed border-border px-2 py-0.5 text-xs text-muted transition hover:border-accent hover:text-accent"
           title="Non ci sono PNG in anagrafe: creane uno in Gestione → PNG"

@@ -20,7 +20,7 @@ export default async function SospesoPage({ searchParams }: PageProps<"/sospeso"
         </p>
       )}
       <p className="mt-6 text-sm text-muted">Per chiarimenti contatta lo staff.</p>
-      <Link href="/" className="btn-ghost mt-8 inline-block">
+      <Link prefetch={false} href="/" className="btn-ghost mt-8 inline-block">
         Torna alla home
       </Link>
     </div>
