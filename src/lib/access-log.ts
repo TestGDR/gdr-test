@@ -88,6 +88,8 @@ async function checkIp(
   return info;
 }
 
+let warnedNoKey = false; // avviso di configurazione mancante gia' scritto
+
 // Registra un accesso. Non lancia mai errori: un problema nel registro
 // non deve impedire all'utente di giocare.
 export async function logAccess(params: {
@@ -101,7 +103,9 @@ export async function logAccess(params: {
 
   const admin = createAdminClient();
   if (!admin) {
-    console.warn("SUPABASE_SECRET_KEY mancante: registro accessi disattivato");
+    // configurazione mancante: lo si scrive una volta sola, non a ogni accesso
+    if (!warnedNoKey) console.error("Registro accessi disattivato: manca SUPABASE_SECRET_KEY");
+    warnedNoKey = true;
     return;
   }
 
@@ -118,8 +122,9 @@ export async function logAccess(params: {
       provider: info?.provider ?? null,
       risk: info?.risk ?? null,
     });
-    if (error) console.error("Registro accessi:", error.message);
+    // solo il tipo di errore: niente IP, utente o altri dati del giocatore
+    if (error) console.error("Registro accessi non salvato:", error.code ?? "errore");
   } catch (e) {
-    console.error("Registro accessi:", e);
+    console.error("Registro accessi non salvato:", e instanceof Error ? e.name : "errore");
   }
 }

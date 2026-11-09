@@ -1,7 +1,7 @@
 "use client";
 
 import PrefetchLink from "@/components/ui/PrefetchLink";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MainCharacter } from "@/lib/main-character";
 import { createClient } from "@/lib/supabase/client";
 
@@ -90,12 +90,19 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
       .then(({ data }) => setRooms((data ?? []) as { room_id: string; room_name: string; location_name: string }[]));
   }, [supabase, me.id, travel]);
 
-  // il tempo che manca si aggiorna da solo; all'arrivo si ricarica
+  // il tempo che manca si aggiorna da solo; all'arrivo si ricarica (al massimo
+  // 3 volte per viaggio: se il database non lo chiude subito, non si insiste)
+  const arrivalReloads = useRef<{ id: number; n: number }>({ id: 0, n: 0 });
   useEffect(() => {
     if (!travel) return;
     const timer = setInterval(() => {
       setNow(Date.now());
-      if (Date.parse(travel.arrive_at) + 70_000 < Date.now()) load().then((r) => (setHere(r.here), setTravel(r.travel)));
+      if (Date.parse(travel.arrive_at) + 70_000 >= Date.now()) return;
+      const r = arrivalReloads.current;
+      if (r.id !== travel.id) arrivalReloads.current = { id: travel.id, n: 0 };
+      if (arrivalReloads.current.n >= 3) return;
+      arrivalReloads.current.n += 1;
+      load().then((res) => (setHere(res.here), setTravel(res.travel)));
     }, 15_000);
     return () => clearInterval(timer);
   }, [travel, load]);

@@ -24,6 +24,8 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
+let warnedNoSmtp = false; // avviso di configurazione mancante gia' scritto
+
 // Email di benvenuto con il riepilogo dei dati di accesso.
 // La password NON viene inclusa: e' salvata solo come hash e un'email resta per sempre
 // nella casella di posta (e in chiaro sui server intermedi).
@@ -34,7 +36,9 @@ export async function sendWelcomeEmail(params: {
 }) {
   const transport = createTransport();
   if (!transport) {
-    console.warn("SMTP non configurato: email di benvenuto non inviata");
+    // configurazione mancante: lo si scrive una volta sola
+    if (!warnedNoSmtp) console.error("Email di benvenuto disattivate: SMTP non configurato");
+    warnedNoSmtp = true;
     return;
   }
 
@@ -88,6 +92,7 @@ Se dimentichi la password puoi reimpostarla con "Password dimenticata?" nella fi
       html,
     });
   } catch (e) {
-    console.error("Invio email di benvenuto fallito:", e);
+    // solo il codice dell'errore: il messaggio intero puo' contenere l'indirizzo email
+    console.error("Invio email di benvenuto fallito:", (e as { code?: string })?.code ?? "errore");
   }
 }

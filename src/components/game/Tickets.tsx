@@ -118,12 +118,23 @@ export default function Tickets({
   useEffect(() => {
     refresh();
     loadSections();
+    // un messaggio nuovo cambia anche il ticket (e la lettura lo cambia di nuovo):
+    // gli avvisi ravvicinati fanno una sola rilettura dell'elenco
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => {
+      if (pending) return;
+      pending = setTimeout(() => {
+        pending = null;
+        refresh();
+      }, 1500);
+    };
     const ch = supabase
       .channel(`ticket-finestra:${me?.id ?? "staff"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => refresh())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, soon)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages" }, soon)
       .subscribe();
     return () => {
+      if (pending) clearTimeout(pending);
       supabase.removeChannel(ch);
     };
   }, [supabase, me?.id, refresh, loadSections]);

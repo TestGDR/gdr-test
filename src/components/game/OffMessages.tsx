@@ -66,6 +66,11 @@ export default function OffMessages({
   const supabase = useMemo(() => createClient(), []);
   const [dms, setDms] = useState<Dm[] | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
+  // gruppi di cui faccio parte: i messaggi degli altri gruppi non si rileggono
+  const groupIds = useRef(new Set<string>());
+  useEffect(() => {
+    groupIds.current = new Set(groups.map((g) => g.id));
+  }, [groups]);
   const [groupMsgs, setGroupMsgs] = useState<GroupMsg[]>([]);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [broadcastRead, setBroadcastRead] = useState<string | null>(null);
@@ -153,6 +158,7 @@ export default function OffMessages({
         setDms((prev) => prev?.map((m) => (m.id === row.id ? { ...m, read_at: row.read_at } : m)) ?? prev);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "off_group_messages" }, async (p) => {
+        if (!groupIds.current.has((p.new as GroupMsg).group_id)) return;
         const { data } = await supabase.from("off_group_messages").select(GROUP_MSG_SELECT).eq("id", (p.new as GroupMsg).id).maybeSingle();
         if (data) setGroupMsgs((prev) => (prev.some((m) => m.id === (data as unknown as GroupMsg).id) ? prev : [...prev, data as unknown as GroupMsg]));
       })
