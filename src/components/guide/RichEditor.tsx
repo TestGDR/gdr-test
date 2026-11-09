@@ -879,7 +879,7 @@ function ImageButton({ editor }: { editor: Editor }) {
         <div className="absolute top-9 left-0 z-50 w-72 space-y-2 rounded-md border border-border bg-panel p-3 text-xs shadow-xl shadow-black">
           <label className="block">
             <span className="mb-1 block tracking-wider text-muted uppercase">
-              Indirizzo web dell'immagine
+              Indirizzo web dell&apos;immagine
             </span>
             <input
               value={url}

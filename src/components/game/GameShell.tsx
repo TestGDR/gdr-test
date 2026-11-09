@@ -1367,9 +1367,11 @@ function useRefreshButton() {
     const chat = /^\/chat\/([^/?#]+)/.exec(pathname)?.[1];
     if (chat) {
       const { data } = await supabase.rpc("in_chat", { r: chat });
-      if (data === true) return window.location.reload();
+      // una sola richiesta al server (non tutta la pagina da capo): la chat unisce
+      // le azioni arrivate a quelle che ha gia', il testo che si sta scrivendo resta
+      if (data === true) return router.refresh();
     }
-    if (pathname === "/mappa") window.location.reload();
+    if (pathname === "/mappa") router.refresh();
     else router.push("/mappa");
   }, [router, pathname, supabase]);
 }
@@ -1414,7 +1416,7 @@ function ManageButton({ canManage, className, caption }: { canManage: boolean; c
   const [denied, setDenied] = useState(false);
   if (canManage)
     return (
-      <Link href="/gestione" className={className} aria-label="Gestione">
+      <Link prefetch={false} href="/gestione" className={className} aria-label="Gestione">
         <GearIcon />
         {caption && <Caption>{caption}</Caption>}
       </Link>
@@ -1549,7 +1551,7 @@ function RightRail({
 
         {/* Zona ON game: il mondo di gioco */}
         <RailZone>On game</RailZone>
-        <Link href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
+        <Link prefetch={false} href="/mappa" className={`${railBtn} ${active("/mappa")}`} aria-label="Mappa">
           <MapIcon />
           <RailCaption>Mappa</RailCaption>
         </Link>
@@ -1675,7 +1677,7 @@ function DesktopTopBar({
             <span className="sr-only">Aggiorna</span>
           </button>
           {canManage && (
-            <Link href="/gestione" className={action} title="Gestione">
+            <Link prefetch={false} href="/gestione" className={action} title="Gestione">
               <GearIcon />
               <span className="sr-only">Gestione</span>
             </Link>

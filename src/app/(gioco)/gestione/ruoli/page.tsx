@@ -14,7 +14,7 @@ export default async function RuoliPage() {
   return (
     <div className="mx-auto max-w-7xl">
       <GameArea title="Ruoli & Permessi" />
-      <Link href="/gestione" className="text-sm text-muted hover:text-accent">
+      <Link prefetch={false} href="/gestione" className="text-sm text-muted hover:text-accent">
         ← Gestione
       </Link>
       <h1 className="mt-1 mb-5 font-serif text-3xl tracking-wide text-accent">Ruoli & Permessi</h1>

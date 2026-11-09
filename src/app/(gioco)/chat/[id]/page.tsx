@@ -151,7 +151,7 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
         ← {room.location.name}
       </PrefetchLink>
       {/* cellulare: torna alla mappa, senza aprire la finestra del luogo */}
-      <Link
+      <Link prefetch={false}
         href={`/mappa?id=${room.location.map_id}`}
         className="flex shrink-0 items-center gap-1 text-sm text-muted hover:text-accent lg:hidden"
       >

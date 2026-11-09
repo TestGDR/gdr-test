@@ -16,7 +16,6 @@ import { isFresh } from "@/lib/chat-ttl";
 import { playEvent } from "@/lib/notify-sound";
 import { createClient } from "@/lib/supabase/client";
 import type { Character, Message, MessageKind } from "@/lib/types";
-import { combatAlerts } from "../combat-actions";
 import {
   deleteMessage,
   editMessage,
@@ -24,7 +23,7 @@ import {
   leaveChat,
   saveGame,
   setMasterMode,
-} from "../presence-actions";
+} from "../chat-db";
 import ChatCommands, { type CommandTab } from "./ChatCommands";
 import ChatAppearance from "./ChatAppearance";
 import { ChatNotepad, ChatSave, type RoomInfo } from "./ChatTools";
@@ -295,12 +294,6 @@ export default function ChatRoom({
     if (atBottom.current) scrollToEnd();
   }, [messages, scrollToEnd]);
 
-  // Avvisi di combattimento (attacchi da cui difendersi, tiro salvezza):
-  // si ricontrollano a ogni nuovo tiro in chat
-  const diceKey = messages
-    .filter((m) => m.kind === "dado")
-    .map((m) => m.id)
-    .slice(-1)[0];
   // Immagine e stemma della casata di chi ha scritto, per le schede delle azioni
   const [cast, setCast] = useState<Record<string, Who>>({});
   const writerKey = [...new Set(messages.map((m) => m.character_id))]
@@ -349,14 +342,36 @@ export default function ChatRoom({
     ? characterId
     : (actors[0]?.id ?? characterId);
   const actorKey = actors.map((a) => a.id).join(",");
+  // Avvisi di combattimento (attacchi da cui difendersi, tiro salvezza): si
+  // ricontrollano solo quando un tiro in chat riguarda uno dei miei personaggi
+  // (l'ha fatto lui o lo nomina, es. "attacca Rhaella"), non a ogni tiro di chiunque
+  const alertKey = useMemo(() => {
+    const ids = new Set(actors.map((a) => a.id));
+    const names = actors.map((a) => a.name.toLowerCase()).filter((n) => n.length >= 2);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.kind !== "dado") continue;
+      const text = m.content.toLowerCase();
+      if (ids.has(m.character_id) || names.some((n) => text.includes(n))) return m.id;
+    }
+    return null;
+  }, [messages, actors]);
+  const loadAlert = useCallback(
+    (id: string) =>
+      supabase
+        .rpc("my_combat_alert", { p_room: roomId, p_character: id })
+        .then(({ data }) => {
+          const r = (data ?? {}) as { attackers?: string[]; dying?: boolean };
+          return { id, attackers: r.attackers ?? [], dying: !!r.dying };
+        }),
+    [supabase, roomId],
+  );
   useEffect(() => {
     const ids = actorKey ? actorKey.split(",") : [];
     if (!ids.length) return;
     // avvisi per tutti i personaggi che muovo (un master puo' avere piu' PNG)
-    Promise.all(
-      ids.map((id) => combatAlerts(roomId, id).then((r) => ({ id, ...r }))),
-    ).then(setAlerts);
-  }, [roomId, actorKey, diceKey]);
+    Promise.all(ids.map(loadAlert)).then(setAlerts);
+  }, [actorKey, alertKey, loadAlert]);
 
   // Gli altri personaggi in giocata (per destinatario, Raggira e combattimento)
   const others = useMemo(
@@ -803,7 +818,7 @@ export default function ChatRoom({
               {busyIn && (
                 <p className="border border-[#f0c75e]/50 bg-[#f0c75e]/10 px-3 py-2 text-sm text-[#f0c75e]">
                   Hai una giocata in corso in{" "}
-                  <Link
+                  <Link prefetch={false}
                     href={`/chat/${busyIn.roomId}`}
                     className="font-semibold underline hover:text-accent"
                   >
@@ -1098,11 +1113,8 @@ export default function ChatRoom({
               canNpc={canNpc}
               onDone={() => {
                 setTool(null);
-                combatAlerts(roomId, actorId).then((r) =>
-                  setAlerts((list) => [
-                    ...list.filter((a) => a.id !== actorId),
-                    { id: actorId, ...r },
-                  ]),
+                loadAlert(actorId).then((r) =>
+                  setAlerts((list) => [...list.filter((a) => a.id !== actorId), r]),
                 );
               }}
             />
@@ -1548,7 +1560,7 @@ function PresenceBar({
       </Modal>
       {/* nessun PNG da portare: si creano in Gestione -> PNG */}
       {canNpc && npcs.length === 0 && !present.some((p) => p.isNpc) && (
-        <Link
+        <Link prefetch={false}
           href="/gestione/png"
           className="shrink-0 border border-dashed border-border px-2 py-0.5 text-xs text-muted transition hover:border-accent hover:text-accent"
           title="Non ci sono PNG in anagrafe: creane uno in Gestione → PNG"

@@ -60,7 +60,7 @@ export function TabDivider() {
 // Mappa: scheda-collegamento della barra in alto
 export function MapTab({ active, icon }: { active: boolean; icon: ReactNode }) {
   return (
-    <Link href="/mappa" className={tabBtn} aria-current={active ? "page" : undefined}>
+    <Link prefetch={false} href="/mappa" className={tabBtn} aria-current={active ? "page" : undefined}>
       {active && <TabBanner />}
       {icon}
       <TabLabel>Mappa</TabLabel>

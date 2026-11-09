@@ -1651,26 +1651,3 @@ export async function combatStatus(
     others: near.filter((x): x is NonNullable<typeof x> => !!x),
   };
 }
-
-// Avviso nella chat: attacchi da cui difendersi e tiro salvezza da fare
-export async function combatAlerts(roomId: string, characterId: string) {
-  const ctx = await me(characterId);
-  if ("error" in ctx) return { attackers: [] as string[], dying: false };
-  const { admin, f } = ctx;
-  const { data } = await admin
-    .from("combat_attacks")
-    .select("data")
-    .eq("room_id", roomId)
-    .eq("target_id", characterId)
-    .is("resolved_at", null);
-  return {
-    attackers: [
-      ...new Set((data ?? []).map((d) => (d.data as AttackData).attackerName)),
-    ],
-    dying:
-      !!f.c.dying_since &&
-      !f.c.stabilized_at &&
-      !f.c.dead_at &&
-      f.c.dying_save_due,
-  };
-}

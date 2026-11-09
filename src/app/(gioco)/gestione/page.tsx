@@ -259,7 +259,7 @@ export default async function GestionePage() {
               <ul className="divide-y divide-border/60">
                 {list.map((panel) => (
                   <li key={panel.href}>
-                    <Link
+                    <Link prefetch={false}
                       href={panel.href}
                       className="group block px-3 py-3 transition hover:bg-blood/10"
                     >
