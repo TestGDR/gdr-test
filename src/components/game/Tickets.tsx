@@ -197,6 +197,7 @@ export default function Tickets({
               }}
               onRead={() => {
                 setUnread((u) => {
+                  if (!u.has(view.id)) return u; // gia' letto: niente da ridisegnare
                   const n = new Set(u);
                   n.delete(view.id);
                   return n;
@@ -622,6 +623,12 @@ function TicketView({
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const id = ticket?.id;
+  // onRead arriva nuova a ogni disegno dell'elenco: la si tiene da parte, cosi'
+  // l'apertura del ticket (messaggi, "letto", tempo reale) non riparte all'infinito
+  const onReadRef = useRef(onRead);
+  useEffect(() => {
+    onReadRef.current = onRead;
+  });
 
   const loadMessages = useCallback(
     (ticketId: string) =>
@@ -637,19 +644,20 @@ function TicketView({
   // messaggi in tempo reale; aprire il ticket lo segna come letto
   useEffect(() => {
     if (!id) return;
+    const read = () => supabase.rpc("mark_ticket_read", { p_ticket: id }).then(() => onReadRef.current());
     loadMessages(id).then(setMessages);
-    supabase.rpc("mark_ticket_read", { p_ticket: id }).then(onRead);
+    read();
     const ch = supabase
       .channel(`ticket:${id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "ticket_messages", filter: `ticket_id=eq.${id}` }, () => {
         loadMessages(id).then(setMessages);
-        supabase.rpc("mark_ticket_read", { p_ticket: id }).then(onRead);
+        read();
       })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [supabase, id, loadMessages, onRead]);
+  }, [supabase, id, loadMessages]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
