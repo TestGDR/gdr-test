@@ -11,6 +11,11 @@ const result = ({ error }: { error: { message: string } | null }) =>
 
 // Entra in giocata: da qui in poi si leggono e si scrivono le azioni della chat
 export async function joinChat(roomId: string, characterId: string): Promise<{ error?: string }> {
+  const first = await supabase.rpc("join_chat", { p_room: roomId, p_character: characterId });
+  if (!first.error) return {};
+  // Appena arrivati da un viaggio: il lavoro automatico che lo chiude passa ogni
+  // 5 minuti. Si chiudono subito i propri viaggi arrivati e si riprova una volta
+  await supabase.rpc("finish_my_travels");
   return result(await supabase.rpc("join_chat", { p_room: roomId, p_character: characterId }));
 }
 

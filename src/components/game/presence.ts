@@ -230,9 +230,15 @@ export function usePresence(me: PresencePayload, invisible = false) {
 
   // Ogni volta che cambio posto, frase, disponibilita'... aggiorno subito cio' che vedono
   // gli altri. Cambiare pagina o frase e' un'azione: tiene presenti per un'altra ora.
+  // (con una breve attesa: entrando in una chat il nome arriva un attimo dopo,
+  // cosi' parte un annuncio solo invece di due; ogni annuncio arriva a TUTTI gli online)
   useEffect(() => {
-    if (invisible) channel?.untrack();
-    else channel?.track(JSON.parse(payload));
+    if (!channel) return;
+    const t = setTimeout(() => {
+      if (invisible) channel.untrack();
+      else channel.track(JSON.parse(payload));
+    }, 800);
+    return () => clearTimeout(t);
   }, [channel, payload, invisible]);
   // Nel database un solo segnale per cambio di pagina: il titolo del posto arriva
   // un attimo dopo l'indirizzo, si aspetta che sia tutto pronto

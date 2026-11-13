@@ -281,7 +281,9 @@ export default function GameShell({
     availability,
     place: placeChat ? "chat" : "mappa",
     placeKey: placeChat ? `chat:${placeChat}` : "mappa",
-    placeLabel: !chatId && playing ? playing.label : shownArea.title,
+    // il nome del posto serve solo in chat (sulla mappa si vede "Mappa"): fuori dalla
+    // chat resta vuoto, cosi' cambiare pagina non manda un annuncio a tutti gli online
+    placeLabel: !placeChat ? "" : !chatId && playing ? playing.label : shownArea.title,
   }, invisible); // invisibile: niente annuncio in tempo reale (lo vede solo chi ha il permesso)
 
   // PG in attesa di approvazione: quando arriva il messaggio di SISTEMA (approvato)

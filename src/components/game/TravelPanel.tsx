@@ -90,22 +90,26 @@ export default function TravelPanel({ me }: { me: MainCharacter }) {
       .then(({ data }) => setRooms((data ?? []) as { room_id: string; room_name: string; location_name: string }[]));
   }, [supabase, me.id, travel]);
 
-  // il tempo che manca si aggiorna da solo; all'arrivo si ricarica (al massimo
-  // 3 volte per viaggio: se il database non lo chiude subito, non si insiste)
+  // il tempo che manca si aggiorna da solo. All'arrivo il viaggio si chiude subito
+  // (finish_my_travels: senza aspettare il lavoro automatico, che passa ogni 5 minuti)
+  // e si ricarica; al massimo 3 tentativi per viaggio
   const arrivalReloads = useRef<{ id: number; n: number }>({ id: 0, n: 0 });
   useEffect(() => {
     if (!travel) return;
     const timer = setInterval(() => {
       setNow(Date.now());
-      if (Date.parse(travel.arrive_at) + 70_000 >= Date.now()) return;
+      if (Date.parse(travel.arrive_at) + 5_000 >= Date.now()) return;
       const r = arrivalReloads.current;
       if (r.id !== travel.id) arrivalReloads.current = { id: travel.id, n: 0 };
       if (arrivalReloads.current.n >= 3) return;
       arrivalReloads.current.n += 1;
-      load().then((res) => (setHere(res.here), setTravel(res.travel)));
+      supabase
+        .rpc("finish_my_travels")
+        .then(() => load())
+        .then((res) => (setHere(res.here), setTravel(res.travel)));
     }, 15_000);
     return () => clearInterval(timer);
-  }, [travel, load]);
+  }, [supabase, travel, load]);
 
   // anteprima del viaggio scelto
   useEffect(() => {
