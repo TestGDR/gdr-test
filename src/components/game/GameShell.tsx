@@ -367,6 +367,8 @@ export default function GameShell({
   // La disponibilita' resta salvata in un cookie (letto dal server al prossimo caricamento)
   // Quest Mode dello staff (menu della disponibilita')
   const quest = useQuestMode(userId);
+  // Spie: solo per chi ha il tratto (limite di spie maggiore di zero)
+  const spiesAllowed = useSpiesAllowed(character?.status === "attivo" ? character.id : null);
 
   function changeAvailability(value: Availability) {
     document.cookie = `${AVAILABILITY_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`;
@@ -379,6 +381,7 @@ export default function GameShell({
   }
 
   return (
+    <SpiesAllowedContext.Provider value={spiesAllowed}>
     <QuestContext.Provider value={quest}>
     <AreaContext.Provider value={setArea}>
       <NewsUnseenContext.Provider value={news.unseen}>
@@ -763,6 +766,7 @@ export default function GameShell({
       </NewsUnseenContext.Provider>
     </AreaContext.Provider>
     </QuestContext.Provider>
+    </SpiesAllowedContext.Provider>
   );
 }
 
@@ -1025,6 +1029,7 @@ function MobileTools({
   newRequests: number;
   inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
+  const spies = useContext(SpiesAllowedContext); // pannello Spie solo con il tratto
   return (
     <div className="space-y-3">
     {/* come la barra del computer: titolo, poi le icone per categoria, centrate */}
@@ -1055,7 +1060,7 @@ function MobileTools({
     {/* stessi pannelli della barra di destra del computer, divisi in zona ON e zona OFF, quattro per riga */}
     <p className="text-center text-[0.625rem] font-semibold tracking-[0.3em] text-[#c9a45c] uppercase">On game</p>
     <div className="grid grid-cols-4 gap-x-1 gap-y-3">
-      {zonePanels(ZONE_ON, inHouse).map((p) => (
+      {zonePanels(ZONE_ON, inHouse, spies).map((p) => (
         <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} caption={PANEL_SHORT[p.id]} />
       ))}
       {onOpenDragon && (
@@ -1068,7 +1073,7 @@ function MobileTools({
     <RailRule />
     <p className="text-center text-[0.625rem] font-semibold tracking-[0.3em] text-[#c9a45c] uppercase">Off game</p>
     <div className="grid grid-cols-4 gap-x-1 gap-y-3">
-      {zonePanels(ZONE_OFF, inHouse).map((p) => (
+      {zonePanels(ZONE_OFF, inHouse, spies).map((p) => (
         <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={drawerBtn} caption={PANEL_SHORT[p.id]} />
       ))}
     </div>
@@ -1339,14 +1344,18 @@ const PANEL_ICONS: { id: Panel; icon: ReactNode }[] = [
 // Pettegolezzi in attesa (per chi li approva): l'icona Voci si accende
 const GossipPendingContext = createContext(0);
 
-const panelsFor = (inHouse: boolean) => PANEL_ICONS.filter((p) => p.id !== "feudi" || inHouse);
+// Feudi solo per chi e' in una casata; Spie solo per chi ha il tratto delle spie
+const panelsFor = (inHouse: boolean, spies: boolean) =>
+  PANEL_ICONS.filter((p) => (p.id !== "feudi" || inHouse) && (p.id !== "spie" || spies));
+// il PG puo' avere spie (tratto delle spie): lo decide useSpiesAllowed
+const SpiesAllowedContext = createContext(false);
 
 // Le icone dei pannelli divise in due zone: quello che riguarda il gioco (ON)
 // e quello che riguarda i giocatori e la comunita' (OFF)
 const ZONE_ON: Panel[] = ["notizie-on", "voci", "viaggio", "feudi", "mercato", "spie", "timeline"];
 const ZONE_OFF: Panel[] = ["notizie-off", "forum", "ricerca", "assenze", "calendario", "faq"];
-const zonePanels = (zone: Panel[], inHouse: boolean) => {
-  const icons = panelsFor(inHouse);
+const zonePanels = (zone: Panel[], inHouse: boolean, spies: boolean) => {
+  const icons = panelsFor(inHouse, spies);
   return zone.flatMap((id) => icons.filter((p) => p.id === id));
 };
 
@@ -1530,6 +1539,7 @@ function RightRail({
   newRequests: number;
   inHouse: boolean; // appartiene a una casata: vede i Feudi
 }) {
+  const spies = useContext(SpiesAllowedContext); // pannello Spie solo con il tratto
   const pathname = usePathname();
   const refresh = useRefreshButton();
   const active = (href: string) => (pathname.startsWith(href) ? "text-accent" : "");
@@ -1557,7 +1567,7 @@ function RightRail({
           <MapIcon />
           <RailCaption>Mappa</RailCaption>
         </Link>
-        {zonePanels(ZONE_ON, inHouse).map((p) => (
+        {zonePanels(ZONE_ON, inHouse, spies).map((p) => (
           <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} caption={PANEL_SHORT[p.id]} />
         ))}
         {/* Il mio drago: solo per chi cavalca un drago */}
@@ -1572,7 +1582,7 @@ function RightRail({
         <div aria-hidden className="col-span-full h-1 max-lg:hidden" />
         <RailRule className="max-lg:hidden" />
         <RailZone>Off game</RailZone>
-        {zonePanels(ZONE_OFF, inHouse).map((p) => (
+        {zonePanels(ZONE_OFF, inHouse, spies).map((p) => (
           <PanelButton key={p.id} panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={`${railBtn} max-lg:hidden`} caption={PANEL_SHORT[p.id]} />
         ))}
       </div>
@@ -1725,8 +1735,9 @@ function DesktopLeft({
   newRequests: number;
   inHouse: boolean;
 }) {
+  const spies = useContext(SpiesAllowedContext); // pannello Spie solo con il tratto
   const status = useCharacterStatus(character?.id ?? null);
-  const offPanels = zonePanels(ZONE_OFF, inHouse);
+  const offPanels = zonePanels(ZONE_OFF, inHouse, spies);
   const gamePanels: Panel[] = ["viaggio", "feudi", "mercato", "spie", "voci", "notizie-on", "timeline"];
   return (
     <aside className="hidden w-64 shrink-0 flex-col gap-2 overflow-hidden p-2 lg:flex">
@@ -1786,7 +1797,7 @@ function DesktopLeft({
               />
             </li>
           )}
-          {zonePanels(gamePanels, inHouse).map((p) => (
+          {zonePanels(gamePanels, inHouse, spies).map((p) => (
             <li key={p.id}>
               <PanelButton panel={p.id} icon={p.icon} newRequests={newRequests} onOpen={onOpenPanel} className={listBtn} caption={SIDE_NAMES[p.id]} list />
             </li>
@@ -2030,3 +2041,33 @@ const ArchiveIcon = () => (
     <path d="M14 3v4h4M9 12h6M9 15h6M9 18h4" />
   </svg>
 );
+
+// Il PG puo' avere spie? Solo con il tratto delle spie (Gestione -> Spie): il
+// database da' 0 come limite a chi non lo ha. Copia nel browser per 5 minuti.
+function useSpiesAllowed(characterId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [allowed, setAllowed] = useState(false);
+  useEffect(() => {
+    if (!characterId) return;
+    const key = `spie:${characterId}`;
+    try {
+      const c = JSON.parse(sessionStorage.getItem(key) ?? "null") as { at: number; ok: boolean } | null;
+      if (c && Date.now() - c.at < 5 * 60_000) {
+        Promise.resolve().then(() => setAllowed(c.ok));
+        return;
+      }
+    } catch {
+      // si richiede
+    }
+    supabase.rpc("spy_limit", { p_character: characterId }).then(({ data }) => {
+      const ok = ((data as number | null) ?? 0) > 0;
+      setAllowed(ok);
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), ok }));
+      } catch {
+        // niente
+      }
+    });
+  }, [supabase, characterId]);
+  return characterId ? allowed : false;
+}

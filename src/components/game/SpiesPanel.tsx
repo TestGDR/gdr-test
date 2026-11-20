@@ -97,7 +97,7 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
       settings: {
         ...(settings.data as SpySettings),
         levels: (levels.data ?? []) as SpyLevel[],
-        limit: (limit.data as number | null) ?? 1,
+        limit: (limit.data as number | null) ?? 0,
       },
       spies: ((fresh.data ?? spies.data ?? []) as Spy[]),
       missions: (missions.data ?? []) as Mission[],
@@ -114,6 +114,13 @@ export default function SpiesPanel({ characterId }: { characterId: string }) {
   if (missing) return <p className="text-amber-200">Per le spie vanno eseguite le migrazioni 0131 e 0134 in Supabase.</p>;
   if (!data) return <p className="text-muted">Caricamento...</p>;
   const { settings: s, spies, missions } = data;
+  // Le spie sono solo per chi ha il tratto (il limite degli altri e' 0)
+  if (s.limit <= 0)
+    return (
+      <p className="py-6 text-center text-muted">
+        Le spie sono riservate ai personaggi con il tratto <strong className="text-accent">&quot;{s.trait_name}&quot;</strong>.
+      </p>
+    );
 
   async function run(op: () => PromiseLike<{ error: { message: string } | null }>, ok: string) {
     setBusy(true);

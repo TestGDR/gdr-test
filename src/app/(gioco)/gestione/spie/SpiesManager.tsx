@@ -343,7 +343,7 @@ function LevelsForm({ levels, canEdit, onSave }: { levels: SpyLevel[]; canEdit: 
 }
 
 const FIELDS: { key: keyof SpySettings; label: string }[] = [
-  { key: "max_spies", label: "Spie per personaggio" },
+  { key: "max_spies", label: "Spie per chi NON ha il tratto (0 = niente spie)" },
   { key: "max_spies_trait", label: "Spie per chi ha il tratto" },
   { key: "hours_light", label: "Ore di ricerca: superficiale" },
   { key: "hours_normal", label: "Ore di ricerca: normale" },
@@ -357,12 +357,13 @@ function RulesForm({ settings, canEdit, onSave }: { settings: SpySettings; canEd
     <div className="space-y-4">
       {!canEdit && <p className="text-sm text-muted">Per cambiare questi numeri serve il permesso &quot;Statistiche, abilità e tratti&quot;.</p>}
       <p className="text-sm text-muted">
-        Nessuno parte con una spia: si reclutano tutte. Chi ha il tratto indicato qui sotto può averne di più. Il tempo di una missione è
-        quello di una staffetta fino al luogo, più le ore della ricerca.
+        Le spie si reclutano. Chi ha il tratto indicato qui sotto può averne fino al numero &quot;per chi ha il tratto&quot;; chi non
+        ce l&apos;ha ne può avere quante indicate nel primo numero: con 0 il pannello Spie non gli compare e non può mandare missioni.
+        Il tempo di una missione è quello di una staffetta fino al luogo, più le ore della ricerca.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block space-y-1 sm:col-span-2">
-          <span className="block text-xs tracking-wide text-muted uppercase">Tratto che alza il numero di spie</span>
+          <span className="block text-xs tracking-wide text-muted uppercase">Tratto delle spie</span>
           <input value={s.trait_name} disabled={!canEdit} onChange={(e) => setS({ ...s, trait_name: e.target.value })} maxLength={60} className="input max-w-xs" />
         </label>
         {FIELDS.map((f) => (
@@ -385,7 +386,7 @@ function RulesForm({ settings, canEdit, onSave }: { settings: SpySettings; canEd
           onClick={() =>
             onSave({
               trait_name: s.trait_name.trim() || "Spie",
-              max_spies: Math.max(1, s.max_spies),
+              max_spies: Math.max(0, s.max_spies),
               max_spies_trait: Math.max(1, s.max_spies_trait),
               hours_light: s.hours_light,
               hours_normal: s.hours_normal,
