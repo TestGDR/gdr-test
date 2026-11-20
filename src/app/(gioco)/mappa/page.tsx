@@ -49,7 +49,13 @@ export default async function MappaPage({ searchParams }: PageProps<"/mappa">) {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col justify-center lg:min-h-full">
-      <GameArea title={map.name} image={map.image_url} description={map.description} weatherRegionId={map.weather_region_id} />
+      {/* meteo: con un luogo scelto quello del luogo (se ne ha uno suo), altrimenti quello della mappa */}
+      <GameArea
+        title={map.name}
+        image={map.image_url}
+        description={map.description}
+        weatherRegionId={locations.find((l) => l.id === luogo)?.weather_region_id ?? map.weather_region_id}
+      />
       {character?.status !== "attivo" && <InactiveBanner />}
 
       {allMaps.length > 1 && (

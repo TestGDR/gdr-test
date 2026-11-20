@@ -12,8 +12,9 @@ import {
   type WeatherRegion,
 } from "@/lib/weather";
 
-// Meteo di oggi. Con una regione (quella della mappa in cui ci si trova) mostra
-// quella; altrimenti si sceglie tra le regioni attive.
+// Meteo di oggi. Parte dalla regione del luogo in cui ci si trova (o della sua
+// mappa); se le regioni attive sono piu' d'una si possono vedere anche le altre
+// (i personaggi non sono tutti nello stesso posto).
 export default function WeatherView({ regionId }: { regionId: string | null }) {
   const supabase = useMemo(() => createClient(), []);
   const [regions, setRegions] = useState<WeatherRegion[] | null>(null);
@@ -47,8 +48,8 @@ export default function WeatherView({ regionId }: { regionId: string | null }) {
 
   return (
     <div className="space-y-5">
-      {/* senza una regione legata al luogo: scelta tra le regioni attive */}
-      {!regionId && regions.length > 1 && (
+      {/* piu' regioni attive: si sceglie quale vedere ("qui" = quella del luogo) */}
+      {regions.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {regions.map((r) => (
             <button
@@ -61,6 +62,7 @@ export default function WeatherView({ regionId }: { regionId: string | null }) {
               className={`border px-3 py-1 text-xs tracking-wider uppercase ${r.id === chosen ? "border-accent text-accent" : "border-border text-muted hover:text-foreground"}`}
             >
               {r.name}
+              {r.id === regionId && <span className="ml-1 normal-case opacity-70">· qui</span>}
             </button>
           ))}
         </div>

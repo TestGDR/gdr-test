@@ -138,7 +138,9 @@ export default async function ChatPage({ params }: PageProps<"/chat/[id]">) {
           .order("created_at")
       : Promise.resolve({ data: [] }),
   ]);
-  const weatherRegionId = (mapInfo?.weather_region_id as string | null) ?? null;
+  // meteo: quello del luogo della chat, se ne ha uno suo; altrimenti quello della mappa
+  const weatherRegionId =
+    (room.location.weather_region_id as string | null | undefined) ?? (mapInfo?.weather_region_id as string | null) ?? null;
 
   // Cellulare: solo "‹ Torna alla mappa" (il nome della chat e' nel menu)
   const header = (

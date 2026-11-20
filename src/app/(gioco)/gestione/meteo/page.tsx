@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { GameArea } from "@/components/game/GameShell";
 import { requirePermission } from "@/lib/staff";
-import type { GameMap } from "@/lib/types";
+import type { GameMap, Location } from "@/lib/types";
 import type { Season, WeatherRegion, WeatherSeed } from "@/lib/weather";
 import WeatherManager from "./WeatherManager";
 
 export default async function MeteoPage() {
   const { supabase } = await requirePermission("meteo.gestire");
 
-  const [regions, seeds, settings, maps] = await Promise.all([
+  const [regions, seeds, settings, maps, locations] = await Promise.all([
     supabase.from("weather_regions").select("*").order("sort_order").order("name"),
     supabase.from("weather_seeds").select("*").order("sort_order").order("name"),
     supabase.from("weather_settings").select("current_season").maybeSingle(),
     supabase.from("maps").select("*").order("sort_order").order("name"),
+    supabase.from("locations").select("id, map_id, name, kind, in_game, weather_region_id").eq("kind", "luogo").order("name"),
   ]);
 
   return (
@@ -27,6 +28,7 @@ export default async function MeteoPage() {
         seeds={(seeds.data ?? []) as WeatherSeed[]}
         season={(settings.data?.current_season ?? "autunno") as Season}
         maps={(maps.data ?? []) as GameMap[]}
+        locations={(locations.data ?? []) as Location[]}
       />
     </div>
   );

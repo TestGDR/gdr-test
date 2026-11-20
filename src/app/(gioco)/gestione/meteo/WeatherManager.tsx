@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import WeatherView from "@/components/game/WeatherView";
 import { createClient } from "@/lib/supabase/client";
-import type { GameMap } from "@/lib/types";
+import type { GameMap, Location } from "@/lib/types";
 import { CONDITIONS, PERIODS, SEASONS, condition, type Season, type WeatherHour, type WeatherRegion, type WeatherSeed } from "@/lib/weather";
 
-type Props = { regions: WeatherRegion[]; seeds: WeatherSeed[]; season: Season; maps: GameMap[] };
+type Props = { regions: WeatherRegion[]; seeds: WeatherSeed[]; season: Season; maps: GameMap[]; locations: Location[] };
 
 const TABS = [
   { id: "regioni", label: "Regioni e stagione" },
@@ -67,7 +67,7 @@ export default function WeatherManager(props: Props) {
 // ---------------------------------------------------------------------
 // Regioni, stagione attuale, regione di ogni mappa
 // ---------------------------------------------------------------------
-function RegionsTab({ regions, season, maps }: Props) {
+function RegionsTab({ regions, season, maps, locations }: Props) {
   const { supabase, run, busy, feedback } = useOp();
   const [selectedId, setSelectedId] = useState<string | null>(regions[0]?.id ?? null);
   const selected = regions.find((r) => r.id === selectedId) ?? null;
@@ -119,31 +119,80 @@ function RegionsTab({ regions, season, maps }: Props) {
       </div>
 
       <div className="space-y-2 border-t border-border pt-4">
-        <h3 className="font-serif text-lg text-accent">Regione climatica di ogni mappa</h3>
-        <p className="text-xs text-muted">Il pulsante Meteo del gioco mostra il tempo della regione della mappa in cui si trova il giocatore (anche nelle sue chat).</p>
+        <h3 className="font-serif text-lg text-accent">Regione climatica di mappe e luoghi</h3>
+        <p className="text-xs text-muted">
+          Il pulsante Meteo del gioco mostra il tempo del luogo in cui si trova il giocatore (anche nelle sue chat). Ogni
+          luogo usa la regione della sua mappa, oppure una sua: cosi&apos; luoghi lontani della stessa mappa possono avere un
+          tempo diverso. Le regioni usate devono essere attive.
+        </p>
         <ul className="divide-y divide-border/60 border border-border/60">
-          {maps.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
-              <span className="min-w-40 flex-1 font-serif">
-                {m.name}
-                {!m.active && <span className="ml-2 text-xs text-muted">(spenta)</span>}
-              </span>
-              <select
-                value={m.weather_region_id ?? ""}
-                disabled={busy}
-                onChange={(e) => run(() => supabase.from("maps").update({ weather_region_id: e.target.value || null }).eq("id", m.id), `Regione di ${m.name} salvata.`)}
-                aria-label={`Regione climatica di ${m.name}`}
-                className="input w-56! py-1"
-              >
-                <option value="">Nessuna</option>
-                {regions.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </li>
-          ))}
+          {maps.map((m) => {
+            const own = locations.filter((l) => l.map_id === m.id);
+            return (
+              <li key={m.id} className="px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="min-w-40 flex-1 font-serif">
+                    {m.name}
+                    {!m.active && <span className="ml-2 text-xs text-muted">(spenta)</span>}
+                  </span>
+                  <select
+                    value={m.weather_region_id ?? ""}
+                    disabled={busy}
+                    onChange={(e) =>
+                      run(
+                        () => supabase.rpc("set_weather_region", { p_map: m.id, p_location: null, p_region: e.target.value || null }),
+                        `Regione di ${m.name} salvata.`,
+                      )
+                    }
+                    aria-label={`Regione climatica di ${m.name}`}
+                    className="input w-56! py-1"
+                  >
+                    <option value="">Nessuna</option>
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                        {r.active ? "" : " (spenta)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {own.length > 0 && (
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+                      Luoghi di questa mappa ({own.filter((l) => l.weather_region_id).length} con un meteo proprio)
+                    </summary>
+                    <ul className="mt-1.5 space-y-1 border-l border-border/60 pl-3">
+                      {own.map((l) => (
+                        <li key={l.id} className="flex flex-wrap items-center gap-3">
+                          <span className="min-w-40 flex-1">{l.name}</span>
+                          <select
+                            value={l.weather_region_id ?? ""}
+                            disabled={busy}
+                            onChange={(e) =>
+                              run(
+                                () => supabase.rpc("set_weather_region", { p_map: null, p_location: l.id, p_region: e.target.value || null }),
+                                `Regione di ${l.name} salvata.`,
+                              )
+                            }
+                            aria-label={`Regione climatica di ${l.name}`}
+                            className="input w-56! py-1 text-xs"
+                          >
+                            <option value="">Come la mappa</option>
+                            {regions.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                                {r.active ? "" : " (spenta)"}
+                              </option>
+                            ))}
+                          </select>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>

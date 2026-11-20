@@ -77,6 +77,7 @@ export type Location = {
   has_ravens: boolean; // castello o citta': partono e arrivano i corvi
   in_game: boolean; // luogo di gioco (no per es. "Chat OFF"): conta per la posizione dei PG
   kind: "luogo" | "viaggio_terra" | "viaggio_mare"; // macroaree di viaggio: chat per chi e' in viaggio
+  weather_region_id?: string | null; // regione climatica del luogo (vuota = quella della mappa)
 };
 
 export type RoomAccess = "pubblica" | "casata" | "affitto";
